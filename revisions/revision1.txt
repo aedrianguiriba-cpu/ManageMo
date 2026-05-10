@@ -1,0 +1,24 @@
+## Admin
+
+1. New tab for condemnation and disposal of items. (The items should be listed there.)
+2. Approved/disapproved procurement requests.
+
+## User
+
+1. Item selection. The items should show detailed information, including the available quantity. If an item is currently borrowed, it should appear on the calendar showing when it will be returned. Users should also be able to reserve items.
+
+   * Availability and quantity of items should be visible.
+   * The calendar should show the return date of borrowed items.
+
+2. Procurement request. If an item is not available in the inventory/supply, the user should be able to request that the item be added by the supply department.
+
+3. Instead of only submitting a signed form from the dean.
+
+## App
+
+1. The QR code should contain complete details such as item name/model, serial number, designation, and others.
+2. Analytics (show current inventory).
+
+   * For admin: it should display the overall supply inventory.
+   * For users: it should only display the total inventory designated to their department.
+3. Delivery.
