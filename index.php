@@ -129,7 +129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
             top: 0;
             width: 50%;
             height: 100vh;
-            background: linear-gradient(135deg, #8B0000 0%, #6B0000 100%);
+            background: linear-gradient(135deg, rgba(139, 0, 0, 0.85) 0%, rgba(107, 0, 0, 0.85) 100%), url('assets/pics/storagebg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -417,39 +420,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
         }
         
         .features-list {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            margin-top: 50px;
         }
         
         .feature-item {
             display: flex;
-            gap: 16px;
-            padding: 22px;
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 10px;
-            transition: all 0.3s;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            gap: 18px;
+            padding: 18px 0;
+            padding-left: 20px;
+            background: transparent;
+            border: none;
+            border-left: 3px solid rgba(255, 255, 255, 0.4);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
         }
         
         .feature-item:hover {
-            background: rgba(255, 255, 255, 0.18);
-            transform: translateY(-3px);
-            border-color: rgba(255, 255, 255, 0.2);
+            border-left-color: rgba(255, 255, 255, 0.8);
+            padding-left: 24px;
         }
         
         .feature-icon {
             font-size: 28px;
-            min-width: 56px;
-            height: 56px;
+            min-width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.25);
-            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
             flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-item:hover .feature-icon {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(1.1);
         }
         
         .feature-icon i {
@@ -457,18 +467,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
         }
         
         .feature-text h4 {
-            margin: 0 0 6px 0;
+            margin: 0 0 5px 0;
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 600;
             color: white;
             text-align: left;
         }
         
         .feature-text p {
             margin: 0;
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.85);
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.75);
             text-align: left;
+            line-height: 1.4;
         }
         
         @media (max-width: 992px) {
