@@ -30,12 +30,13 @@ jobs:
             **.htaccess
 
       - name: Commit sync state to repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add .ftp-deploy-sync-state.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update FTP deployment state"
-          git push
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update FTP deployment state" && git push origin main)
 
       - name: Deployment Success
         run: echo "✅ Deployment to InfinityFree completed successfully!"
