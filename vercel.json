@@ -1,25 +1,10 @@
 {
-  "functions": {
-    "*.php": {
-      "runtime": "vercel-php@0.6.0"
-    },
-    "admin/**/*.php": {
-      "runtime": "vercel-php@0.6.0"
-    },
-    "user/**/*.php": {
-      "runtime": "vercel-php@0.6.0"
-    },
-    "config/**/*.php": {
-      "runtime": "vercel-php@0.6.0"
-    },
-    "includes/**/*.php": {
-      "runtime": "vercel-php@0.6.0"
-    },
-    "lib/**/*.php": {
-      "runtime": "vercel-php@0.6.0"
-    }
-  },
+  "buildCommand": "echo 'Deploying ManageMo PHP app'",
   "routes": [
+    { "src": "/css/(.*)", "dest": "/css/$1" },
+    { "src": "/js/(.*)", "dest": "/js/$1" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/(.*\\.php)$", "dest": "/$1" },
     { "src": "/(.*)", "dest": "/index.php" }
   ]
 }
