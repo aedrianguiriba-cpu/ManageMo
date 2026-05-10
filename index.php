@@ -503,7 +503,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
                     <div class="auth-card">
                         <div class="auth-header">
                             <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" alt="ManageMo Logo" class="auth-logo">
-                            <h1>Sign in tite</h1>
+                            <h1>Sign in</h1>
                         </div>
 
                         <?php if ($error && isset($_POST['login_submit'])): ?>
