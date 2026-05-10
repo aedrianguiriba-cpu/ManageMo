@@ -1,0 +1,35 @@
+# ManageMo - InfinityFree Configuration
+# Place this file in the root directory of your domain
+
+# Enable mod_rewrite if available
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    
+    # Force HTTPS (optional, uncomment if your server supports it)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Set BASE_URL to root (for InfinityFree)
+# This overrides the PHP auto-detection
+SetEnv MANAGEMO_BASE_URL "/"
+
+# Allow direct access to actual files and folders
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|woff|woff2|ttf|svg|eot)$">
+    Header set Cache-Control "max-age=604800, public"
+</FilesMatch>
+
+# PHP Configuration
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 60
+</IfModule>
+
+# Security headers (optional)
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
