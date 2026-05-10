@@ -24,6 +24,10 @@ jobs:
           server-dir: ./
           state-name: .ftp-deploy-sync-state.json
           dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/node_modules/**
+            **.htaccess
 
       - name: Deployment Success
         run: echo "✅ Deployment to InfinityFree completed successfully!"
