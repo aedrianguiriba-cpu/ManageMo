@@ -26,42 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $request_type = sanitizeInput($_POST['request_type']);
     $urgency = sanitizeInput($_POST['urgency']);
 
-    // Validate approval letter upload
-    if (empty($_FILES['approval_letter']['name'])) {
-        $error = 'An approval letter from your office/college/department head is required.';
-    } elseif ($_FILES['approval_letter']['error'] !== UPLOAD_ERR_OK) {
-        $error = 'File upload failed. Please try again.';
-    } else {
-        $allowed_types = ['application/pdf','image/jpeg','image/jpg','image/png'];
-        $allowed_ext   = ['pdf','jpg','jpeg','png'];
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime  = $finfo->file($_FILES['approval_letter']['tmp_name']);
-        $ext   = strtolower(pathinfo($_FILES['approval_letter']['name'], PATHINFO_EXTENSION));
-        $size  = $_FILES['approval_letter']['size'];
+    // Generate request number
+    $request_number = 'REQ-' . date('YmdHis') . '-' . strtoupper(substr(md5(mt_rand()), 0, 5));
 
-        if (!in_array($mime, $allowed_types) || !in_array($ext, $allowed_ext)) {
-            $error = 'Only PDF, JPG, and PNG files are accepted for the approval letter.';
-        } elseif ($size > 5 * 1024 * 1024) {
-            $error = 'The approval letter file must not exceed 5 MB.';
-        }
-    }
-
-    if (!isset($error)) {
-        // Store the uploaded file
-        $upload_dir = dirname(__DIR__) . '/assets/uploads/approval_letters/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
-        $safe_name = 'letter_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-        move_uploaded_file($_FILES['approval_letter']['tmp_name'], $upload_dir . $safe_name);
-
-        // Generate request number
-        $request_number = 'REQ-' . date('YmdHis') . '-' . strtoupper(substr(md5(mt_rand()), 0, 5));
-
-        // In hardcoded mode, just log and redirect
-        logActivity($current_user['id'], 'CREATE', "Submitted $request_type request", 'requests', rand(100, 999));
-        redirectWithMessage('requests.php', 'Request submitted successfully! Request ID: ' . $request_number, 'success');
-    }
+    // In hardcoded mode, just log and redirect
+    logActivity($current_user['id'], 'CREATE', "Submitted $request_type request", 'requests', rand(100, 999));
+    redirectWithMessage('requests.php', 'Request submitted successfully! Request ID: ' . $request_number, 'success');
 }
 
 require_once dirname(__DIR__) . '/includes/header.php';
@@ -349,33 +319,6 @@ displayMessage();
 .rq-cart-error { display:none; color:#dc2626; font-size:0.80rem; font-weight:600; margin-top:8px; padding:8px 12px; background:rgba(239,68,68,0.08); border-radius:9px; }
 .rq-sum-preview-item { display:flex; align-items:flex-start; gap:7px; padding:5px 0; }
 .rq-sum-preview-num { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:5px; background:rgba(139,0,0,0.12); color:#8B0000; font-size:0.60rem; font-weight:800; flex-shrink:0; margin-top:1px; }
-/* ── Approval letter upload ── */
-.rq-upload-area { border:2px dashed rgba(139,0,0,0.25); border-radius:14px; padding:22px 18px; text-align:center; background:rgba(139,0,0,0.025); cursor:pointer; transition:all 0.18s; position:relative; }
-.rq-upload-area:hover, .rq-upload-area.drag-over { background:rgba(139,0,0,0.06); border-color:rgba(139,0,0,0.55); }
-.rq-upload-area input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
-.rq-upload-icon { font-size:2rem; color:rgba(139,0,0,0.30); margin-bottom:8px; }
-.rq-upload-label { font-size:0.87rem; font-weight:700; color:#1a1d23; margin-bottom:3px; }
-.rq-upload-sub { font-size:0.76rem; color:rgba(0,0,0,0.42); }
-.rq-upload-preview { display:none; align-items:center; gap:12px; background:rgba(255,255,255,0.90); border:1px solid rgba(0,0,0,0.09); border-radius:12px; padding:12px 14px; margin-top:10px; }
-.rq-upload-preview-icon { width:38px; height:38px; border-radius:10px; background:rgba(139,0,0,0.09); color:#8B0000; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
-.rq-upload-preview-name { font-size:0.84rem; font-weight:700; color:#1a1d23; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
-.rq-upload-preview-size { font-size:0.72rem; color:rgba(0,0,0,0.40); }
-.rq-upload-remove { margin-left:auto; padding:4px 10px; border-radius:7px; border:none; background:rgba(239,68,68,0.09); color:#dc2626; font-size:0.72rem; font-weight:700; cursor:pointer; flex-shrink:0; }
-.rq-upload-remove:hover { background:rgba(239,68,68,0.20); }
-.rq-upload-error { display:none; color:#dc2626; font-size:0.80rem; font-weight:600; margin-top:8px; padding:8px 12px; background:rgba(239,68,68,0.08); border-radius:9px; }
-.rq-upload-view { margin-left:auto; padding:4px 10px; border-radius:7px; border:none; background:rgba(139,0,0,0.09); color:#8B0000; font-size:0.72rem; font-weight:700; cursor:pointer; flex-shrink:0; }
-.rq-upload-view:hover { background:rgba(139,0,0,0.18); }
-/* Document view modal */
-#docViewModal { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.70); display:flex; align-items:center; justify-content:center; padding:16px; visibility:hidden; opacity:0; transition:visibility 0.2s, opacity 0.2s; pointer-events:none; }
-#docViewModal.open { visibility:visible; opacity:1; pointer-events:auto; }
-.doc-modal-box { background:#fff; border-radius:18px; width:100%; max-width:780px; max-height:90vh; margin:auto; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.35); }
-.doc-modal-header { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid rgba(0,0,0,0.08); flex-shrink:0; }
-.doc-modal-title { flex:1; font-size:0.92rem; font-weight:800; color:#1a1d23; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.doc-modal-close { width:32px; height:32px; border-radius:9px; border:none; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.50); font-size:0.90rem; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.doc-modal-close:hover { background:rgba(239,68,68,0.12); color:#dc2626; }
-.doc-modal-body { flex:1; overflow:auto; background:#f4f4f4; display:flex; align-items:center; justify-content:center; min-height:300px; }
-.doc-modal-body iframe { width:100%; height:70vh; border:none; }
-.doc-modal-body img { max-width:100%; max-height:70vh; object-fit:contain; display:block; }
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -725,32 +668,6 @@ displayMessage();
                 </div>
 
                 <hr class="rq-divider">
-                <!-- ─── APPROVAL LETTER UPLOAD ─── -->
-                <div class="rq-section-title"><i class="fas fa-file-signature"></i> Approval Letter <span class="rq-req">*</span></div>
-                <p style="font-size:0.80rem;color:rgba(0,0,0,0.45);margin:-6px 0 12px;">Upload the signed approval letter from your office/college/department head. Required before your request can be submitted.</p>
-                <div class="rq-upload-area" id="upload-drop-zone">
-                    <input type="file" id="approval_letter" name="approval_letter"
-                           accept=".pdf,.jpg,.jpeg,.png"
-                           onchange="handleLetterUpload(this)">
-                    <div id="upload-placeholder">
-                        <div class="rq-upload-icon"><i class="fas fa-file-upload"></i></div>
-                        <div class="rq-upload-label">Click or drag &amp; drop to upload</div>
-                        <div class="rq-upload-sub">PDF, JPG, or PNG &nbsp;·&nbsp; Max 5 MB</div>
-                    </div>
-                </div>
-                <div class="rq-upload-preview" id="upload-preview">
-                    <div class="rq-upload-preview-icon" id="upload-preview-icon"><i class="fas fa-file-pdf"></i></div>
-                    <div style="flex:1;min-width:0;">
-                        <div class="rq-upload-preview-name" id="upload-preview-name"></div>
-                        <div class="rq-upload-preview-size" id="upload-preview-size"></div>
-                    </div>
-                    <button type="button" class="rq-upload-view" onclick="openUploadModal()"><i class="fas fa-eye me-1"></i>View</button>
-                    <button type="button" class="rq-upload-remove" onclick="removeUpload()"><i class="fas fa-times me-1"></i>Remove</button>
-                </div>
-
-                <div class="rq-upload-error" id="upload-error"></div>
-
-                <hr class="rq-divider">
                 <input type="hidden" id="items_json" name="items_json">
                 <div class="d-flex gap-2 flex-wrap">
                     <button type="submit" class="btn rq-submit-btn">
@@ -1012,89 +929,6 @@ function escHtml(str) {
     var d = document.createElement('div'); d.textContent = String(str); return d.innerHTML;
 }
 
-/* ── Approval letter upload ── */
-function handleLetterUpload(input) {
-    var file = input.files[0];
-    if (!file) return;
-    var allowed = ['application/pdf','image/jpeg','image/png'];
-    var allowedExt = ['pdf','jpg','jpeg','png'];
-    var ext = file.name.split('.').pop().toLowerCase();
-    if (!allowedExt.includes(ext)) {
-        showUploadError('Only PDF, JPG, and PNG files are accepted.'); input.value = ''; return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-        showUploadError('File must not exceed 5 MB.'); input.value = ''; return;
-    }
-    hideUploadError();
-    var icon = ext === 'pdf' ? 'fa-file-pdf' : 'fa-file-image';
-    document.getElementById('upload-preview-icon').innerHTML = '<i class="fas ' + icon + '"></i>';
-    document.getElementById('upload-preview-name').textContent = file.name;
-    document.getElementById('upload-preview-size').textContent = (file.size / 1024).toFixed(1) + ' KB';
-    document.getElementById('upload-drop-zone').style.display = 'none';
-    document.getElementById('upload-preview').style.display = 'flex';
-    // Store object URL for preview modal
-    if (window._uploadObjectURL) URL.revokeObjectURL(window._uploadObjectURL);
-    window._uploadObjectURL = URL.createObjectURL(file);
-    window._uploadFileExt   = ext;
-    window._uploadFileName  = file.name;
-}
-function openUploadModal() {
-    if (!window._uploadObjectURL) return;
-    var body   = document.getElementById('modal-file-body');
-    var title  = document.getElementById('modal-file-name');
-    var icon   = document.getElementById('modal-file-icon');
-    title.textContent = window._uploadFileName;
-    icon.innerHTML = '<i class="fas ' + (window._uploadFileExt === 'pdf' ? 'fa-file-pdf' : 'fa-file-image') + '"></i>';
-    if (window._uploadFileExt === 'pdf') {
-        body.innerHTML = '<iframe src="' + window._uploadObjectURL + '"></iframe>';
-    } else {
-        body.innerHTML = '<img src="' + window._uploadObjectURL + '" alt="Letter preview">';
-    }
-    document.getElementById('docViewModal').classList.add('open');
-    document.body.style.overflow = 'hidden';
-}
-function closeUploadModal() {
-    document.getElementById('docViewModal').classList.remove('open');
-    document.getElementById('modal-file-body').innerHTML = '';
-    document.body.style.overflow = '';
-}
-function removeUpload() {
-    var inp = document.getElementById('approval_letter');
-    inp.value = '';
-    if (window._uploadObjectURL) { URL.revokeObjectURL(window._uploadObjectURL); window._uploadObjectURL = null; }
-    document.getElementById('upload-drop-zone').style.display = '';
-    document.getElementById('upload-preview').style.display = 'none';
-}
-function showUploadError(msg) {
-    var el = document.getElementById('upload-error');
-    if (el) { el.textContent = msg; el.style.display = 'block'; }
-}
-function hideUploadError() {
-    var el = document.getElementById('upload-error');
-    if (el) el.style.display = 'none';
-}
-// Drag-and-drop
-(function() {
-    var zone = document.getElementById('upload-drop-zone');
-    if (!zone) return;
-    zone.addEventListener('dragover', function(e) { e.preventDefault(); zone.classList.add('drag-over'); });
-    zone.addEventListener('dragleave', function()  { zone.classList.remove('drag-over'); });
-    zone.addEventListener('drop', function(e) {
-        e.preventDefault(); zone.classList.remove('drag-over');
-        var dt = e.dataTransfer;
-        if (dt && dt.files.length) {
-            var inp = document.getElementById('approval_letter');
-            // Transfer files to the input
-            try {
-                var dataTransfer = new DataTransfer();
-                dataTransfer.items.add(dt.files[0]);
-                inp.files = dataTransfer.files;
-            } catch(ex) {}
-            handleLetterUpload(inp);
-        }
-    });
-})();
-
 /* ── Live summary ── */
 function updateSummary() {
     var type    = document.getElementById('request_type_hidden').value;
@@ -1143,13 +977,6 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
         document.getElementById('rq-cart-area').scrollIntoView({ behavior:'smooth', block:'center' });
         return;
     }
-    var letterInput = document.getElementById('approval_letter');
-    if (!letterInput || !letterInput.files || !letterInput.files.length) {
-        e.preventDefault();
-        showUploadError('An approval letter from your office/college/department head is required.');
-        document.getElementById('upload-drop-zone').scrollIntoView({ behavior:'smooth', block:'center' });
-        return;
-    }
     document.getElementById('items_json').value = JSON.stringify(cart);
 });
 
@@ -1184,17 +1011,5 @@ updateSummary();
     }
 <?php endif; ?>
 </script>
-
-<!-- Document view modal (outside form/card so position:fixed works correctly) -->
-<div id="docViewModal" onclick="if(event.target===this)closeUploadModal()">
-    <div class="doc-modal-box">
-        <div class="doc-modal-header">
-            <div class="rq-upload-preview-icon" id="modal-file-icon" style="width:32px;height:32px;font-size:0.95rem;"><i class="fas fa-file-pdf"></i></div>
-            <div class="doc-modal-title" id="modal-file-name"></div>
-            <button type="button" class="doc-modal-close" onclick="closeUploadModal()"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="doc-modal-body" id="modal-file-body"></div>
-    </div>
-</div>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
