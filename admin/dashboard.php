@@ -171,12 +171,8 @@ $all_requests_json = json_encode($all_requests);
 
 .adash-kpi-icon {
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; flex-shrink: 0;
-    color: #fff;
-    background: linear-gradient(135deg, var(--kpi-color, #8B0000), var(--kpi-accent, #b91c1c));
-    width: 48px; height: 48px; border-radius: 14px;
-    animation: iconBounce 2.5s ease-in-out infinite;
-    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    font-size: 1rem; flex-shrink: 0;
+    color: var(--kpi-color, #8B0000);
 }
 .adash-kpi-body { flex: 1; min-width: 0; }
 .adash-kpi-val  { font-size: 2.4rem; font-weight: 950; color: #0f172a; line-height:1; letter-spacing:-1px; }
@@ -214,11 +210,7 @@ $all_requests_json = json_encode($all_requests);
 }
 .adash-card-icon {
     display: flex; align-items: center; justify-content: center;
-    font-size: .8rem; color: #fff; flex-shrink:0;
-    background: linear-gradient(135deg, #8B0000, #b91c1c);
-    width: 38px; height: 38px; border-radius: 12px;
-    animation: iconWiggle 2s ease-in-out infinite;
-    box-shadow: 0 4px 12px rgba(139,0,0,.2);
+    font-size: .85rem; color: #8B0000; flex-shrink:0;
 }
 
 /* ── Table ── */
