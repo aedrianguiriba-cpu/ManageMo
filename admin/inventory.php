@@ -953,86 +953,64 @@ displayMessage();
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 32px;
-    padding-bottom: 0;
-    border-bottom: 1px solid rgba(0,0,0,0.08);
-    background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(59,130,246,0.02) 100%);
-    border-radius: 16px 16px 0 0;
-    padding: 8px;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding: 6px;
+    background: rgba(0,0,0,0.04);
+    border-radius: 14px;
     flex-wrap: wrap;
 }
 
 .ai-tab {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 18px;
-    color: rgba(0,0,0,0.55);
+    gap: 7px;
+    padding: 8px 14px;
+    color: rgba(0,0,0,0.50);
     text-decoration: none;
-    font-size: 0.95rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    border: none;
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 10px;
+    transition: all 0.18s ease;
     cursor: pointer;
     white-space: nowrap;
-    position: relative;
     background: transparent;
 }
 
 .ai-tab-icon {
     display: flex;
     align-items: center;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
+    font-size: 0.78rem;
 }
 
 .ai-tab-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 24px;
-    height: 24px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
     background: rgba(0,0,0,0.08);
-    color: rgba(0,0,0,0.70);
-    border-radius: 12px;
-    font-size: 0.8rem;
+    color: rgba(0,0,0,0.55);
+    border-radius: 20px;
+    font-size: 0.72rem;
     font-weight: 700;
-    margin-left: 4px;
-    transition: all 0.3s ease;
 }
 
 .ai-tab:hover {
     color: rgba(0,0,0,0.75);
-    background: rgba(0,0,0,0.06);
-}
-
-.ai-tab:hover .ai-tab-icon {
-    transform: scale(1.15);
-}
-
-.ai-tab:hover .ai-tab-badge {
-    background: rgba(0,0,0,0.12);
+    background: rgba(255,255,255,0.7);
 }
 
 .ai-tab-active {
-    color: #1d4ed8;
-    background: linear-gradient(135deg, rgba(29,78,216,0.08) 0%, rgba(59,130,246,0.06) 100%);
-    border-bottom: 3px solid #1d4ed8;
-    box-shadow: 0 4px 12px rgba(29,78,216,0.12);
-}
-
-.ai-tab-active .ai-tab-icon {
-    color: #1d4ed8;
-    transform: scale(1.1);
+    color: #8B0000;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.10);
 }
 
 .ai-tab-active .ai-tab-badge {
-    background: rgba(29,78,216,0.15);
-    color: #1d4ed8;
-    font-weight: 800;
+    background: rgba(139,0,0,0.10);
+    color: #8B0000;
 }
 </style>
 
