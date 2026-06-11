@@ -1,0 +1,15 @@
+{
+    "colleges": [],
+    "offices": {
+        "TITE": "tttttttttttt"
+    },
+    "campuses": [
+        {
+            "id": 9,
+            "name": "jhgjhgjh",
+            "location": "jhvgjhgjhgj",
+            "description": "tite",
+            "colleges": []
+        }
+    ]
+}

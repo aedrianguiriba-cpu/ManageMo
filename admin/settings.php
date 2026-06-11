@@ -42,47 +42,23 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 <style>
 /* ===== ADMIN SETTINGS ===== */
-@keyframes slideUpFade { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-@keyframes iconBounce { 0%, 100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
-@keyframes shimmer { 0% { opacity:0.6; } 50% { opacity:1; } 100% { opacity:0.6; } }
-
-.as-layout { display:flex; gap:28px; align-items:flex-start; animation:slideUpFade 0.5s ease-out; }
+.as-layout { display:flex; gap:28px; align-items:flex-start; }
 @media(max-width:768px){ .as-layout{ flex-direction:column; gap:16px; } }
 
 /* Sidebar */
 .as-sidebar { flex:0 0 280px; }
 .as-profile-card {
-    background:linear-gradient(135deg,#6b0000 0%,#8B0000 40%,#c0392b 100%);
-    border-radius:20px; padding:32px 26px 26px; text-align:center;
-    box-shadow:0 20px 48px rgba(139,0,0,0.25), 0 0 1px rgba(139,0,0,0.15);
-    margin-bottom:18px; color:#fff; position:relative; overflow:hidden;
-    border:1px solid rgba(255,255,255,0.15);
-    backdrop-filter:blur(10px);
-    transition:transform 0.3s ease, box-shadow 0.3s ease;
-}
-.as-profile-card:hover {
-    transform:translateY(-4px);
-    box-shadow:0 24px 56px rgba(139,0,0,0.32), 0 0 1px rgba(139,0,0,0.20);
-}
-.as-profile-card::before {
-    content:''; position:absolute; top:-80px; right:-80px;
-    width:200px; height:200px; border-radius:50%;
-    background:rgba(255,255,255,0.10); pointer-events:none;
-    animation:shimmer 3s ease-in-out infinite;
-}
-.as-profile-card::after {
-    content:''; position:absolute; bottom:-60px; left:-60px;
-    width:150px; height:150px; border-radius:50%;
-    background:rgba(255,255,255,0.08); pointer-events:none;
+    background:#8B0000;
+    border-radius:8px; padding:32px 26px 26px; text-align:center;
+    margin-bottom:18px; color:#fff;
+    border:1px solid #6b0000;
 }
 .as-avatar {
     width:90px; height:90px; border-radius:50%;
-    background:linear-gradient(135deg,rgba(255,255,255,0.30),rgba(255,255,255,0.10));
-    border:3px solid rgba(255,255,255,0.40);
+    background:rgba(255,255,255,0.15);
+    border:2px solid rgba(255,255,255,0.35);
     display:flex; align-items:center; justify-content:center;
     font-size:2.2rem; font-weight:900; margin:0 auto 18px; color:#fff;
-    box-shadow:0 8px 24px rgba(0,0,0,0.30), inset 0 1px 2px rgba(255,255,255,0.30);
-    animation:iconBounce 3s ease-in-out infinite;
 }
 .as-profile-name   { font-size:1.12rem; font-weight:900; margin-bottom:6px; letter-spacing:-0.3px; text-shadow:0 2px 4px rgba(0,0,0,0.15); }
 .as-profile-email  { font-size:0.75rem; opacity:0.80; margin-bottom:16px; word-break:break-all; font-weight:500; }
@@ -90,24 +66,19 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .as-profile-meta { display:flex; flex-direction:column; gap:10px; }
 .as-profile-meta-row {
     display:flex; align-items:center; gap:10px;
-    background:rgba(255,255,255,0.16); border-radius:12px;
+    background:rgba(255,255,255,0.14); border-radius:6px;
     padding:10px 14px; font-size:0.79rem; font-weight:600; text-align:left;
     border:1px solid rgba(255,255,255,0.10);
-    transition:all 0.2s ease;
-    backdrop-filter:blur(8px);
 }
 .as-profile-meta-row:hover {
-    background:rgba(255,255,255,0.22);
-    transform:translateX(4px);
+    background:rgba(255,255,255,0.20);
 }
 .as-profile-meta-row i { width:16px; text-align:center; opacity:0.90; }
-.as-role-pill { display:inline-flex; align-items:center; padding:6px 16px; border-radius:20px; font-size:0.76rem; font-weight:700; background:rgba(255,255,255,0.30); color:#fff; margin-bottom:0; border:1px solid rgba(255,255,255,0.20); }
+.as-role-pill { display:inline-flex; align-items:center; padding:6px 16px; border-radius:4px; font-size:0.76rem; font-weight:700; background:rgba(255,255,255,0.25); color:#fff; margin-bottom:0; border:1px solid rgba(255,255,255,0.20); }
 
 .as-nav {
-    background:rgba(255,255,255,0.88);
-    backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-    border:1.5px solid rgba(0,0,0,0.08); border-radius:16px;
-    box-shadow:0 8px 32px rgba(0,0,0,0.08), inset 0 1px 2px rgba(255,255,255,0.60);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
     overflow:hidden;
     display:flex;
     flex-direction:column;
@@ -126,17 +97,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .as-nav-link:last-child { border-bottom:none; }
 .as-nav-link:focus { outline:none; }
 .as-nav-link.active {
-    color:#fff; 
-    background:linear-gradient(135deg,#8B0000 0%,#b91c1c 100%);
-    box-shadow:inset 0 1px 2px rgba(0,0,0,0.15), inset 0 -1px 2px rgba(255,255,255,0.10);
+    color:#111;
+    background:#f7f7f7;
     font-weight:700;
-}
-.as-nav-link.active::before {
-    content:'';
-    position:absolute;
-    left:0; top:0; bottom:0;
-    width:4px;
-    background:linear-gradient(180deg,rgba(255,255,255,0.80),rgba(255,255,255,0.30));
+    border-left:3px solid #8B0000;
 }
 .as-nav-link:not(.active):hover {
     background:rgba(139,0,0,0.10);
@@ -148,9 +112,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .as-nav-link i:first-child { 
     width:18px; text-align:center; transition:all 0.3s ease;
     font-size:1rem;
-}
-.as-nav-link.active i:first-child {
-    animation:iconBounce 0.6s ease-out;
 }
 .as-nav-arrow {
     margin-left:auto;
@@ -167,17 +128,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 /* Content */
 .as-content { flex:1; min-width:0; }
 .as-card {
-    background:rgba(255,255,255,0.88);
-    backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-    border:1.5px solid rgba(0,0,0,0.08); border-radius:18px;
-    box-shadow:0 10px 40px rgba(0,0,0,0.08), inset 0 1px 2px rgba(255,255,255,0.60);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:32px; margin-bottom:24px;
-    animation:slideUpFade 0.5s ease-out;
-    transition:all 0.3s ease;
-}
-.as-card:hover {
-    box-shadow:0 15px 50px rgba(0,0,0,0.10), inset 0 1px 2px rgba(255,255,255,0.60);
-    border-color:rgba(139,0,0,0.10);
 }
 .as-card-title {
     font-size:1.2rem; font-weight:900; color:#1a1d23; margin-bottom:6px;
@@ -204,14 +158,14 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     position:relative;
 }
 .as-input-wrap .form-control {
-    border-radius:12px; border:1.5px solid rgba(0,0,0,0.12);
-    background:rgba(255,255,255,0.95); padding:12px 16px 12px 42px;
-    font-size:0.91rem; font-weight:500; transition:all 0.2s ease;
-    height:auto; color:#1a1d23;
+    border-radius:6px; border:1px solid #e5e7eb;
+    background:#fff; padding:12px 16px 12px 42px;
+    font-size:0.91rem; font-weight:500; transition:border-color 0.15s;
+    height:auto; color:#111;
 }
 .as-input-wrap .form-control:focus {
-    border-color:#8B0000; box-shadow:0 0 0 4px rgba(139,0,0,0.12);
-    background:#fff; transform:translateY(-1px);
+    border-color:#8B0000; box-shadow:0 0 0 3px rgba(139,0,0,0.08);
+    background:#fff;
 }
 .as-input-wrap .form-control::placeholder { color:rgba(0,0,0,0.30); font-weight:500; }
 .as-input-icon {
@@ -225,12 +179,12 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 /* Password strength */
 .as-strength-bar {
-    height:6px; border-radius:99px; background:rgba(0,0,0,0.08);
-    overflow:hidden; margin-top:8px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.05);
+    height:6px; border-radius:4px; background:rgba(0,0,0,0.08);
+    overflow:hidden; margin-top:8px;
 }
 .as-strength-fill {
-    height:100%; border-radius:99px; transition:width 0.3s ease, background 0.3s ease;
-    width:0%; box-shadow:0 2px 8px rgba(0,0,0,0.15);
+    height:100%; border-radius:4px; transition:width 0.3s ease, background 0.3s ease;
+    width:0%;
 }
 .as-strength-label {
     font-size:0.74rem; margin-top:6px; font-weight:700;
@@ -246,39 +200,33 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 /* Buttons */
 .as-btn-primary {
-    background:linear-gradient(135deg,#8B0000,#b91c1c) !important;
-    border:none !important; border-radius:12px !important;
+    background:#8B0000 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; color:#fff !important;
     padding:12px 28px !important; font-size:0.89rem !important;
-    box-shadow:0 6px 20px rgba(139,0,0,0.25) !important;
-    transition:all 0.2s ease !important;
+    transition:background 0.15s !important;
     text-transform:uppercase !important;
     letter-spacing:0.3px !important;
 }
 .as-btn-primary:hover {
     color:#fff !important;
-    transform:translateY(-2px) !important;
-    box-shadow:0 8px 28px rgba(139,0,0,0.35) !important;
-}
-.as-btn-primary:active {
-    transform:translateY(0) !important;
+    background:#6b0000 !important;
 }
 
 /* Catalog items */
 .as-catalog-item {
     display:flex; align-items:center; gap:14px;
-    padding:14px 16px; border-radius:12px; margin-bottom:8px;
-    background:rgba(139,0,0,0.03); border:1.5px solid rgba(139,0,0,0.10);
-    font-size:0.88rem; transition:all 0.2s ease;
+    padding:14px 16px; border-radius:6px; margin-bottom:8px;
+    background:#f7f7f7; border:1px solid #e5e7eb;
+    font-size:0.88rem;
 }
 .as-catalog-item:hover {
-    background:rgba(139,0,0,0.08);
-    border-color:rgba(139,0,0,0.20);
-    transform:translateX(4px);
+    background:#f0f0f0;
+    border-color:#d1d5db;
 }
 .as-catalog-item-id {
-    font-size:0.70rem; font-weight:800; background:linear-gradient(135deg,rgba(139,0,0,0.15),rgba(139,0,0,0.08));
-    color:#8B0000; border-radius:8px; padding:4px 10px; flex-shrink:0;
+    font-size:0.70rem; font-weight:800; background:rgba(139,0,0,0.08);
+    color:#8B0000; border-radius:4px; padding:4px 10px; flex-shrink:0;
     text-transform:uppercase; letter-spacing:0.3px;
 }
 .as-catalog-item-name { font-weight:700; color:#1a1d23; }
@@ -327,16 +275,16 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .as-table tr:last-child td { border-bottom:none; }
 .as-badge {
     display:inline-flex; align-items:center; padding:4px 12px;
-    border-radius:20px; font-size:0.75rem; font-weight:800;
+    border-radius:4px; font-size:0.75rem; font-weight:800;
     text-transform:uppercase; letter-spacing:0.3px;
 }
 .as-badge-primary {
-    background:linear-gradient(135deg,rgba(139,0,0,0.15),rgba(139,0,0,0.08));
+    background:rgba(139,0,0,0.08);
     color:#8B0000;
 }
 .as-note {
-    background:linear-gradient(135deg,rgba(59,130,246,0.08),rgba(59,130,246,0.03));
-    border:1.5px solid rgba(59,130,246,0.20); border-radius:12px;
+    background:#f0f4ff;
+    border:1px solid rgba(59,130,246,0.22); border-radius:6px;
     padding:14px 18px; font-size:0.84rem; color:#1d4ed8; margin-top:18px;
     font-weight:500;
 }
@@ -449,7 +397,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="as-card-title"><i class="fas fa-lock me-2" style="opacity:0.8;"></i>Change Password</div>
                 <div class="as-card-sub">Use a strong password to protect your admin account</div>
                 <?php if (isset($password_error)): ?>
-                <div style="background:linear-gradient(135deg,rgba(220,38,38,0.10),rgba(220,38,38,0.04)); border:1.5px solid rgba(220,38,38,0.20); border-radius:12px; padding:14px 18px; margin-bottom:22px; font-size:0.84rem; color:#dc2626; font-weight:600; display:flex; align-items:center; gap:10px;">
+                <div style="background:rgba(220,38,38,0.06); border:1px solid rgba(220,38,38,0.22); border-radius:6px; padding:14px 18px; margin-bottom:22px; font-size:0.84rem; color:#dc2626; font-weight:600; display:flex; align-items:center; gap:10px;">
                     <i class="fas fa-exclamation-circle" style="font-size:1rem;"></i>
                     <span><?php echo htmlspecialchars($password_error); ?></span>
                 </div>
@@ -530,11 +478,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <div class="as-catalog-item-desc"><?php echo htmlspecialchars($item['description']); ?></div>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:0.72rem; font-weight:700; background:rgba(34,197,94,0.12); color:#15803d; padding:3px 10px; border-radius:20px; border:1px solid rgba(34,197,94,0.22);">
+                        <span style="font-size:0.72rem; font-weight:700; background:rgba(34,197,94,0.10); color:#15803d; padding:3px 10px; border-radius:4px; border:1px solid rgba(34,197,94,0.22);">
                             <i class="fas fa-check-circle me-1"></i>Available
                         </span>
                         <?php if (in_array($item['id'], $catalog_ids)): ?>
-                        <span style="font-size:0.72rem; font-weight:700; background:linear-gradient(135deg,rgba(139,0,0,0.12),rgba(185,28,28,0.08)); color:#8B0000; padding:3px 10px; border-radius:20px; border:1px solid rgba(139,0,0,0.20);">
+                        <span style="font-size:0.72rem; font-weight:700; background:rgba(139,0,0,0.08); color:#8B0000; padding:3px 10px; border-radius:4px; border:1px solid rgba(139,0,0,0.18);">
                             <i class="fas fa-star me-1"></i>Borrowable
                         </span>
                         <?php endif; ?>

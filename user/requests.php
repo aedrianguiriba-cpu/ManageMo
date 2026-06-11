@@ -81,11 +81,10 @@ displayMessage();
     transition:all 0.25s;
 }
 .rq-step-dot.active {
-    background:linear-gradient(135deg,var(--red),var(--red2));
+    background:var(--red);
     color:#fff; border-color:var(--red);
-    box-shadow:0 4px 14px rgba(139,0,0,0.30);
 }
-.rq-step-dot.done { background:#22c55e; border-color:#22c55e; color:#fff; box-shadow:0 4px 12px rgba(34,197,94,0.25); }
+.rq-step-dot.done { background:#22c55e; border-color:#22c55e; color:#fff; }
 .rq-step-lbl {
     font-size:0.67rem; font-weight:700; margin-top:5px; text-align:center;
     color:rgba(0,0,0,0.35); text-transform:uppercase; letter-spacing:0.3px;
@@ -106,27 +105,16 @@ displayMessage();
 }
 @media(max-width:600px){ .rq-type-grid { grid-template-columns:1fr; } }
 .rq-type-card {
-    background:rgba(255,255,255,0.68);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:2px solid rgba(0,0,0,0.08); border-radius:18px;
+    background:#fff; border:2px solid #e5e7eb; border-radius:8px;
     padding:20px 18px 16px; cursor:pointer;
-    transition:all 0.20s; user-select:none; position:relative;
+    transition:border-color 0.15s; user-select:none; position:relative;
     overflow:hidden;
 }
-.rq-type-card::before {
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(135deg,rgba(139,0,0,0.04),transparent);
-    opacity:0; transition:opacity 0.20s;
-}
-.rq-type-card:hover { border-color:rgba(139,0,0,0.22); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.09); }
-.rq-type-card:hover::before { opacity:1; }
+.rq-type-card:hover { border-color:rgba(139,0,0,0.30); }
 .rq-type-card.selected {
     border-color:var(--red) !important;
-    background:rgba(139,0,0,0.04) !important;
-    box-shadow:0 0 0 4px rgba(139,0,0,0.09), 0 8px 24px rgba(139,0,0,0.12) !important;
-    transform:translateY(-2px);
+    background:#fff !important;
 }
-.rq-type-card.selected::before { opacity:1; }
 .rq-type-check {
     position:absolute; top:12px; right:12px;
     width:20px; height:20px; border-radius:50%;
@@ -138,7 +126,7 @@ displayMessage();
 .rq-type-card.selected .rq-type-check { opacity:1; transform:scale(1); }
 .rq-type-card input[type=radio] { display:none; }
 .rq-type-icon {
-    width:48px; height:48px; border-radius:14px;
+    width:36px; height:36px;
     display:flex; align-items:center; justify-content:center;
     font-size:1.2rem; margin-bottom:12px;
 }
@@ -151,10 +139,8 @@ displayMessage();
 
 /* ── Form card ── */
 .rq-form-card {
-    background:rgba(255,255,255,0.74);
-    backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:20px;
-    box-shadow:0 4px 24px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     overflow:hidden;
 }
 .rq-form-head {
@@ -163,7 +149,7 @@ displayMessage();
     display:flex; align-items:center; gap:10px;
 }
 .rq-form-head-icon {
-    width:36px; height:36px; border-radius:10px;
+    width:30px; height:30px;
     display:flex; align-items:center; justify-content:center;
     font-size:0.95rem; flex-shrink:0;
 }
@@ -196,26 +182,25 @@ displayMessage();
 .rq-input-icon-ta { top:14px; transform:none; }
 .rq-input-wrap .form-control,
 .rq-input-wrap .form-select {
-    border-radius:11px !important; border:1.5px solid rgba(0,0,0,0.10) !important;
+    border-radius:6px !important; border:1px solid #e5e7eb !important;
     font-size:0.88rem !important; padding:10px 12px 10px 36px !important;
-    background:rgba(255,255,255,0.80) !important;
-    transition:border-color 0.15s, box-shadow 0.15s !important;
+    background:#fff !important;
+    transition:border-color 0.15s !important;
 }
 .rq-input-wrap .form-control:focus,
 .rq-input-wrap .form-select:focus {
     border-color:var(--red) !important;
-    box-shadow:0 0 0 3px rgba(139,0,0,0.09) !important; outline:none !important;
+    box-shadow:none !important; outline:none !important;
 }
 /* fields without icon */
 .form-control.rq-no-icon, .form-select.rq-no-icon {
-    border-radius:11px !important; border:1.5px solid rgba(0,0,0,0.10) !important;
-    font-size:0.88rem !important;
-    background:rgba(255,255,255,0.80) !important;
-    transition:border-color 0.15s, box-shadow 0.15s !important;
+    border-radius:6px !important; border:1px solid #e5e7eb !important;
+    font-size:0.88rem !important; background:#fff !important;
+    transition:border-color 0.15s !important;
 }
 .form-control.rq-no-icon:focus, .form-select.rq-no-icon:focus {
     border-color:var(--red) !important;
-    box-shadow:0 0 0 3px rgba(139,0,0,0.09) !important; outline:none !important;
+    box-shadow:none !important; outline:none !important;
 }
 .rq-input-wrap textarea.form-control { padding-top:10px !important; }
 
@@ -224,15 +209,15 @@ displayMessage();
 @media(max-width:500px){ .urgency-group { grid-template-columns:repeat(2,1fr); } }
 .urgency-pill {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:5px; padding:10px 8px; border-radius:12px;
-    border:1.5px solid rgba(0,0,0,0.09);
-    background:rgba(255,255,255,0.60); cursor:pointer;
-    font-size:0.78rem; font-weight:700; color:rgba(0,0,0,0.50);
-    transition:all 0.15s; user-select:none; text-align:center;
+    gap:5px; padding:10px 8px; border-radius:6px;
+    border:1px solid #e5e7eb;
+    background:#fff; cursor:pointer;
+    font-size:0.78rem; font-weight:700; color:#555;
+    transition:border-color 0.15s; user-select:none; text-align:center;
 }
 .urgency-pill input[type=radio] { display:none; }
 .urgency-pill i { font-size:1rem; }
-.urgency-pill:hover { border-color:rgba(0,0,0,0.20); color:#1a1d23; transform:translateY(-1px); }
+.urgency-pill:hover { border-color:#aaa; color:#111; }
 .urgency-pill.selected-low      { background:rgba(34,197,94,0.12);  border-color:#22c55e; color:#15803d; }
 .urgency-pill.selected-medium   { background:rgba(59,130,246,0.12); border-color:#3b82f6; color:#1d4ed8; }
 .urgency-pill.selected-high     { background:rgba(245,158,11,0.12); border-color:#f59e0b; color:#b45309; }
@@ -240,14 +225,12 @@ displayMessage();
 
 /* ── Summary sidebar ── */
 .rq-summary-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:20px;
-    box-shadow:0 4px 24px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     overflow:hidden; position:sticky; top:88px;
 }
 .rq-summary-head {
-    background:linear-gradient(135deg,var(--red),var(--red2));
+    background:#8B0000;
     padding:16px 18px; color:#fff;
 }
 .rq-summary-head-title { font-size:0.88rem; font-weight:800; margin:0; }
@@ -276,24 +259,22 @@ displayMessage();
 
 /* Buttons */
 .rq-submit-btn {
-    background:linear-gradient(135deg,var(--red),var(--red2)) !important;
-    border:none !important; border-radius:12px !important;
+    background:#8B0000 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; font-size:0.90rem !important;
     color:#fff !important; padding:12px 28px !important;
-    box-shadow:0 4px 14px rgba(139,0,0,0.28) !important;
-    transition:transform 0.15s, box-shadow 0.15s !important;
+    transition:background 0.15s !important;
 }
 .rq-submit-btn:hover {
-    transform:translateY(-2px) !important;
-    box-shadow:0 8px 22px rgba(139,0,0,0.35) !important;
+    background:#7a0000 !important;
 }
 .rq-cancel-btn {
-    background:rgba(0,0,0,0.05) !important; border:1.5px solid rgba(0,0,0,0.10) !important;
-    border-radius:12px !important; font-weight:600 !important;
-    color:rgba(0,0,0,0.50) !important; padding:12px 22px !important;
-    transition:all 0.15s !important;
+    background:#f7f7f7 !important; border:1px solid #e5e7eb !important;
+    border-radius:6px !important; font-weight:600 !important;
+    color:#555 !important; padding:12px 22px !important;
+    transition:background 0.15s !important;
 }
-.rq-cancel-btn:hover { background:rgba(0,0,0,0.09) !important; color:#1a1d23 !important; }
+.rq-cancel-btn:hover { background:#e5e7eb !important; color:#111 !important; }
 
 /* Info chip for read-only desc */
 .rq-desc-chip {
@@ -308,7 +289,7 @@ displayMessage();
 .rq-cart-badge { background:rgba(139,0,0,0.10); color:#8B0000; border-radius:20px; padding:2px 10px; font-size:0.72rem; font-weight:800; }
 .rq-cart-empty { text-align:center; padding:20px 12px; color:rgba(0,0,0,0.30); font-size:0.81rem; background:rgba(0,0,0,0.02); border:1.5px dashed rgba(0,0,0,0.10); border-radius:12px; }
 .rq-cart-item { display:flex; align-items:flex-start; gap:10px; background:rgba(255,255,255,0.85); border:1px solid rgba(0,0,0,0.08); border-radius:12px; padding:11px 13px; margin-bottom:8px; }
-.rq-cart-item-num { width:24px; height:24px; border-radius:7px; flex-shrink:0; background:linear-gradient(135deg,#8B0000,#b91c1c); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.68rem; font-weight:800; }
+.rq-cart-item-num { width:24px; height:24px; border-radius:4px; flex-shrink:0; background:#8B0000; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.68rem; font-weight:800; }
 .rq-cart-item-body { flex:1; min-width:0; }
 .rq-cart-item-name { font-weight:700; color:#1a1d23; font-size:0.87rem; margin-bottom:3px; }
 .rq-cart-item-meta { font-size:0.75rem; color:rgba(0,0,0,0.44); display:flex; flex-wrap:wrap; gap:6px; }
@@ -353,7 +334,7 @@ displayMessage();
             <label class="rq-type-card selected" onclick="selectType(this,'borrow')">
                 <input type="radio" name="_type_vis" value="borrow" checked>
                 <div class="rq-type-check"><i class="fas fa-check"></i></div>
-                <div class="rq-type-icon" style="background:rgba(59,130,246,0.12);color:#1d4ed8;">
+                <div class="rq-type-icon" style="color:#1d4ed8;">
                     <i class="fas fa-hand-holding"></i>
                 </div>
                 <h6>Borrow Item</h6>
@@ -362,7 +343,7 @@ displayMessage();
             <label class="rq-type-card" onclick="selectType(this,'item')">
                 <input type="radio" name="_type_vis" value="item">
                 <div class="rq-type-check"><i class="fas fa-check"></i></div>
-                <div class="rq-type-icon" style="background:rgba(34,197,94,0.12);color:#15803d;">
+                <div class="rq-type-icon" style="color:#15803d;">
                     <i class="fas fa-shopping-cart"></i>
                 </div>
                 <h6>Request Item</h6>
@@ -371,7 +352,7 @@ displayMessage();
             <label class="rq-type-card" onclick="selectType(this,'service')">
                 <input type="radio" name="_type_vis" value="service">
                 <div class="rq-type-check"><i class="fas fa-check"></i></div>
-                <div class="rq-type-icon" style="background:rgba(245,158,11,0.12);color:#b45309;">
+                <div class="rq-type-icon" style="color:#b45309;">
                     <i class="fas fa-tools"></i>
                 </div>
                 <h6>Request Service</h6>
@@ -388,7 +369,7 @@ displayMessage();
             <!-- Dynamic head -->
             <div class="rq-form-head" id="formHead">
                 <div class="rq-form-head-icon" id="formHeadIcon"
-                     style="background:rgba(59,130,246,0.12);color:#1d4ed8;">
+                     style="color:#1d4ed8;">
                     <i class="fas fa-hand-holding"></i>
                 </div>
                 <div>
@@ -642,7 +623,7 @@ displayMessage();
                             <input type="radio" name="receiving_method" value="delivery" checked>
                             <div class="rq-type-check"><i class="fas fa-check"></i></div>
                             <div style="display:flex;align-items:center;gap:10px;">
-                                <div class="rq-type-icon" style="background:rgba(59,130,246,0.12);color:#1d4ed8;width:38px;height:38px;min-width:38px;font-size:1rem;border-radius:10px;margin-bottom:0;">
+                                <div class="rq-type-icon" style="color:#1d4ed8;width:32px;height:32px;min-width:32px;font-size:1rem;margin-bottom:0;">
                                     <i class="fas fa-truck"></i>
                                 </div>
                                 <div>
@@ -655,7 +636,7 @@ displayMessage();
                             <input type="radio" name="receiving_method" value="pickup">
                             <div class="rq-type-check"><i class="fas fa-check"></i></div>
                             <div style="display:flex;align-items:center;gap:10px;">
-                                <div class="rq-type-icon" style="background:rgba(34,197,94,0.12);color:#15803d;width:38px;height:38px;min-width:38px;font-size:1rem;border-radius:10px;margin-bottom:0;">
+                                <div class="rq-type-icon" style="color:#15803d;width:32px;height:32px;min-width:32px;font-size:1rem;margin-bottom:0;">
                                     <i class="fas fa-walking"></i>
                                 </div>
                                 <div>
@@ -737,7 +718,7 @@ function selectType(card, type) {
     card.classList.add('selected');
     document.getElementById('request_type_hidden').value = type;
     const cfg = typeConfig[type];
-    document.getElementById('formHeadIcon').style.background = cfg.bg;
+    document.getElementById('formHeadIcon').style.background = '';
     document.getElementById('formHeadIcon').style.color      = cfg.color;
     document.getElementById('formHeadIcon').innerHTML = '<i class="fas ' + cfg.icon + '"></i>';
     document.getElementById('formHeadTitle').textContent = cfg.title;

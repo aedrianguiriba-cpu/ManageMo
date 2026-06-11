@@ -5,10 +5,22 @@
  * No database connection required
  */
 
+// ===== DEPARTMENTS CUSTOM JSON HELPER =====
+function _loadCustomDepartments() {
+    $file = dirname(__FILE__) . '/departments_custom.json';
+    if (!file_exists($file)) return ['colleges' => [], 'offices' => []];
+    $data = json_decode(file_get_contents($file), true);
+    return $data ?: ['colleges' => [], 'offices' => []];
+}
+
+function saveCustomDepartments($data) {
+    $file = dirname(__FILE__) . '/departments_custom.json';
+    file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT));
+}
+
 // ===== MAIN CAMPUS COLLEGES =====
-// Returns the list of colleges for campus_id = 1 (Main Campus)
 function getMainCampusColleges() {
-    return [
+    $defaults = [
         'CEA'  => 'College of Engineering and Architecture (CEA)',
         'COE'  => 'College of Education (COE)',
         'CCS'  => 'College of Computing Studies (CCS)',
@@ -18,12 +30,13 @@ function getMainCampusColleges() {
         'CHTM' => 'College of Hospitality and Tourism Management (CHTM)',
         'CSSP' => 'College of Social Sciences and Philosophy (CSSP)',
     ];
+    $custom = _loadCustomDepartments();
+    return array_merge($defaults, $custom['colleges'] ?? []);
 }
 
 // ===== MAIN CAMPUS OFFICES =====
-// Returns the list of administrative/support offices for campus_id = 1 (Main Campus)
 function getMainCampusOffices() {
-    return [
+    $defaults = [
         'OUP'   => 'Office of the University President (OUP)',
         'OVPAA' => 'Office of the VP for Academic Affairs (OVPAA)',
         'OVPAF' => 'Office of the VP for Administration & Finance (OVPAF)',
@@ -39,6 +52,8 @@ function getMainCampusOffices() {
         'GCC'   => 'Guidance and Counseling Center (GCC)',
         'PDO'   => 'Planning and Development Office (PDO)',
     ];
+    $custom = _loadCustomDepartments();
+    return array_merge($defaults, $custom['offices'] ?? []);
 }
 
 // ===== COMBINED MAIN CAMPUS DEPARTMENTS =====
@@ -60,7 +75,7 @@ function getUsers() {
 
 // ===== CAMPUSES DATA =====
 function getCampuses() {
-    return [
+    $defaults = [
         [
             'id' => 1,
             'name' => 'Main Campus',
@@ -127,6 +142,12 @@ function getCampuses() {
             'colleges' => [],
         ],
     ];
+
+    $custom = _loadCustomDepartments();
+    foreach ($custom['campuses'] ?? [] as $c) {
+        $defaults[] = $c;
+    }
+    return $defaults;
 }
 
 // ===== BORROW CATALOG DATA =====

@@ -115,7 +115,7 @@ $campuses = getAllCampuses();
             top: 0;
             width: 50%;
             height: 100vh;
-            background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%);
+            background: #FFFFFF;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -135,7 +135,7 @@ $campuses = getAllCampuses();
             top: 0;
             width: 50%;
             height: 100vh;
-            background: linear-gradient(135deg, #8B0000 0%, #6B0000 100%);
+            background: #8B0000;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -152,15 +152,7 @@ $campuses = getAllCampuses();
         }
         
         .auth-right::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-            background-size: 50px 50px;
-            pointer-events: none;
+            content: none;
         }
         
         /* Forms container */
@@ -248,13 +240,13 @@ $campuses = getAllCampuses();
         .form-control,
         .form-select {
             background: #FFFFFF;
-            border: 1.5px solid #E0E0E0;
+            border: 1px solid #e5e7eb;
             padding: 12px 14px;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 14px;
             color: #2C3E50;
             width: 100%;
-            transition: all 0.3s;
+            transition: border-color 0.2s;
         }
         
         .form-control::placeholder {
@@ -270,7 +262,7 @@ $campuses = getAllCampuses();
         .form-select:focus {
             outline: none;
             border-color: #8B0000;
-            box-shadow: 0 0 0 4px rgba(139, 0, 0, 0.08);
+            box-shadow: none;
         }
         
         .form-row {
@@ -315,23 +307,21 @@ $campuses = getAllCampuses();
         .btn-auth {
             width: 100%;
             padding: 13px 20px;
-            background: linear-gradient(135deg, #8B0000 0%, #A52A2A 100%);
+            background: #8B0000;
             border: none;
             color: white;
             font-weight: 700;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 15px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 12px rgba(139, 0, 0, 0.25);
+            transition: background 0.2s;
+            box-shadow: none;
             letter-spacing: 0.3px;
             margin-top: 10px;
         }
-        
+
         .btn-auth:hover {
-            background: linear-gradient(135deg, #6B0000 0%, #8B0000 100%);
-            box-shadow: 0 6px 16px rgba(139, 0, 0, 0.35);
-            transform: translateY(-1px);
+            background: #6B0000;
         }
         
         .auth-toggle {
@@ -432,29 +422,18 @@ $campuses = getAllCampuses();
         .feature-item {
             display: flex;
             gap: 16px;
-            padding: 22px;
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 10px;
-            transition: all 0.3s;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
+            padding: 18px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
         }
-        
-        .feature-item:hover {
-            background: rgba(255, 255, 255, 0.18);
-            transform: translateY(-3px);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-        
+
         .feature-icon {
-            font-size: 28px;
-            min-width: 56px;
-            height: 56px;
+            font-size: 24px;
+            min-width: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.25);
-            border-radius: 10px;
             flex-shrink: 0;
         }
         

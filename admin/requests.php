@@ -125,31 +125,30 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
 <style>
 /* ===== ADMIN REQUESTS ===== */
 .ar-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:22px 24px; margin-bottom:20px;
 }
 .ar-card-title { font-size:1.05rem; font-weight:800; color:#1a1d23; margin-bottom:4px; }
-.ar-card-sub   { font-size:0.81rem; color:rgba(0,0,0,0.42); margin-bottom:18px; }
+.ar-card-sub   { font-size:0.81rem; color:#999; margin-bottom:18px; }
 .ar-section-label {
     font-size:0.69rem; font-weight:700; text-transform:uppercase;
-    letter-spacing:0.5px; color:rgba(0,0,0,0.36);
-    margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid rgba(0,0,0,0.07);
+    letter-spacing:0.5px; color:#999;
+    margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e5e7eb;
 }
 .ar-info-row { display:flex; flex-direction:column; gap:8px; }
 .ar-info-row p { margin:0; font-size:0.87rem; color:#374151; }
 .ar-info-row p strong { color:#1a1d23; margin-right:6px; }
 .ar-desc-box {
-    background:rgba(0,0,0,0.03); border:1px solid rgba(0,0,0,0.07);
-    border-radius:10px; padding:14px 16px; font-size:0.88rem;
+    background:#f7f7f7; border:1px solid #e5e7eb;
+    border-radius:6px; padding:14px 16px; font-size:0.88rem;
     color:#374151; line-height:1.6;
 }
-.ar-action-tabs { display:flex; gap:0; border-bottom:2px solid rgba(0,0,0,0.07); margin-bottom:20px; }
+.ar-action-tabs { display:flex; gap:0; border-bottom:2px solid #e5e7eb; margin-bottom:20px; }
 .ar-tab-btn {
     background:none; border:none; font-size:0.87rem; font-weight:700;
-    color:rgba(0,0,0,0.40); padding:9px 20px;
+    color:#999; padding:9px 20px;
     border-bottom:2px solid transparent; margin-bottom:-2px; cursor:pointer;
     transition:all 0.15s;
 }
@@ -159,47 +158,43 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
 
 /* Filter card */
 .ar-filter-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
     padding:16px 20px; margin-bottom:16px;
     display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px;
 }
-.ar-filter-label { font-size:0.71rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:rgba(0,0,0,0.36); margin-bottom:5px; }
+.ar-filter-label { font-size:0.71rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#999; margin-bottom:5px; }
 
 /* Buttons */
 .ar-btn-primary {
-    background:linear-gradient(135deg,#8B0000,#b91c1c) !important;
-    border:none !important; border-radius:11px !important;
+    background:#8B0000 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; color:#fff !important;
     padding:9px 18px !important; font-size:0.87rem !important;
-    box-shadow:0 4px 12px rgba(139,0,0,0.22) !important;
-    transition:transform 0.15s !important;
+    transition:opacity 0.15s !important;
 }
-.ar-btn-primary:hover { color:#fff !important; transform:translateY(-1px) !important; }
+.ar-btn-primary:hover { color:#fff !important; opacity:0.88 !important; }
 .ar-btn-secondary {
-    background:rgba(0,0,0,0.06) !important; border:1px solid rgba(0,0,0,0.10) !important;
-    border-radius:11px !important; font-weight:600 !important; color:rgba(0,0,0,0.55) !important;
+    background:#f7f7f7 !important; border:1px solid #e5e7eb !important;
+    border-radius:6px !important; font-weight:600 !important; color:#555 !important;
     padding:9px 16px !important; font-size:0.87rem !important;
     text-decoration:none; display:inline-flex; align-items:center; gap:6px;
 }
 .ar-btn-success {
-    background:linear-gradient(135deg,#166534,#15803d) !important;
-    border:none !important; border-radius:11px !important;
+    background:#166534 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; color:#fff !important;
     padding:9px 18px !important; font-size:0.87rem !important;
-    box-shadow:0 4px 12px rgba(22,101,52,0.22) !important;
 }
 .ar-btn-danger {
-    background:linear-gradient(135deg,#991b1b,#dc2626) !important;
-    border:none !important; border-radius:11px !important;
+    background:#991b1b !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; color:#fff !important;
     padding:9px 18px !important; font-size:0.87rem !important;
-    box-shadow:0 4px 12px rgba(153,27,27,0.22) !important;
 }
 .ar-btn-view {
     background:rgba(139,0,0,0.09); color:#8B0000;
-    border:none; border-radius:8px; font-size:0.79rem; font-weight:700;
+    border:none; border-radius:6px; font-size:0.79rem; font-weight:700;
     padding:5px 12px; cursor:pointer; text-decoration:none;
     display:inline-flex; align-items:center; gap:5px;
     transition:background 0.13s;
@@ -208,53 +203,51 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
 
 /* Table */
 .ar-table-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07); overflow:hidden;
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06); overflow:hidden;
 }
 .ar-table { width:100%; border-collapse:collapse; }
 .ar-table th {
     font-size:0.69rem; font-weight:700; text-transform:uppercase;
-    letter-spacing:0.5px; color:rgba(0,0,0,0.36);
-    padding:12px 16px; border-bottom:1px solid rgba(0,0,0,0.07);
-    background:rgba(0,0,0,0.015);
+    letter-spacing:0.5px; color:#999;
+    padding:12px 16px; border-bottom:1px solid #e5e7eb;
+    background:#f7f7f7;
 }
 .ar-table td {
-    padding:12px 16px; border-bottom:1px solid rgba(0,0,0,0.05);
+    padding:12px 16px; border-bottom:1px solid #e5e7eb;
     font-size:0.87rem; color:#374151; vertical-align:middle;
 }
 .ar-table tr:last-child td { border-bottom:none; }
-.ar-table tr:hover td { background:rgba(0,0,0,0.015); }
+.ar-table tr:hover td { background:#f7f7f7; }
 
 .ar-badge {
     display:inline-flex; align-items:center;
-    padding:3px 10px; border-radius:20px; font-size:0.74rem; font-weight:700;
+    padding:3px 10px; border-radius:4px; font-size:0.74rem; font-weight:700;
 }
 .ar-badge-success   { background:rgba(34,197,94,0.12);  color:#15803d; }
 .ar-badge-warning   { background:rgba(245,158,11,0.12); color:#b45309; }
 .ar-badge-danger    { background:rgba(239,68,68,0.12);  color:#dc2626; }
 .ar-badge-info      { background:rgba(59,130,246,0.12); color:#1d4ed8; }
-.ar-badge-secondary { background:rgba(0,0,0,0.07);       color:rgba(0,0,0,0.50); }
+.ar-badge-secondary { background:rgba(0,0,0,0.07);       color:#555; }
 .ar-badge-primary   { background:rgba(139,0,0,0.10);     color:#8B0000; }
 
-.ar-req-id { font-family:monospace; font-size:0.76rem; font-weight:600; background:rgba(139,0,0,0.07); color:#8B0000; border-radius:6px; padding:2px 7px; }
-.ar-empty  { padding:48px 24px; text-align:center; color:rgba(0,0,0,0.35); }
+.ar-req-id { font-family:monospace; font-size:0.76rem; font-weight:600; background:rgba(139,0,0,0.07); color:#8B0000; border-radius:4px; padding:2px 7px; }
+.ar-empty  { padding:48px 24px; text-align:center; color:#999; }
 .ar-empty i { font-size:2.5rem; margin-bottom:12px; display:block; opacity:0.3; }
 
 /* ── Request Tracker Stepper ── */
 .ar-stepper-wrap {
     padding: 22px 24px;
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(0,0,0,0.07);
-    border-radius: 18px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     margin-bottom: 20px;
 }
 .ar-stepper-title {
     font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.5px; color: rgba(0,0,0,0.36); margin-bottom: 20px;
+    letter-spacing: 0.5px; color: #999; margin-bottom: 20px;
 }
 .ar-steps { display: flex; align-items: flex-start; position: relative; }
 .ar-step  { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
@@ -262,81 +255,81 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
     width: 36px; height: 36px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.78rem; font-weight: 700;
-    border: 2px solid rgba(0,0,0,0.10);
-    background: #fff; color: rgba(0,0,0,0.28);
+    border: 2px solid #e5e7eb;
+    background: #fff; color: #999;
     position: relative; z-index: 2; transition: all 0.2s;
 }
-.ar-step-dot.s-done     { background: linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; color:#fff; box-shadow:0 3px 10px rgba(34,197,94,.28); }
-.ar-step-dot.s-active   { background: linear-gradient(135deg,#8B0000,#b91c1c); border-color:#8B0000; color:#fff; box-shadow:0 3px 10px rgba(139,0,0,.28); }
+.ar-step-dot.s-done     { background: #15803d; border-color:#15803d; color:#fff; }
+.ar-step-dot.s-active   { background: #8B0000; border-color:#8B0000; color:#fff; }
 .ar-step-dot.s-pending  { background: rgba(245,158,11,.12); border-color:#f59e0b; color:#b45309; }
-.ar-step-dot.s-rejected { background: linear-gradient(135deg,#ef4444,#b91c1c); border-color:#ef4444; color:#fff; box-shadow:0 3px 10px rgba(239,68,68,.25); }
+.ar-step-dot.s-rejected { background: #991b1b; border-color:#991b1b; color:#fff; }
 .ar-step-lbl {
     font-size: 0.68rem; font-weight: 700; text-align: center;
-    margin-top: 8px; color: rgba(0,0,0,0.32); line-height: 1.3; max-width: 72px;
+    margin-top: 8px; color: #999; line-height: 1.3; max-width: 72px;
 }
 .ar-step-lbl.l-done     { color: #15803d; }
 .ar-step-lbl.l-active   { color: #8B0000; }
 .ar-step-lbl.l-pending  { color: #b45309; }
 .ar-step-lbl.l-rejected { color: #b91c1c; }
 .ar-step-line {
-    flex: 1; height: 2px; background: rgba(0,0,0,0.08);
+    flex: 1; height: 2px; background: #e5e7eb;
     margin: 0 -2px; margin-top: -19px; position: relative; z-index: 1;
 }
 .ar-step-line.l-done { background: #22c55e; }
 
 /* Tracker card view */
 .ar-tracker-card {
-    background: rgba(255,255,255,0.72); backdrop-filter: blur(16px);
-    border: 1px solid rgba(0,0,0,0.07); border-radius: 18px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    background: #fff;
+    border: 1px solid #e5e7eb; border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     margin-bottom: 14px; overflow: hidden;
-    transition: box-shadow .18s, border-color .18s;
+    transition: border-color .18s;
 }
-.ar-tracker-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,.10); border-color: rgba(139,0,0,.12); }
+.ar-tracker-card:hover { border-color: rgba(139,0,0,.20); }
 .ar-tracker-head {
     padding: 14px 20px;
     display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid rgba(0,0,0,.06); gap: 12px; flex-wrap: wrap;
+    border-bottom: 1px solid #e5e7eb; gap: 12px; flex-wrap: wrap;
 }
 .ar-tracker-body { padding: 16px 20px; }
 .ar-view-toggle {
-    display: inline-flex; background: rgba(0,0,0,.04); border-radius: 10px; padding: 3px;
+    display: inline-flex; background: #f7f7f7; border-radius: 6px; padding: 3px;
     gap: 2px; margin-bottom: 16px;
 }
 .ar-vt-btn {
-    padding: 6px 14px; border-radius: 8px; border: none; background: transparent;
-    font-size: .8rem; font-weight: 700; color: rgba(0,0,0,.45);
+    padding: 6px 14px; border-radius: 4px; border: none; background: transparent;
+    font-size: .8rem; font-weight: 700; color: #555;
     cursor: pointer; transition: all .2s;
 }
-.ar-vt-btn.active { background: #fff; color: #8B0000; box-shadow: 0 1px 6px rgba(0,0,0,.10); }
+.ar-vt-btn.active { background: #fff; color: #8B0000; border: 1px solid #e5e7eb; }
 
 /* Request type tabs */
 .ar-type-tabs {
-    display: flex; gap: 0; border-bottom: 2px solid rgba(0,0,0,0.07); margin-bottom: 18px;
+    display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 18px;
 }
 .ar-type-tab {
     background: none; border: none; font-size: 0.87rem; font-weight: 700;
-    color: rgba(0,0,0,0.40); padding: 10px 20px;
+    color: #999; padding: 10px 20px;
     border-bottom: 2px solid transparent; margin-bottom: -2px;
     cursor: pointer; transition: all 0.15s; text-decoration: none;
     display: inline-flex; align-items: center; gap: 6px;
 }
-.ar-type-tab:hover { color: rgba(0,0,0,0.65); }
+.ar-type-tab:hover { color: #555; }
 .ar-type-tab.active { color: #8B0000; border-bottom-color: #8B0000; }
 .ar-type-tab .ar-tab-count {
-    font-size: 0.70rem; background: rgba(0,0,0,0.07); color: rgba(0,0,0,0.45);
-    border-radius: 20px; padding: 1px 7px; font-weight: 700;
+    font-size: 0.70rem; background: rgba(0,0,0,0.07); color: #555;
+    border-radius: 4px; padding: 1px 7px; font-weight: 700;
 }
 .ar-type-tab.active .ar-tab-count { background: rgba(139,0,0,0.12); color: #8B0000; }
 
 /* ── QR Sticker Sheet ── */
 .ar-sticker-btn {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 7px 16px; border-radius: 10px;
-    border: 1.5px solid rgba(139,0,0,.25);
+    padding: 7px 16px; border-radius: 6px;
+    border: 1px solid rgba(139,0,0,.25);
     background: rgba(139,0,0,.06); color: #8B0000;
     font-size: .82rem; font-weight: 700; cursor: pointer;
-    transition: all .18s; text-decoration: none;
+    transition: background .18s; text-decoration: none;
 }
 .ar-sticker-btn:hover { background: rgba(139,0,0,.13); }
 .ar-sticker-overlay {
@@ -347,9 +340,9 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
 }
 .ar-sticker-overlay.open { display: flex; }
 .ar-sticker-sheet-wrap {
-    background: #f3f3f3; border-radius: 16px;
+    background: #f3f3f3; border-radius: 8px;
     padding: 28px; width: 100%; max-width: 700px;
-    box-shadow: 0 24px 60px rgba(0,0,0,.28);
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
 }
 .ar-sticker-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
@@ -357,12 +350,12 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
 /* ── individual label ── */
 .ar-sticker {
     background: #fff; border: 1.5px solid #ccc;
-    border-radius: 10px; overflow: hidden;
+    border-radius: 6px; overflow: hidden;
     font-family: Arial, Helvetica, sans-serif;
     page-break-inside: avoid; break-inside: avoid;
 }
 .ar-sticker-top {
-    background: linear-gradient(135deg,#8B0000,#b91c1c);
+    background: #8B0000;
     color: #fff; text-align: center;
     padding: 8px 6px 5px; font-size: 8px; font-weight: 800;
     letter-spacing: .5px; text-transform: uppercase;
@@ -530,7 +523,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                         <p><strong>Phone:</strong><?php echo htmlspecialchars($request['phone']); ?></p>
                         <?php if (!empty($request['college_id'])): ?>
                         <p><strong>Department:</strong>
-                            <span style="display:inline-flex;align-items:center;gap:4px;background:rgba(59,130,246,0.12);color:#1d4ed8;border-radius:20px;padding:2px 10px;font-size:0.78rem;font-weight:700;">
+                            <span style="display:inline-flex;align-items:center;gap:4px;background:rgba(59,130,246,0.12);color:#1d4ed8;border-radius:4px;padding:2px 10px;font-size:0.78rem;font-weight:700;">
                                 <i class="fas fa-graduation-cap"></i> <?php echo htmlspecialchars($request['college_id']); ?>
                             </span>
                         </p>
@@ -563,7 +556,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                                     <input type="hidden" name="receiving_method" value="delivery">
                                     <button type="submit" style="
                                         display:inline-flex;align-items:center;gap:6px;
-                                        padding:6px 14px;border-radius:20px;font-size:0.80rem;font-weight:700;
+                                        padding:6px 14px;border-radius:6px;font-size:0.80rem;font-weight:700;
                                         border:2px solid <?php echo $rm === 'delivery' ? '#1d4ed8' : 'rgba(0,0,0,0.12)'; ?>;
                                         background:<?php echo $rm === 'delivery' ? 'rgba(59,130,246,0.12)' : 'transparent'; ?>;
                                         color:<?php echo $rm === 'delivery' ? '#1d4ed8' : 'rgba(0,0,0,0.40)'; ?>;
@@ -577,7 +570,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                                     <input type="hidden" name="receiving_method" value="pickup">
                                     <button type="submit" style="
                                         display:inline-flex;align-items:center;gap:6px;
-                                        padding:6px 14px;border-radius:20px;font-size:0.80rem;font-weight:700;
+                                        padding:6px 14px;border-radius:6px;font-size:0.80rem;font-weight:700;
                                         border:2px solid <?php echo $rm === 'pickup' ? '#15803d' : 'rgba(0,0,0,0.12)'; ?>;
                                         background:<?php echo $rm === 'pickup' ? 'rgba(34,197,94,0.12)' : 'transparent'; ?>;
                                         color:<?php echo $rm === 'pickup' ? '#15803d' : 'rgba(0,0,0,0.40)'; ?>;
@@ -592,7 +585,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                             $rm_color = $rm === 'delivery' ? '#1d4ed8'    : '#15803d';
                             $rm_bg    = $rm === 'delivery' ? 'rgba(59,130,246,0.12)' : 'rgba(34,197,94,0.12)';
                             ?>
-                            <span style="display:inline-flex;align-items:center;gap:5px;background:<?php echo $rm_bg; ?>;color:<?php echo $rm_color; ?>;border-radius:20px;padding:3px 12px;font-size:0.80rem;font-weight:700;margin-top:4px;">
+                            <span style="display:inline-flex;align-items:center;gap:5px;background:<?php echo $rm_bg; ?>;color:<?php echo $rm_color; ?>;border-radius:4px;padding:3px 12px;font-size:0.80rem;font-weight:700;margin-top:4px;">
                                 <i class="fas <?php echo $rm_icon; ?>"></i> <?php echo ucfirst($rm); ?>
                             </span>
                             <?php endif; ?>
@@ -776,7 +769,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                 + 'body{background:#fff;padding:8mm;font-family:Arial,Helvetica,sans-serif;}'
                 + '.ar-sticker-grid{display:grid;grid-template-columns:repeat(3,60mm);gap:4mm;}'
                 + '.ar-sticker{background:#fff;border:1.5px solid #999;border-radius:6px;overflow:hidden;page-break-inside:avoid;break-inside:avoid;}'
-                + '.ar-sticker-top{background:linear-gradient(135deg,#8B0000,#b91c1c);color:#fff;text-align:center;padding:5px 4px 4px;font-size:7px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}'
+                + '.ar-sticker-top{background:#8B0000;color:#fff;text-align:center;padding:5px 4px 4px;font-size:7px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}'
                 + '.ar-sticker-top span{display:block;font-size:6px;font-weight:400;opacity:.82;margin-top:1px;}'
                 + '.ar-sticker-qr{padding:8px 4px 3px;text-align:center;}'
                 + '.ar-sticker-qr img{width:80px;height:80px;display:block;margin:0 auto;}'
@@ -1064,7 +1057,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
         <div class="ar-tracker-card">
             <div class="ar-tracker-head">
                 <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:36px;height:36px;border-radius:10px;background:<?php echo $col;?>;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;"><?php echo $initials;?></div>
+                    <div style="width:36px;height:36px;border-radius:6px;background:<?php echo $col;?>;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;"><?php echo $initials;?></div>
                     <div>
                         <div style="font-weight:700;font-size:.88rem;color:#0f172a;"><?php echo htmlspecialchars($req['full_name']);?></div>
                         <div style="font-size:.74rem;color:#94a3b8;margin-top:1px;">

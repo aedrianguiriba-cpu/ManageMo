@@ -59,21 +59,10 @@ displayMessage();
 
 /* Sidebar profile card */
 .st-profile-card {
-    background:linear-gradient(135deg,#8B0000,#b91c1c);
-    border-radius:18px; padding:24px 16px 20px;
+    background:#8B0000;
+    border-radius:8px; padding:24px 16px 20px;
     text-align:center; margin-bottom:10px;
-    box-shadow:0 6px 24px rgba(139,0,0,0.28);
     position:relative; overflow:hidden;
-}
-.st-profile-card::before {
-    content:''; position:absolute; top:-30px; right:-30px;
-    width:100px; height:100px; border-radius:50%;
-    background:rgba(255,255,255,0.08);
-}
-.st-profile-card::after {
-    content:''; position:absolute; bottom:-20px; left:-20px;
-    width:80px; height:80px; border-radius:50%;
-    background:rgba(255,255,255,0.06);
 }
 .st-avatar {
     width:72px; height:72px; border-radius:50%;
@@ -102,10 +91,7 @@ displayMessage();
 
 /* Sidebar nav */
 .st-nav {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
     overflow:hidden; padding:8px;
 }
 .st-nav-link {
@@ -130,10 +116,8 @@ displayMessage();
 
 /* Card */
 .st-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:26px 28px;
 }
 .st-card-title {
@@ -215,16 +199,14 @@ displayMessage();
 
 /* Buttons */
 .st-save-btn {
-    background:linear-gradient(135deg,#8B0000,#b91c1c) !important;
-    border:none !important; border-radius:12px !important;
+    background:#8B0000 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; color:#fff !important;
     padding:11px 26px !important;
-    box-shadow:0 4px 14px rgba(139,0,0,0.25) !important;
-    transition:transform 0.15s, box-shadow 0.15s !important;
+    transition:background 0.15s !important;
 }
 .st-save-btn:hover {
-    transform:translateY(-1px) !important;
-    box-shadow:0 7px 20px rgba(139,0,0,0.32) !important;
+    background:#7a0000 !important;
 }
 
 /* Badge */
@@ -404,7 +386,7 @@ displayMessage();
                         <div class="st-section-title"><i class="fas fa-id-card me-1"></i>Account Details</div>
 
                         <div class="st-info-row">
-                            <div class="st-info-icon" style="background:rgba(139,0,0,0.10);color:#8B0000;">
+                            <div class="st-info-icon" style="color:#8B0000;">
                                 <i class="fas fa-user-tag"></i>
                             </div>
                             <div>
@@ -414,7 +396,7 @@ displayMessage();
                         </div>
 
                         <div class="st-info-row">
-                            <div class="st-info-icon" style="background:rgba(59,130,246,0.10);color:#1d4ed8;">
+                            <div class="st-info-icon" style="color:#1d4ed8;">
                                 <i class="fas fa-building"></i>
                             </div>
                             <div>
@@ -425,7 +407,7 @@ displayMessage();
                         </div>
 
                         <div class="st-info-row">
-                            <div class="st-info-icon" style="background:rgba(34,197,94,0.10);color:#15803d;">
+                            <div class="st-info-icon" style="color:#15803d;">
                                 <i class="fas fa-shield-alt"></i>
                             </div>
                             <div>
@@ -437,7 +419,7 @@ displayMessage();
                         </div>
 
                         <div class="st-info-row">
-                            <div class="st-info-icon" style="background:rgba(245,158,11,0.10);color:#b45309;">
+                            <div class="st-info-icon" style="color:#b45309;">
                                 <i class="fas fa-calendar-alt"></i>
                             </div>
                             <div>

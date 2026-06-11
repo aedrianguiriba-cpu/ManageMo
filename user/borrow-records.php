@@ -71,52 +71,47 @@ displayMessage();
 }
 .br-title-icon {
     width:40px; height:40px;
-    background:linear-gradient(135deg,#8B0000,#b91c1c);
-    border-radius:11px; display:flex; align-items:center; justify-content:center;
-    color:#fff; font-size:1rem;
-    box-shadow:0 4px 12px rgba(139,0,0,0.25); flex-shrink:0;
+    background:#8B0000;
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:1rem; flex-shrink:0;
 }
 /* Tabs */
 .br-tabs {
     display:flex; gap:6px; flex-wrap:wrap;
-    background:rgba(255,255,255,0.60); backdrop-filter:blur(12px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px; padding:7px; width:fit-content;
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:6px; width:fit-content;
 }
 .br-tab {
     display:inline-flex; align-items:center; gap:7px;
-    padding:9px 18px; border-radius:11px; font-size:0.85rem; font-weight:700;
-    color:rgba(0,0,0,0.50); background:transparent; border:none; cursor:pointer;
-    text-decoration:none; transition:all 0.15s; white-space:nowrap;
+    padding:9px 18px; border-radius:6px; font-size:0.85rem; font-weight:700;
+    color:#555; background:transparent; border:none; cursor:pointer;
+    text-decoration:none; transition:background 0.15s, color 0.15s; white-space:nowrap;
 }
-.br-tab:hover { background:rgba(0,0,0,0.04); color:rgba(0,0,0,0.70); text-decoration:none; }
-.br-tab.active { background:linear-gradient(135deg,#8B0000,#b91c1c); color:#fff; box-shadow:0 4px 12px rgba(139,0,0,0.28); }
-.br-tab .br-tab-count { background:rgba(255,255,255,0.25); color:#fff; border-radius:10px; padding:1px 7px; font-size:0.68rem; }
-.br-tab:not(.active) .br-tab-count { background:rgba(0,0,0,0.08); color:rgba(0,0,0,0.45); }
+.br-tab:hover { background:#f7f7f7; color:#111; text-decoration:none; }
+.br-tab.active { background:#8B0000; color:#fff; }
+.br-tab .br-tab-count { background:rgba(255,255,255,0.25); color:#fff; border-radius:4px; padding:1px 7px; font-size:0.68rem; }
+.br-tab:not(.active) .br-tab-count { background:#e5e7eb; color:#555; }
 /* Stat cards */
 .br-stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
 .br-stat-card {
     flex:1; min-width:130px;
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:14px 16px; display:flex; align-items:center; gap:12px;
 }
-.br-stat-icon { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.05rem; flex-shrink:0; }
-.br-stat-val { font-size:1.55rem; font-weight:800; color:#1a1d23; line-height:1; }
-.br-stat-lbl { font-size:0.73rem; color:rgba(0,0,0,0.45); font-weight:600; margin-top:2px; }
+.br-stat-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; font-size:1.05rem; flex-shrink:0; }
+.br-stat-val { font-size:1.55rem; font-weight:800; color:#111; line-height:1; }
+.br-stat-lbl { font-size:0.73rem; color:#555; font-weight:600; margin-top:2px; }
 /* Filter */
 .br-filter {
-    background:rgba(255,255,255,0.70); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
     padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
 }
-.br-filter-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:rgba(0,0,0,0.40); white-space:nowrap; }
-.br-filter .form-select { border-radius:10px !important; font-size:0.87rem !important; max-width:220px; }
+.br-filter-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#999; white-space:nowrap; }
+.br-filter .form-select { border-radius:6px !important; font-size:0.87rem !important; max-width:220px; }
 /* Table card */
 .br-table-card {
-    background:rgba(255,255,255,0.72); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px; box-shadow:0 4px 20px rgba(0,0,0,0.07); overflow:hidden;
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06); overflow:hidden;
 }
 .br-table-card table { margin:0; }
 .br-table-card thead th {
@@ -200,19 +195,19 @@ displayMessage();
 
     <div class="br-stats">
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(59,130,246,0.12);color:#1d4ed8;"><i class="fas fa-hand-holding"></i></div>
+            <div class="br-stat-icon" style="color:#1d4ed8;"><i class="fas fa-hand-holding"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_borrow_active; ?></div><div class="br-stat-lbl">Active</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(34,197,94,0.12);color:#15803d;"><i class="fas fa-check-circle"></i></div>
+            <div class="br-stat-icon" style="color:#15803d;"><i class="fas fa-check-circle"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_borrow_returned; ?></div><div class="br-stat-lbl">Returned</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(239,68,68,0.12);color:#b91c1c;"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="br-stat-icon" style="color:#b91c1c;"><i class="fas fa-exclamation-triangle"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_borrow_overdue; ?></div><div class="br-stat-lbl">Overdue</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(107,114,128,0.12);color:#4b5563;"><i class="fas fa-list"></i></div>
+            <div class="br-stat-icon" style="color:#4b5563;"><i class="fas fa-list"></i></div>
             <div><div class="br-stat-val"><?php echo count($user_borrows); ?></div><div class="br-stat-lbl">Total</div></div>
         </div>
     </div>
@@ -288,19 +283,19 @@ displayMessage();
     ?>
     <div class="br-stats">
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(245,158,11,0.12);color:#b45309;"><i class="fas fa-hourglass-half"></i></div>
+            <div class="br-stat-icon" style="color:#b45309;"><i class="fas fa-hourglass-half"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_item_pending; ?></div><div class="br-stat-lbl">Pending</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(34,197,94,0.12);color:#15803d;"><i class="fas fa-check-circle"></i></div>
+            <div class="br-stat-icon" style="color:#15803d;"><i class="fas fa-check-circle"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_item_approved; ?></div><div class="br-stat-lbl">Approved</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(239,68,68,0.10);color:#b91c1c;"><i class="fas fa-times-circle"></i></div>
+            <div class="br-stat-icon" style="color:#b91c1c;"><i class="fas fa-times-circle"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_item_disapproved; ?></div><div class="br-stat-lbl">Disapproved</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(107,114,128,0.12);color:#4b5563;"><i class="fas fa-list"></i></div>
+            <div class="br-stat-icon" style="color:#4b5563;"><i class="fas fa-list"></i></div>
             <div><div class="br-stat-val"><?php echo count($all_mine_item); ?></div><div class="br-stat-lbl">Total</div></div>
         </div>
     </div>
@@ -375,19 +370,19 @@ displayMessage();
     ?>
     <div class="br-stats">
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(245,158,11,0.12);color:#b45309;"><i class="fas fa-hourglass-half"></i></div>
+            <div class="br-stat-icon" style="color:#b45309;"><i class="fas fa-hourglass-half"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_svc_pending; ?></div><div class="br-stat-lbl">Pending</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(34,197,94,0.12);color:#15803d;"><i class="fas fa-check-circle"></i></div>
+            <div class="br-stat-icon" style="color:#15803d;"><i class="fas fa-check-circle"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_svc_approved; ?></div><div class="br-stat-lbl">Approved</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(239,68,68,0.10);color:#b91c1c;"><i class="fas fa-times-circle"></i></div>
+            <div class="br-stat-icon" style="color:#b91c1c;"><i class="fas fa-times-circle"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_svc_disapproved; ?></div><div class="br-stat-lbl">Disapproved</div></div>
         </div>
         <div class="br-stat-card">
-            <div class="br-stat-icon" style="background:rgba(107,114,128,0.12);color:#4b5563;"><i class="fas fa-list"></i></div>
+            <div class="br-stat-icon" style="color:#4b5563;"><i class="fas fa-list"></i></div>
             <div><div class="br-stat-val"><?php echo count($all_mine_service); ?></div><div class="br-stat-lbl">Total</div></div>
         </div>
     </div>

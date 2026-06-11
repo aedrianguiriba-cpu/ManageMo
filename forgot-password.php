@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             min-height: 100vh;
         }
         .forgotpw-left {
-            background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%);
+            background: #FFFFFF;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -128,13 +128,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         .form-control {
             background: #FFFFFF;
-            border: 1.5px solid #E0E0E0;
+            border: 1px solid #e5e7eb;
             padding: 14px 16px;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 14px;
             color: #2C3E50;
             width: 100%;
-            transition: all 0.3s;
+            transition: border-color 0.2s;
         }
         .form-control::placeholder {
             color: #BDBDBD;
@@ -145,30 +145,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .form-control:focus {
             outline: none;
             border-color: #8B0000;
-            box-shadow: 0 0 0 4px rgba(139, 0, 0, 0.08);
+            box-shadow: none;
         }
         .btn-reset {
             width: 100%;
             padding: 13px 20px;
-            background: linear-gradient(135deg, #8B0000 0%, #A52A2A 100%);
+            background: #8B0000;
             border: none;
             color: white;
             font-weight: 700;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 15px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 12px rgba(139, 0, 0, 0.25);
+            transition: background 0.2s;
+            box-shadow: none;
             letter-spacing: 0.3px;
             margin-top: 10px;
         }
         .btn-reset:hover {
-            background: linear-gradient(135deg, #6B0000 0%, #8B0000 100%);
-            box-shadow: 0 6px 16px rgba(139, 0, 0, 0.35);
-            transform: translateY(-1px);
-        }
-        .btn-reset:active {
-            transform: translateY(0);
+            background: #6B0000;
         }
         .back-to-login {
             text-align: center;
@@ -196,7 +191,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-decoration: underline;
         }
         .forgotpw-right {
-            background: linear-gradient(135deg, #8B0000 0%, #6B0000 100%);
+            background: #8B0000;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -206,15 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             overflow: hidden;
         }
         .forgotpw-right::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-            background-size: 50px 50px;
-            pointer-events: none;
+            content: none;
         }
         .info-content {
             max-width: 400px;
@@ -238,11 +225,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-bottom: 30px;
         }
         .info-steps {
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
             padding: 24px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.12);
         }
         .step-item {
             display: flex;

@@ -13,17 +13,18 @@ using hardcoded/mock data arrays. The UI uses Bootstrap 5.3 and Font Awesome 6.4
 All pages are server-rendered PHP. Session-based authentication (BCrypt passwords).
 
 No external database is required — all data lives in:
-  config/data.php       — live data functions (getUsers, getInventory, etc.)
-  config/mock_data.php  — MockData class with the same data (legacy/reference)
-  config/functions.php  — all business logic helpers
-  config/constants.php  — app-wide constants (roles, statuses, urgency levels)
+  config/data.php                — live data functions (getUsers, getInventory, etc.)
+  config/mock_data.php           — MockData class with the same data (legacy/reference)
+  config/functions.php           — all business logic helpers
+  config/constants.php           — app-wide constants (roles, statuses, urgency levels)
+  config/departments_custom.json — user-added colleges, offices, and campuses (persisted)
 
 ================================================================================
 DIRECTORY STRUCTURE
 ================================================================================
 
 ManageMo/
-├── index.php                   Login page
+├── index.php                   Login page (split-panel design, blurred bg)
 ├── auth.php                    Login POST handler (authenticates, sets session)
 ├── logout.php                  Destroys session, redirects to login
 ├── signup.php                  User self-registration (currently disabled/mock)
@@ -33,26 +34,28 @@ ManageMo/
 │   ├── constants.php           App constants (roles, request/borrow statuses, etc.)
 │   ├── data.php                Data layer — all getXxx() functions returning PHP arrays
 │   ├── functions.php           Business logic (auth, formatting, QR generation, email)
-│   └── mock_data.php           MockData class (mirrors data.php; used as reference)
+│   ├── mock_data.php           MockData class (mirrors data.php; used as reference)
+│   └── departments_custom.json Persisted user-added colleges, offices, and campuses
 │
 ├── includes/
-│   ├── header.php              HTML <head>, Bootstrap/FA CDN links
-│   ├── navbar.php              Left sidebar navigation (role-aware links)
+│   ├── header.php              HTML <head>, Bootstrap/FA CDN links (cache-busted style.css)
+│   ├── navbar.php              Left sidebar navigation (role-aware links, active state)
 │   ├── topbar.php              Top bar — page title + user dropdown
 │   └── footer.php              Closing </body></html>
 │
 ├── user/                       Pages accessible to Role: user
-│   ├── dashboard.php           User home — summary stats + recent activity
+│   ├── dashboard.php           User home — KPI cards, request summary, recent activity
 │   ├── inventory.php           Browse all inventory items (read-only)
-│   ├── requests.php            Submit new request (cart-based, multi-item)
-│   ├── my-requests.php         View all submitted requests (legacy)
+│   ├── requests.php            Submit new request (borrow / item / service)
+│   ├── my-requests.php         View all submitted requests
 │   ├── borrow-records.php      My Records — 3-tab page (Borrow/Item/Service)
 │   └── settings.php            Profile/account settings
 │
 ├── admin/                      Pages accessible to Role: admin
-│   ├── dashboard.php           Admin home — system-wide stats
+│   ├── dashboard.php           Admin home — KPI cards, charts, campus summary
 │   ├── inventory.php           Full inventory CRUD (all campuses)
-│   ├── inventory-campus.php    Campus-filtered inventory view
+│   ├── inventory-campus.php    Campus overview + Manage Departments modal
+│   ├── campus-detail.php       Single campus detail view
 │   ├── requests.php            Review & approve/disapprove requests
 │   ├── analytics.php           Charts and usage analytics
 │   ├── reports.php             Printable reports
@@ -60,13 +63,13 @@ ManageMo/
 │   └── settings.php            System/admin settings
 │
 ├── assets/
-│   ├── pics/                   Logo and UI images
+│   ├── pics/                   Logo and UI images (logo.png, storagebg.jpg)
 │   ├── qrcodes/                Generated QR code images (PNG)
-│   └── uploads/
-│       └── approval_letters/   Uploaded approval letter files (PDF/JPG/PNG)
+│   └── uploads/                File uploads
 │
 ├── css/
-│   └── style.css               Global stylesheet (sidebar, topbar, cards, forms)
+│   └── style.css               Global stylesheet — sidebar, topbar, cards, forms
+│                               Design tokens: --primary #8B0000, --border #e5e7eb
 │
 ├── js/
 │   └── script.js               Global JS (sidebar toggle, misc utilities)
@@ -82,12 +85,16 @@ MODULE DOCUMENTATION
 MODULE 1: AUTHENTICATION  (index.php, auth.php, logout.php)
 ────────────────────────────────────────────────────────────────────────────────
 Flow:
-  1. User visits index.php — shown login form (email + password).
-  2. Form POSTs to auth.php.
-  3. auth.php calls getUsers(), finds user by email, verifies BCrypt hash via
+  1. User visits index.php — shown split-panel login form (email + password).
+     Left panel: storagebg.jpg with blurred backdrop + maroon gradient overlay.
+     Right panel: white form panel with logo, inputs, remember me, forgot password.
+  2. Form POSTs to index.php (self-posting).
+  3. PHP calls getUsers(), finds user by email, verifies BCrypt hash via
      password_verify(). On success: sets $_SESSION['user_id'], redirects to
      role-appropriate dashboard (/admin/dashboard.php or /user/dashboard.php).
-  4. logout.php calls session_destroy(), redirects to index.php.
+  4. Forgot Password form toggles in-place via showForgot()/showLogin() JS.
+     No actual email is sent — placeholder success message shown.
+  5. logout.php calls session_destroy(), redirects to index.php.
 
 Role system:
   ROLE_ADMIN = 'admin'  → admin/ pages only
@@ -97,7 +104,6 @@ Role system:
 Security:
   - Passwords hashed with BCrypt (PASSWORD_BCRYPT).
   - All user-supplied values passed through sanitizeInput() (htmlspecialchars + trim).
-  - File uploads validated by MIME type (finfo) + extension + size ≤ 5 MB.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 2: INVENTORY  (user/inventory.php, admin/inventory.php, admin/inventory-campus.php)
@@ -105,10 +111,10 @@ MODULE 2: INVENTORY  (user/inventory.php, admin/inventory.php, admin/inventory-c
 Data source: getInventory() → array of items.
 Each item has:
   id, qr_code_id, item_name, category, description,
-  campus_id, quantity, status, location,
+  campus_id, college_id (Main Campus only), quantity, status, location,
   purchase_date, cost, condition, created_at
 
-Item statuses: available | borrowed | maintenance | disposed
+Item statuses: available | borrowed | maintenance | damaged | requested
 
 QR Code system:
   - Every item has a base qr_code_id (e.g. 'QR-A1B2C3D4E5').
@@ -117,36 +123,29 @@ QR Code system:
   - lib/qrcode.php generates the actual QR image for each code.
   - QR images are stored in assets/qrcodes/.
 
-User view: read-only browse, filter by campus/category.
+User view:  read-only browse, filter by campus/category/status.
 Admin view: full CRUD — add, edit, delete items; update status; generate QR codes.
-Campus view: admin/inventory-campus.php filters items by campus_id.
+Campus view (admin/inventory-campus.php):
+  - Grid of all campus cards with per-campus stats.
+  - Main Campus card shows Colleges and Offices breakdowns.
+  - "Manage Departments" button opens a tabbed modal (see Module 11).
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 3: REQUEST SUBMISSION  (user/requests.php)
 ────────────────────────────────────────────────────────────────────────────────
 Three request types (selected via radio buttons):
-  a) Borrow     — borrow an existing inventory item temporarily
-  b) Item       — request procurement of a new item
-  c) Service    — request maintenance/repair/service on an existing item
-
-Cart system (client-side JS):
-  - addToCart(id, name)     — adds item to cart array
-  - removeFromCart(index)   — removes item by index
-  - renderCart()            — renders cart list in sidebar
-  - resetStaging()          — clears cart when request type changes
-  - On submit: serializes cart to hidden input items_json as JSON
+  a) Borrow   — borrow an existing inventory item temporarily
+  b) Item     — request procurement of a new item
+  c) Service  — request maintenance/repair/service on an existing item
 
 Form fields (vary by type):
   Borrow:  inventory item, expected return date, urgency, reason
   Item:    item description, quantity, urgency, reason
   Service: inventory item, service type, description, urgency
 
-Required for all types:
-  Approval letter upload (PDF/JPG/PNG, max 5 MB) from office/college/dept head.
+Note: Approval letter upload has been removed. Requests are submitted directly.
 
 Server-side:
-  - MIME + extension + size validation on upload.
-  - File saved to assets/uploads/approval_letters/ with timestamped random name.
   - Request stored (mock: session flash message shown on redirect).
 
 ────────────────────────────────────────────────────────────────────────────────
@@ -158,7 +157,7 @@ Each request has:
   inventory_id (nullable for item requests), service_description,
   urgency (low/medium/high/critical), status, reason_for_request,
   approval_notes, approved_by, approved_at, expected_return_date,
-  created_at, updated_at, full_name, email, item_name, qr_code_id
+  created_at, updated_at
 
 Request lifecycle:
   pending → approved / disapproved → (for approved item requests) → delivered
@@ -168,7 +167,6 @@ Admin actions:
   - Approve with optional notes → status = 'approved'.
   - Disapprove with reason → status = 'disapproved'.
   - Mark as delivered (triggers delivery email via sendDeliveryEmail()).
-  - View attached approval letter.
 
 Email notifications:
   sendDeliveryEmail($email, $name, $request_number, $stage)
@@ -187,62 +185,54 @@ Tab 1 — Borrow Records:
   Columns: Item, QR Code, Borrowed, Expected Return, Returned On, Status, Notes.
   Status badges: active (blue) | returned (green) | overdue (red).
   Overdue detection: active record where expected_return_date < now().
-  Stats: Active / Returned / Overdue / Total.
-  Overdue alert banner shown if stat_borrow_overdue > 0.
 
 Tab 2 — Item Requests:
   Source: getRequests() filtered by user_id + request_type='item'.
   Columns: Request #, Item/Description, Urgency, Reason, Submitted, Status, Admin Notes.
-  Status badges: pending (amber) | approved (green) | disapproved (red).
-  Stats: Pending / Approved / Disapproved / Total.
 
 Tab 3 — Service Requests:
   Source: getRequests() filtered by user_id + request_type='service'.
   Columns: Request #, Item, Service Type, Description, Urgency, Submitted, Status.
-  Stats: Pending / Approved / Disapproved / Total.
 
-Print: window.print() — @media print hides sidebar/topbar/tabs/filters, renders
-       table cleanly with black text on white background.
+Print: window.print() — @media print hides sidebar/topbar/tabs/filters.
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 6: QR DELIVERY SCANNER  [PLANNED — MOBILE APP FEATURE]
+MODULE 6: ADMIN DASHBOARD  (admin/dashboard.php)
 ────────────────────────────────────────────────────────────────────────────────
-NOTE: QR code scanning is NOT implemented in this web application.
-      It is reserved for a dedicated companion mobile app to be developed
-      separately (e.g. React Native, Flutter, or native Android/iOS).
+Sections (top to bottom):
+  1. KPI Cards — Total Items, Available, Borrowed, Maintenance, User-Owned Items.
+     Each card has a full colored border matching the metric color.
 
-Purpose: Allow the recipient user to confirm delivery of approved item/borrow
-requests by scanning the QR code printed on each delivered unit. When all
-expected units are scanned, the request is automatically marked as 'delivered'.
+  2. Campus Inventory Overview (Line Chart)
+     Chart.js 4.4 line graph — one line per metric (Total/Borrowed/Maintenance)
+     across all campuses. Smooth curves, filled areas.
 
-Planned Mobile App Flow:
-  1. User opens the ManageMo mobile app and logs in with the same credentials.
-  2. App fetches the user's approved requests from the ManageMo API.
-  3. User selects the request they are receiving.
-  4. App activates the device rear camera to scan QR codes.
-  5. Each scanned code is matched against the expected per-unit QR codes for
-     that request (e.g. QR-A1B2C3D4E5-U01, QR-A1B2C3D4E5-U02 ...).
-  6. Matched items are checked off; a progress indicator shows X of Y scanned.
-  7. When all units are confirmed → app calls the ManageMo API endpoint
-     (POST /api/requests/{id}/deliver) → request status updated to 'delivered'.
-  8. Duplicate scans are rejected silently; unrecognised codes show a warning.
+  3. Campus Summary Table
+     Per-campus row: Total, Borrowed, Requested, Maintenance counts + View button
+     that opens the campus detail modal.
 
-QR Code Format (already defined in the web system):
-  - Every inventory item has a base qr_code_id, e.g. 'QR-A1B2C3D4E5'.
-  - getItemUnitQRCodes($item) generates per-unit codes:
-      quantity=3 → ['QR-A1B2C3D4E5-U01', 'QR-A1B2C3D4E5-U02', 'QR-A1B2C3D4E5-U03']
-  - QR images are generated by lib/qrcode.php and stored in assets/qrcodes/.
-  - For item requests with no inventory_id, the request_number itself is used
-    as the QR payload printed on the delivery paperwork.
+  4. Charts Row (3 columns):
+     - Item Status Doughnut  — available / borrowed / maintenance breakdown
+     - Request Status Doughnut — pending / approved / disapproved + stat rows
+       + "Review All Requests" button
+     - Quick Actions — 6 shortcut buttons to key admin pages
 
-Planned Technology Stack (Mobile App):
-  - Framework:  React Native, Flutter, or native Android/iOS
-  - QR Library: react-native-camera / mobile_scanner (Flutter) / ZXing (Android)
-  - Auth:       Same JWT or session token as the web system
-  - API:        REST API layer to be added to ManageMo backend
+  5. Recent Requests + Recently Added Items
+     Feed of the 5 most recent entries for each.
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 7: BORROW MANAGEMENT  (implicit via borrow-records + admin/requests)
+MODULE 7: USER DASHBOARD  (user/dashboard.php)
+────────────────────────────────────────────────────────────────────────────────
+Sections:
+  1. Welcome Banner — maroon banner with campus name, date, "New Request" button.
+  2. KPI Cards — Campus Items, Available, Active Borrows, Pending, My Owned Items.
+     White background with colored border per card.
+  3. Quick Actions | Request Summary | Campus Inventory Breakdown (3 columns).
+  4. Recent Requests table + Campus Items list.
+  5. My Owned Items list.
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 8: BORROW MANAGEMENT  (implicit via borrow-records + admin/requests)
 ────────────────────────────────────────────────────────────────────────────────
 Data source: getBorrowRecords() → array of borrow tracking records.
 Each record has:
@@ -255,7 +245,7 @@ Return process: admin sets actual_return_date → status = 'returned' →
                 inventory item status reverts to 'available'.
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 8: ANALYTICS  (admin/analytics.php)
+MODULE 9: ANALYTICS  (admin/analytics.php)
 ────────────────────────────────────────────────────────────────────────────────
 Charts and metrics including:
   - Requests over time (by type)
@@ -265,7 +255,7 @@ Charts and metrics including:
   - Overdue rate
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 9: REPORTS  (admin/reports.php)
+MODULE 10: REPORTS  (admin/reports.php)
 ────────────────────────────────────────────────────────────────────────────────
 Printable tabular reports:
   - Inventory by campus / category / status
@@ -274,30 +264,86 @@ Printable tabular reports:
   - User activity log
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 10: USER MANAGEMENT  (admin/users.php)
+MODULE 11: DEPARTMENT & CAMPUS MANAGER  (admin/inventory-campus.php)
+────────────────────────────────────────────────────────────────────────────────
+Accessed via "Manage Departments" button on the Campus Inventory page.
+Opens a tabbed modal with three tabs:
+
+  Tab 1 — Colleges (Main Campus only)
+    - Lists all colleges (8 defaults + any custom).
+    - Add: enter abbreviation (auto-uppercased) + full name → POST → saved to JSON.
+    - Delete: custom entries only; default colleges are protected.
+
+  Tab 2 — Offices (Main Campus only)
+    - Lists all administrative offices (14 defaults + any custom).
+    - Add/delete same as colleges tab.
+
+  Tab 3 — Campuses
+    - Lists all PSU campuses (8 defaults + any custom).
+    - Add: enter name, location, optional description → assigned auto-incremented ID.
+    - Delete: custom campuses only; default 8 campuses are protected.
+
+  Note: Colleges and Offices apply to Main Campus (ID 1) only.
+        Other campuses do not have sub-department breakdowns.
+
+Persistence:
+  Custom entries are saved to config/departments_custom.json:
+  {
+    "colleges": { "CON": "College of Nursing (CON)" },
+    "offices":  { "OAR": "Office of Alumni Relations (OAR)" },
+    "campuses": [
+      { "id": 9, "name": "Magalang Campus", "location": "Magalang, Pampanga",
+        "description": "", "colleges": [] }
+    ]
+  }
+
+  At runtime, getMainCampusColleges(), getMainCampusOffices(), and getCampuses()
+  merge defaults with custom JSON entries automatically.
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 12: QR DELIVERY SCANNER  [PLANNED — MOBILE APP FEATURE]
+────────────────────────────────────────────────────────────────────────────────
+NOTE: QR code scanning is NOT implemented in this web application.
+      It is reserved for a dedicated companion mobile app.
+
+Planned Mobile App Flow:
+  1. User opens the ManageMo mobile app and logs in.
+  2. App fetches the user's approved requests from the ManageMo API.
+  3. User selects the request they are receiving.
+  4. App activates camera to scan QR codes on delivered units.
+  5. Each scanned code matched against expected per-unit QR codes.
+  6. When all units confirmed → request status updated to 'delivered'.
+
+QR Code Format:
+  - Base: qr_code_id, e.g. 'QR-A1B2C3D4E5'
+  - Per-unit: 'QR-A1B2C3D4E5-U01', 'QR-A1B2C3D4E5-U02', ...
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 13: USER MANAGEMENT  (admin/users.php)
 ────────────────────────────────────────────────────────────────────────────────
 Admin-only. Lists all users (getUsers()).
 Actions: view profile, activate/deactivate, assign campus/college.
 Passwords are never displayed (BCrypt hash only).
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 11: SETTINGS  (user/settings.php, admin/settings.php)
+MODULE 14: SETTINGS  (user/settings.php, admin/settings.php)
 ────────────────────────────────────────────────────────────────────────────────
 User settings: update full_name, phone, password (with current password verify).
 Admin settings: system name, email, campus configuration.
-Changes are session-persisted (mock mode — no DB write).
+Changes are session-persisted (mock mode — no persistent write).
 
 ================================================================================
 DATA RELATIONSHIPS
 ================================================================================
 
-Users ──────────────────── campus_id  →  Campuses
-Users ──────────────────── college_id →  Main Campus Colleges (string key)
-Inventory ──────────────── campus_id  →  Campuses
-Requests ───────────────── user_id    →  Users
+Users ──────────────────── campus_id   →  Campuses
+Users ──────────────────── college_id  →  Main Campus Colleges (string key)
+Inventory ──────────────── campus_id   →  Campuses
+Inventory ──────────────── college_id  →  Main Campus Colleges (Main Campus only)
+Requests ───────────────── user_id     →  Users
 Requests ───────────────── inventory_id → Inventory (nullable for item requests)
 Requests ───────────────── approved_by  → Users (admin)
-BorrowRecords ──────────── user_id    →  Users
+BorrowRecords ──────────── user_id     →  Users
 BorrowRecords ──────────── inventory_id → Inventory
 BorrowRecords ──────────── request_id   → Requests
 
@@ -316,7 +362,7 @@ REQUEST STATUS FLOW
        │ approved │          │ disapproved │ (terminal)
        └────┬─────┘          └─────────────┘
             │
-            │ Items dispatched / user scans QR
+            │ Items dispatched / QR scan (mobile app)
             ▼
        ┌───────────┐
        │ delivered │ (terminal for item requests)
@@ -347,7 +393,8 @@ URGENCY LEVELS
 CAMPUS STRUCTURE
 ================================================================================
 
-  ID 1 — Main Campus (Bacolor)
+Default campuses (cannot be deleted):
+  ID 1 — Main Campus (Brgy. Cabambangan, Bacolor, Pampanga)
            Colleges: CEA, COE, CCS, CBS, CAS, CIT, CHTM, CSSP
            Offices:  OUP, OVPAA, OVPAF, OVPRDE, OUR, OSAS, HRMO,
                      ICTO, FBO, PMO, PPMO, ULib, GCC, PDO
@@ -359,28 +406,57 @@ CAMPUS STRUCTURE
   ID 7 — Apalit Campus
   ID 8 — City of San Fernando Campus
 
+Custom campuses are added via the Department Manager UI and stored in
+config/departments_custom.json with auto-incremented IDs starting at 9.
+
+Only Main Campus (ID 1) supports College and Office sub-department breakdowns.
+
+================================================================================
+DESIGN SYSTEM
+================================================================================
+
+Primary color:  #8B0000 (maroon)
+Dark variant:   #6B0000
+Border:         #e5e7eb
+Background:     #ffffff
+Muted bg:       #f7f7f7
+Text:           #111111
+
+CSS variables (defined in css/style.css):
+  --primary, --primary-dk, --border, --bg, --bg-muted, --text, --text-2, --text-3
+
+Design rules:
+  - No gradients or glassmorphism on internal pages
+  - Border-radius: max 8px (cards), 6px (buttons/inputs), 4px (badges)
+  - Sidebar active state: background #8B0000 !important, color #fff !important
+  - KPI cards: white background, full colored border (1.5px) matching metric color
+  - Flat icons only — no icon wrapper backgrounds
+  - Login page: split-panel, left = image + maroon gradient overlay, right = white form
+  - Cache-busted style.css via ?v=filemtime() in header.php
+
 ================================================================================
 TECH STACK
 ================================================================================
 
-  Backend:    PHP 8.x (no framework, no ORM)
-  Data:       Hardcoded PHP arrays (no database)
+  Backend:    PHP 7.4+ (no framework, no ORM)
+  Data:       Hardcoded PHP arrays + JSON file persistence
   Auth:       PHP sessions + BCrypt (password_hash / password_verify)
   Frontend:   Bootstrap 5.3, Font Awesome 6.4
-  QR Reader:  [MOBILE APP — planned, not in web]  jsQR / ZXing / mobile_scanner
+  Charts:     Chart.js 4.4 (CDN) — line, doughnut chart types
   QR Writer:  lib/qrcode.php (PHP QR Code generator)
+  QR Reader:  [MOBILE APP — planned] ZXing / mobile_scanner
   Server:     Apache (XAMPP) — http://localhost/ManageMo/
-  Upload:     PHP $_FILES, validated by MIME + extension + size
 
 ================================================================================
 KNOWN LIMITATIONS (MOCK MODE)
 ================================================================================
 
   - All data mutations (approve, submit, deliver, etc.) are NOT persisted
-    between page loads. Session flash messages confirm the action visually,
-    but the underlying PHP arrays are reset on each request.
+    between page loads except for department/campus additions which write to
+    config/departments_custom.json.
+  - Session flash messages confirm actions visually, but underlying PHP arrays
+    reset on each request.
   - Email delivery requires a working PHP mail() / SMTP configuration.
   - QR scanner requires HTTPS or localhost for camera access (browser security).
-  - No real file storage across requests for uploaded approval letters.
 
 ================================================================================

@@ -61,51 +61,44 @@ displayMessage();
 }
 .mrt-title-icon {
     width:40px; height:40px;
-    background:linear-gradient(135deg,#8B0000,#b91c1c);
-    border-radius:11px; display:flex; align-items:center; justify-content:center;
-    color:#fff; font-size:1rem;
-    box-shadow:0 4px 12px rgba(139,0,0,0.25); flex-shrink:0;
+    background:#8B0000;
+    border-radius:8px; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:1rem; flex-shrink:0;
 }
 
 /* Stat cards */
 .mrt-stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
 .mrt-stat-card {
     flex:1; min-width:130px;
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:14px 16px;
     display:flex; align-items:center; gap:12px;
-    cursor:pointer; transition:border-color 0.15s, box-shadow 0.15s;
+    cursor:pointer; transition:border-color 0.15s;
     text-decoration:none; color:inherit;
 }
-.mrt-stat-card:hover { border-color:rgba(139,0,0,0.20); box-shadow:0 6px 24px rgba(0,0,0,0.11); color:inherit; text-decoration:none; }
-.mrt-stat-card.active-filter { border-color:#8B0000; box-shadow:0 0 0 3px rgba(139,0,0,0.10); }
-.mrt-stat-icon { width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
-.mrt-stat-val  { font-size:1.5rem; font-weight:800; color:#1a1d23; line-height:1; }
-.mrt-stat-lbl  { font-size:0.73rem; color:rgba(0,0,0,0.45); font-weight:600; margin-top:2px; }
+.mrt-stat-card:hover { border-color:rgba(139,0,0,0.25); color:inherit; text-decoration:none; }
+.mrt-stat-card.active-filter { border-color:#8B0000; }
+.mrt-stat-icon { width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+.mrt-stat-val  { font-size:1.5rem; font-weight:800; color:#111; line-height:1; }
+.mrt-stat-lbl  { font-size:0.73rem; color:#555; font-weight:600; margin-top:2px; }
 
 /* Filter bar */
 .mrt-filter {
-    background:rgba(255,255,255,0.70);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
     padding:14px 18px; margin-bottom:20px;
     display:flex; align-items:center; flex-wrap:wrap; gap:10px;
 }
-.mrt-filter-label { font-size:0.71rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:rgba(0,0,0,0.40); margin-bottom:4px; }
+.mrt-filter-label { font-size:0.71rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#999; margin-bottom:4px; }
 
 /* Request card */
 .mrt-card {
-    background:rgba(255,255,255,0.74);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     margin-bottom:16px; overflow:hidden;
-    transition:box-shadow 0.18s, border-color 0.18s;
+    transition:border-color 0.15s;
 }
-.mrt-card:hover { box-shadow:0 8px 30px rgba(0,0,0,0.11); border-color:rgba(139,0,0,0.12); }
+.mrt-card:hover { border-color:rgba(139,0,0,0.20); }
 
 .mrt-card-head {
     padding:16px 20px 14px;
@@ -143,11 +136,11 @@ displayMessage();
 /* Status tracker stepper */
 .mrt-tracker {
     padding:18px 20px;
-    border-bottom:1px solid rgba(0,0,0,0.06);
+    border-bottom:1px solid #e5e7eb;
 }
 .mrt-tracker-label {
     font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
-    color:rgba(0,0,0,0.36); margin-bottom:14px;
+    color:#999; margin-bottom:14px;
 }
 .mrt-steps { display:flex; align-items:center; position:relative; }
 .mrt-step  { display:flex; flex-direction:column; align-items:center; flex:1; position:relative; }
@@ -155,29 +148,29 @@ displayMessage();
     width:32px; height:32px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     font-size:0.75rem; font-weight:700;
-    border:2px solid rgba(0,0,0,0.10);
-    background:#fff; color:rgba(0,0,0,0.30);
+    border:2px solid #e5e7eb;
+    background:#fff; color:#999;
     position:relative; z-index:2;
     transition:all 0.2s;
 }
-.mrt-step-dot.done     { background:linear-gradient(135deg,#22c55e,#16a34a); border-color:#22c55e; color:#fff; box-shadow:0 3px 10px rgba(34,197,94,0.30); }
-.mrt-step-dot.active   { background:linear-gradient(135deg,#8B0000,#b91c1c); border-color:#8B0000; color:#fff; box-shadow:0 3px 10px rgba(139,0,0,0.30); }
-.mrt-step-dot.rejected { background:linear-gradient(135deg,#ef4444,#b91c1c); border-color:#ef4444; color:#fff; box-shadow:0 3px 10px rgba(239,68,68,0.28); }
-.mrt-step-dot.pending-dot { background:rgba(245,158,11,0.12); border-color:#f59e0b; color:#b45309; }
+.mrt-step-dot.done     { background:#22c55e; border-color:#22c55e; color:#fff; }
+.mrt-step-dot.active   { background:#8B0000; border-color:#8B0000; color:#fff; }
+.mrt-step-dot.rejected { background:#ef4444; border-color:#ef4444; color:#fff; }
+.mrt-step-dot.pending-dot { background:#fff; border-color:#f59e0b; color:#b45309; }
 .mrt-step-lbl {
     font-size:0.67rem; font-weight:700; text-align:center; margin-top:6px;
-    color:rgba(0,0,0,0.35); line-height:1.25; max-width:70px;
+    color:#999; line-height:1.25; max-width:70px;
 }
 .mrt-step-lbl.done-lbl     { color:#15803d; }
 .mrt-step-lbl.active-lbl   { color:#8B0000; }
 .mrt-step-lbl.rejected-lbl { color:#b91c1c; }
 .mrt-step-lbl.pending-lbl  { color:#b45309; }
 .mrt-step-line {
-    flex:1; height:2px; background:rgba(0,0,0,0.08);
+    flex:1; height:2px; background:#e5e7eb;
     margin: 0 -1px; margin-top:-22px; position:relative; z-index:1;
 }
-.mrt-step-line.done-line { background:linear-gradient(90deg,#22c55e,#22c55e); }
-.mrt-step-line.partial-line { background:linear-gradient(90deg,#22c55e 50%,rgba(0,0,0,0.08) 50%); }
+.mrt-step-line.done-line { background:#22c55e; }
+.mrt-step-line.partial-line { background:#22c55e; }
 
 /* Details section */
 .mrt-card-body {
@@ -201,28 +194,26 @@ displayMessage();
 /* Empty state */
 .mrt-empty {
     text-align:center; padding:60px 20px;
-    background:rgba(255,255,255,0.60);
-    backdrop-filter:blur(16px); border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    color:rgba(0,0,0,0.38);
+    background:#fff; border:1px solid #e5e7eb; border-radius:8px;
+    color:#999;
 }
 .mrt-empty-icon {
-    width:64px; height:64px; background:rgba(0,0,0,0.05); border-radius:18px;
+    width:56px; height:56px;
     display:flex; align-items:center; justify-content:center; font-size:1.8rem;
-    margin:0 auto 16px; color:rgba(0,0,0,0.25);
+    margin:0 auto 16px; color:#999;
 }
-.mrt-empty h5 { color:rgba(0,0,0,0.45); font-size:1rem; margin:0 0 6px; }
+.mrt-empty h5 { color:#555; font-size:1rem; margin:0 0 6px; }
 .mrt-empty p  { font-size:0.85rem; margin:0; }
 
 .mrt-new-btn {
-    background:linear-gradient(135deg,#8B0000,#b91c1c) !important;
-    border:none !important; border-radius:12px !important;
+    background:#8B0000 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; font-size:0.88rem !important;
     color:#fff !important; padding:9px 20px !important;
-    box-shadow:0 4px 14px rgba(139,0,0,0.25) !important;
     text-decoration:none; display:inline-flex; align-items:center; gap:7px;
-    transition:transform 0.15s, box-shadow 0.15s;
+    transition:background 0.15s;
 }
-.mrt-new-btn:hover { transform:translateY(-1px) !important; box-shadow:0 7px 20px rgba(139,0,0,0.32) !important; color:#fff !important; }
+.mrt-new-btn:hover { background:#7a0000 !important; color:#fff !important; }
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -237,7 +228,7 @@ displayMessage();
     <!-- Stats -->
     <div class="mrt-stats">
         <a href="my-requests.php" class="mrt-stat-card <?php echo !$status_filter ? 'active-filter' : ''; ?>">
-            <div class="mrt-stat-icon" style="background:rgba(107,114,128,0.10);color:#6b7280;">
+            <div class="mrt-stat-icon" style="color:#6b7280;">
                 <i class="fas fa-layer-group"></i>
             </div>
             <div>
@@ -246,7 +237,7 @@ displayMessage();
             </div>
         </a>
         <a href="my-requests.php?status=pending" class="mrt-stat-card <?php echo $status_filter === 'pending' ? 'active-filter' : ''; ?>">
-            <div class="mrt-stat-icon" style="background:rgba(245,158,11,0.12);color:#b45309;">
+            <div class="mrt-stat-icon" style="color:#b45309;">
                 <i class="fas fa-hourglass-half"></i>
             </div>
             <div>
@@ -255,7 +246,7 @@ displayMessage();
             </div>
         </a>
         <a href="my-requests.php?status=approved" class="mrt-stat-card <?php echo $status_filter === 'approved' ? 'active-filter' : ''; ?>">
-            <div class="mrt-stat-icon" style="background:rgba(34,197,94,0.12);color:#15803d;">
+            <div class="mrt-stat-icon" style="color:#15803d;">
                 <i class="fas fa-check-circle"></i>
             </div>
             <div>
@@ -264,7 +255,7 @@ displayMessage();
             </div>
         </a>
         <a href="my-requests.php?status=disapproved" class="mrt-stat-card <?php echo $status_filter === 'disapproved' ? 'active-filter' : ''; ?>">
-            <div class="mrt-stat-icon" style="background:rgba(239,68,68,0.10);color:#b91c1c;">
+            <div class="mrt-stat-icon" style="color:#b91c1c;">
                 <i class="fas fa-times-circle"></i>
             </div>
             <div>

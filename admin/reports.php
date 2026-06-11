@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $page_title = 'Reports';
 require_once dirname(__DIR__) . '/config/functions.php';
 
@@ -80,40 +80,38 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 /* --- Screen styles --- */
 .rp-filter-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
     padding:16px 20px; margin-bottom:18px;
 }
 .rp-filter-label { font-size:0.71rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:rgba(0,0,0,0.36); margin-bottom:5px; }
 .rp-btn {
     display:inline-flex; align-items:center; gap:6px;
-    padding:8px 18px; border-radius:10px; border:none;
+    padding:8px 18px; border-radius:6px; border:none;
     font-size:0.83rem; font-weight:700; cursor:pointer;
-    text-decoration:none; transition:all 0.15s;
+    text-decoration:none; transition:background 0.15s;
 }
-.rp-btn-primary { background:linear-gradient(135deg,var(--rp-red),var(--rp-red2)); color:#fff !important; box-shadow:0 3px 12px rgba(139,0,0,0.22); }
-.rp-btn-primary:hover { transform:translateY(-1px); box-shadow:0 5px 18px rgba(139,0,0,0.30); }
-.rp-btn-outline { background:transparent; color:var(--rp-red) !important; border:2px solid var(--rp-red); }
+.rp-btn-primary { background:#8B0000; color:#fff !important; }
+.rp-btn-primary:hover { background:#6b0000; }
+.rp-btn-outline { background:transparent; color:var(--rp-red) !important; border:1px solid var(--rp-red); }
 .rp-btn-outline:hover { background:rgba(139,0,0,0.06); }
-.rp-btn-print { background:linear-gradient(135deg,#1d4ed8,#3b82f6); color:#fff !important; box-shadow:0 3px 12px rgba(29,78,216,0.22); }
-.rp-btn-print:hover { transform:translateY(-1px); }
+.rp-btn-print { background:#1d4ed8; color:#fff !important; }
+.rp-btn-print:hover { background:#1e40af; }
 
 .rp-type-tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
 .rp-type-tab {
-    padding:7px 18px; border-radius:10px; font-size:0.82rem; font-weight:700;
-    border:2px solid rgba(0,0,0,0.09); background:rgba(255,255,255,0.6);
-    color:rgba(0,0,0,0.45); cursor:pointer; text-decoration:none;
-    transition:all 0.15s; display:inline-flex; align-items:center; gap:6px;
+    padding:7px 18px; border-radius:6px; font-size:0.82rem; font-weight:700;
+    border:1px solid #e5e7eb; background:#fff;
+    color:#555; cursor:pointer; text-decoration:none;
+    transition:border-color 0.15s, color 0.15s; display:inline-flex; align-items:center; gap:6px;
 }
-.rp-type-tab:hover { border-color:rgba(139,0,0,0.25); color:var(--rp-red); background:rgba(139,0,0,0.04); }
-.rp-type-tab.active { border-color:var(--rp-red); background:rgba(139,0,0,0.07); color:var(--rp-red); }
+.rp-type-tab:hover { border-color:var(--rp-red); color:var(--rp-red); }
+.rp-type-tab.active { border-color:var(--rp-red); background:#fff; color:#111; font-weight:800; }
 
 .rp-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:0; overflow:hidden; margin-bottom:18px;
 }
 .rp-card-head {
@@ -123,10 +121,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 }
 .rp-card-title { font-size:0.93rem; font-weight:800; color:#1a1d23; display:flex; align-items:center; gap:8px; }
 .rp-card-icon {
-    width:30px; height:30px; border-radius:8px;
-    background:linear-gradient(135deg,var(--rp-red),var(--rp-red2));
     display:flex; align-items:center; justify-content:center;
-    color:#fff; font-size:0.75rem;
+    color:#8B0000; font-size:1rem;
 }
 .rp-record-count { font-size:0.75rem; font-weight:700; color:rgba(0,0,0,0.38); }
 
@@ -143,7 +139,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .rp-table tr:last-child td { border-bottom:none; }
 .rp-table tr:hover td { background:rgba(0,0,0,0.011); }
 .rp-badge {
-    display:inline-flex; padding:2px 9px; border-radius:20px;
+    display:inline-flex; padding:2px 9px; border-radius:4px;
     font-size:0.71rem; font-weight:700;
 }
 .rp-badge-available  { background:rgba(34,197,94,0.12);  color:#15803d; }
@@ -436,17 +432,17 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div style="display:flex; gap:8px;">
                     <?php for ($p = 1; $p <= min($total_pages, 5); $p++): ?>
                     <a href="?type=<?php echo $report_type; ?>&campus_id=<?php echo $campus_id; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $p; ?>"
-                       style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; font-size:0.85rem; font-weight:700; text-decoration:none; transition:all 0.2s; 
-                              background:<?php echo $p === $page ? 'linear-gradient(135deg,#8B0000,#b91c1c)' : 'rgba(0,0,0,0.06)'; ?>;
-                              color:<?php echo $p === $page ? '#fff' : 'rgba(0,0,0,0.55)'; ?>;
-                              border:<?php echo $p === $page ? 'none' : '1px solid rgba(0,0,0,0.1)'; ?>;">
+                       style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; font-size:0.85rem; font-weight:700; text-decoration:none; 
+                              background:<?php echo $p === $page ? '#8B0000' : '#f7f7f7'; ?>;
+                              color:<?php echo $p === $page ? '#fff' : '#555'; ?>;
+                              border:<?php echo $p === $page ? 'none' : '1px solid #e5e7eb'; ?>;">
                         <?php echo $p; ?>
                     </a>
                     <?php endfor; ?>
                     <?php if ($total_pages > 5): ?>
                     <span style="padding:0 8px; color:rgba(0,0,0,0.35);">...</span>
                     <a href="?type=<?php echo $report_type; ?>&campus_id=<?php echo $campus_id; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $total_pages; ?>"
-                       style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; font-size:0.85rem; font-weight:700; text-decoration:none; transition:all 0.2s; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.55); border:1px solid rgba(0,0,0,0.1);">
+                       style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:6px; font-size:0.85rem; font-weight:700; text-decoration:none; background:#f7f7f7; color:#555; border:1px solid #e5e7eb;">
                         <?php echo $total_pages; ?>
                     </a>
                     <?php endif; ?>

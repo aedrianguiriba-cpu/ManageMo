@@ -14,33 +14,22 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
-// Handle login
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
-    $email = sanitizeInput($_POST['email'] ?? '');
+    $email    = sanitizeInput($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    
+
     if (!$email || !$password) {
         $error = 'Email and password are required';
     } else {
         $users = getUsers();
-        $user = null;
-        
+        $user  = null;
         foreach ($users as $u) {
-            if ($u['email'] === $email && $u['is_active'] == 1) {
-                $user = $u;
-                break;
-            }
+            if ($u['email'] === $email && $u['is_active'] == 1) { $user = $u; break; }
         }
-        
         if ($user && verifyPassword($password, $user['password'])) {
             startSession();
             $_SESSION['user_id'] = $user['id'];
-            
-            if ($user['role'] === ROLE_ADMIN) {
-                header('Location: ' . BASE_URL . 'admin/dashboard.php');
-            } else {
-                header('Location: ' . BASE_URL . 'user/dashboard.php');
-            }
+            header('Location: ' . BASE_URL . ($user['role'] === ROLE_ADMIN ? 'admin/dashboard.php' : 'user/dashboard.php'));
             exit;
         } else {
             $error = 'Invalid email or password';
@@ -48,30 +37,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
     }
 }
 
-// Handle forgot password
-$forgot_error = '';
+$forgot_error   = '';
 $forgot_success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
     $forgot_email = sanitizeInput($_POST['forgot_email'] ?? '');
-
     if (!$forgot_email) {
         $forgot_error = 'Email address is required';
     } elseif (!filter_var($forgot_email, FILTER_VALIDATE_EMAIL)) {
         $forgot_error = 'Invalid email address';
     } else {
         $users = getUsers();
-        $user_exists = false;
-        foreach ($users as $u) {
-            if ($u['email'] === $forgot_email && $u['is_active'] == 1) {
-                $user_exists = true;
-                break;
-            }
-        }
-        if ($user_exists) {
-            $forgot_success = 'Password reset instructions have been sent to ' . htmlspecialchars($forgot_email) . '. Please check your email inbox.';
-        } else {
-            $forgot_success = 'If an account exists with this email, you will receive password reset instructions shortly.';
-        }
+        $found = false;
+        foreach ($users as $u) { if ($u['email'] === $forgot_email && $u['is_active'] == 1) { $found = true; break; } }
+        $forgot_success = 'If an account exists with this email, you will receive reset instructions shortly.';
     }
 }
 ?>
@@ -80,624 +58,435 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ManageMo | Pampanga State University</title>
+    <title>ManageMo | Sign In</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
             min-height: 100vh;
-            background: #FFFFFF;
+            background: #1a1a1a;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            overflow: hidden;
-        }
-        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
             position: relative;
-            width: 100%;
-            min-height: 100vh;
-            display: flex;
-        }
-        
-        /* Left section (forms) */
-        .auth-left {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 50%;
-            height: 100vh;
-            background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 60px 50px;
-            z-index: 2;
-            transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-        
-        .auth-left.signup-active {
-            transform: translateX(100%);
-        }
-        
-        /* Right section (promo) */
-        .auth-right {
-            position: absolute;
-            right: 0;
-            top: 0;
-            width: 50%;
-            height: 100vh;
-            background: linear-gradient(135deg, rgba(139, 0, 0, 0.85) 0%, rgba(107, 0, 0, 0.85) 100%), url('assets/pics/storagebg.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 60px 40px;
-            color: white;
             overflow: hidden;
-            transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: -20px;
+            background: url('<?php echo BASE_URL; ?>assets/pics/storagebg.jpg') center/cover no-repeat;
+            filter: blur(12px);
+            transform: scale(1.05);
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.45) 100%);
+            z-index: 0;
+        }
+
+        /* ── Outer card ── */
+        .login-card {
+            position: relative;
             z-index: 1;
+            display: flex;
+            width: 100%;
+            max-width: 1600px;
+            min-height: 680px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.45);
         }
-        
-        .auth-right.signup-active {
-            z-index: 3;
-            transform: translateX(-100%);
+
+        /* ── Left panel ── */
+        .login-left {
+            flex: 1;
+            position: relative;
+            background: url('<?php echo BASE_URL; ?>assets/pics/storagebg.jpg') center/cover no-repeat;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 32px;
+            min-width: 0;
         }
-        
-        .auth-right::before {
+
+        .login-left::after {
             content: '';
             position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-            background-size: 50px 50px;
-            pointer-events: none;
+            inset: 0;
+            background: linear-gradient(160deg, rgba(107,0,0,0.72) 0%, rgba(139,0,0,0.60) 45%, rgba(61,0,0,0.80) 100%);
         }
-        
-        /* Forms container */
-        .auth-forms-wrapper {
+
+        .login-left-top,
+        .login-left-bottom {
             position: relative;
-            width: 100%;
-            max-width: 400px;
-            height: 100%;
+            z-index: 1;
+        }
+
+        .login-left-tag {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.65);
             display: flex;
-            flex-direction: column;
-            justify-content: center;
+            align-items: center;
+            gap: 10px;
         }
-        
-        .auth-form {
-            position: absolute;
-            width: 100%;
-            opacity: 1;
-            visibility: visible;
-            transition: opacity 0.4s ease, visibility 0.4s ease;
-        }
-        
-        .auth-form.hidden {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-        }
-        
-        /* Card styles */
-        .auth-card {
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            padding: 0;
-        }
-        
-        .auth-header {
-            margin-bottom: 35px;
-            text-align: left;
-        }
-        
-        .auth-logo {
-            width: 110px;
-            height: 65px;
-            object-fit: contain;
-            margin-bottom: 30px;
+
+        .login-left-tag::after {
+            content: '';
             display: block;
-            filter: none;
-            transition: transform 0.3s;
+            width: 40px;
+            height: 1px;
+            background: rgba(255,255,255,0.45);
         }
-        
-        .auth-logo:hover {
-            transform: scale(1.05);
-        }
-        
-        .auth-header h1 {
-            color: #1a1a1a;
-            font-size: 38px;
+
+        .login-left-heading {
+            font-size: 2.6rem;
             font-weight: 800;
-            margin-bottom: 8px;
+            color: #fff;
+            line-height: 1.15;
+            margin-bottom: 12px;
             letter-spacing: -0.5px;
         }
-        
-        .auth-header p {
-            color: #7F8C8D;
-            font-size: 15px;
-            margin: 0;
-        }
-        
-        .form-group {
-            margin-bottom: 18px;
-            clear: both;
-            position: relative;
-        }
-        
-        .form-group label {
-            display: block;
-            color: #2C3E50;
-            font-size: 13px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            text-transform: capitalize;
-            letter-spacing: 0.3px;
-        }
-        
-        .form-control,
-        .form-select {
-            background: #FFFFFF;
-            border: 1.5px solid #E0E0E0;
-            padding: 12px 14px;
-            border-radius: 8px;
-            font-size: 14px;
-            color: #2C3E50;
-            width: 100%;
-            transition: all 0.3s;
-        }
-        
-        .form-control::placeholder {
-            color: #BDBDBD;
-        }
-        
-        .form-control:hover,
-        .form-select:hover {
-            border-color: #CCCCCC;
-        }
-        
-        .form-control:focus,
-        .form-select:focus {
-            outline: none;
-            border-color: #8B0000;
-            box-shadow: 0 0 0 4px rgba(139, 0, 0, 0.08);
-        }
-        
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        
-        .password-strength {
-            height: 4px;
-            background: #E0E0E0;
-            border-radius: 3px;
-            margin-top: 6px;
-            overflow: hidden;
-        }
-        
-        .password-strength-bar {
-            height: 100%;
-            width: 0%;
-            border-radius: 3px;
-            transition: all 0.3s;
-        }
-        
-        .password-help {
-            text-align: right;
-            margin-bottom: 20px;
-        }
-        
-        .password-help a {
-            color: #8B0000;
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 600;
-            transition: color 0.3s;
-        }
-        
-        .password-help a:hover {
-            color: #6B0000;
-            text-decoration: underline;
-        }
-        
-        .btn-auth {
-            width: 100%;
-            padding: 13px 20px;
-            background: linear-gradient(135deg, #8B0000 0%, #A52A2A 100%);
-            border: none;
-            color: white;
-            font-weight: 700;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 15px;
-            transition: all 0.3s;
-            box-shadow: 0 4px 12px rgba(139, 0, 0, 0.25);
-            letter-spacing: 0.3px;
-            margin-top: 10px;
-        }
-        
-        .btn-auth:hover {
-            background: linear-gradient(135deg, #6B0000 0%, #8B0000 100%);
-            box-shadow: 0 6px 16px rgba(139, 0, 0, 0.35);
-            transform: translateY(-1px);
-        }
-        
-        .auth-toggle {
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        .auth-toggle a {
-            color: #7F8C8D;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 400;
-            transition: color 0.3s;
-            cursor: pointer;
-        }
-        
-        .auth-toggle a strong {
-            color: #8B0000;
-            font-weight: 700;
-            transition: color 0.3s;
-        }
-        
-        .auth-toggle a:hover,
-        .auth-toggle a:hover strong {
-            color: #6B0000;
-            text-decoration: underline;
-        }
-        
-        .alert {
-            padding: 12px 14px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 13px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .alert-danger {
-            background: rgba(231, 76, 60, 0.1);
-            border: 1px solid #E74C3C;
-            color: #C0392B;
-        }
-        
-        .alert-success {
-            background: rgba(39, 174, 96, 0.1);
-            border: 1px solid #27AE60;
-            color: #1E8449;
-        }
-        
-        .alert i {
-            margin-right: 8px;
-        }
-        
-        .btn-close {
-            background: transparent;
-            border: none;
-            color: inherit;
-            cursor: pointer;
-            font-size: 18px;
-            opacity: 0.7;
-            padding: 0;
-            width: 20px;
-            height: 20px;
-        }
-        
-        .btn-close:hover {
-            opacity: 1;
-        }
-        
-        /* Promo content */
-        .promo-content {
-            max-width: 400px;
-            z-index: 1;
-            text-align: center;
-        }
-        
-        .promo-heading {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 15px;
-        }
-        
-        .promo-text {
-            font-size: 14px;
-            opacity: 0.9;
+
+        .login-left-sub {
+            font-size: 0.84rem;
+            color: rgba(255,255,255,0.65);
             line-height: 1.6;
-            margin-bottom: 40px;
+            max-width: 320px;
         }
-        
-        .features-list {
+
+        /* ── Right panel ── */
+        .login-right {
+            width: 640px;
+            flex-shrink: 0;
+            background: #fff;
             display: flex;
             flex-direction: column;
-            gap: 24px;
-            margin-top: 50px;
+            justify-content: center;
+            padding: 64px 56px;
         }
-        
-        .feature-item {
-            display: flex;
-            gap: 18px;
-            padding: 18px 0;
-            padding-left: 20px;
-            background: transparent;
-            border: none;
-            border-left: 3px solid rgba(255, 255, 255, 0.4);
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-        }
-        
-        .feature-item:hover {
-            border-left-color: rgba(255, 255, 255, 0.8);
-            padding-left: 24px;
-        }
-        
-        .feature-icon {
-            font-size: 28px;
-            min-width: 40px;
-            height: 40px;
+
+        .login-logo {
             display: flex;
             align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.15);
+            gap: 10px;
+            margin-bottom: 36px;
+        }
+
+        .login-logo img {
+            height: 32px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .login-logo-name {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #111;
+            letter-spacing: -0.2px;
+        }
+
+        .login-heading {
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: #111;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .login-sub {
+            font-size: 0.84rem;
+            color: #888;
+            margin-bottom: 28px;
+        }
+
+        /* Form */
+        .login-label {
+            font-size: 0.80rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .login-input {
+            width: 100%;
+            background: #f5f6f7;
+            border: 1px solid transparent;
             border-radius: 8px;
-            flex-shrink: 0;
-            transition: all 0.3s ease;
+            padding: 11px 14px;
+            font-size: 0.88rem;
+            color: #111;
+            transition: border-color 0.15s, background 0.15s;
+            outline: none;
         }
-        
-        .feature-item:hover .feature-icon {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(1.1);
+
+        .login-input::placeholder { color: #bbb; }
+
+        .login-input:focus {
+            background: #fff;
+            border-color: #8B0000;
         }
-        
-        .feature-icon i {
-            color: white;
+
+        .login-input-wrap {
+            position: relative;
         }
-        
-        .feature-text h4 {
-            margin: 0 0 5px 0;
-            font-size: 15px;
+
+        .login-eye {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #bbb;
+            cursor: pointer;
+            font-size: 0.82rem;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .login-eye:hover { color: #888; }
+
+        .login-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 12px 0 22px;
+            font-size: 0.80rem;
+        }
+
+        .login-remember {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: #555;
+            cursor: pointer;
+        }
+
+        .login-remember input[type=checkbox] {
+            width: 14px; height: 14px;
+            accent-color: #8B0000;
+            cursor: pointer;
+        }
+
+        .login-forgot {
+            color: #555;
+            text-decoration: none;
             font-weight: 600;
-            color: white;
-            text-align: left;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            font-size: 0.80rem;
         }
-        
-        .feature-text p {
-            margin: 0;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.75);
-            text-align: left;
-            line-height: 1.4;
+
+        .login-forgot:hover { color: #8B0000; text-decoration: underline; }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: #8B0000;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+            letter-spacing: 0.2px;
         }
-        
-        @media (max-width: 992px) {
-            .auth-left,
-            .auth-right {
-                width: 100%;
-                position: relative;
-            }
-            
-            .auth-left.signup-active {
-                transform: none;
-            }
-            
-            .auth-right {
-                display: none;
-            }
-            
-            .auth-right.signup-active {
-                transform: none;
-            }
+
+        .login-btn:hover { background: #6B0000; }
+
+        .login-footer {
+            margin-top: 22px;
+            text-align: center;
+            font-size: 0.80rem;
+            color: #888;
+        }
+
+        .login-footer a, .login-footer button {
+            color: #111;
+            font-weight: 700;
+            text-decoration: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            font-size: 0.80rem;
+        }
+
+        .login-footer a:hover, .login-footer button:hover { color: #8B0000; }
+
+        .login-alert {
+            padding: 10px 13px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .login-alert-danger  { background: rgba(220,38,38,0.07); border: 1px solid rgba(220,38,38,0.25); color: #b91c1c; }
+        .login-alert-success { background: rgba(22,163,74,0.07);  border: 1px solid rgba(22,163,74,0.25);  color: #15803d; }
+
+        .login-alert-close {
+            background: none; border: none; cursor: pointer;
+            color: inherit; opacity: 0.6; font-size: 1rem; padding: 0; line-height: 1;
+        }
+        .login-alert-close:hover { opacity: 1; }
+
+        .login-field { margin-bottom: 16px; }
+
+        /* Forgot form */
+        .login-back {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: none; border: none; cursor: pointer;
+            color: #8B0000; font-size: 0.80rem; font-weight: 600;
+            padding: 0; margin-top: 14px;
+        }
+        .login-back:hover { text-decoration: underline; }
+
+        @media (max-width: 768px) {
+            .login-left { display: none; }
+            .login-right { width: 100%; padding: 36px 28px; }
+            .login-card  { max-width: 420px; min-height: auto; border-radius: 12px; }
         }
     </style>
 </head>
 <body>
-    <div class="auth-container">
-        <!-- Forms Section -->
-        <div class="auth-left" id="authLeft">
-            <div class="auth-forms-wrapper">
-                
-                <!-- Login Form -->
-                <div class="auth-form" id="loginForm">
-                    <div class="auth-card">
-                        <div class="auth-header">
-                            <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" alt="ManageMo Logo" class="auth-logo">
-                            <h1>Sign in</h1>
-                        </div>
+    <div class="login-card">
 
-                        <?php if ($error && isset($_POST['login_submit'])): ?>
-                            <div class="alert alert-danger">
-                                <span><i class="fas fa-exclamation-circle"></i> <?php echo $error; ?></span>
-                                <button type="button" class="btn-close" onclick="this.parentElement.style.display='none';">&times;</button>
-                            </div>
-                        <?php endif; ?>
-
-                        <form method="POST" action="">
-                            <div class="form-group">
-                                <label for="email_login">E-mail</label>
-                                <input type="email" class="form-control" id="email_login" name="email" required 
-                                       placeholder="your@email.com">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="password_login">Password</label>
-                                <input type="password" class="form-control" id="password_login" name="password" required 
-                                       placeholder="••••••••">
-                            </div>
-
-                            <div class="password-help">
-                                <a onclick="toggleForm()" style="cursor:pointer;">Forgot password?</a>
-                            </div>
-
-                            <button type="submit" name="login_submit" class="btn-auth">
-                                Sign In
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Forgot Password Form -->
-                <div class="auth-form hidden" id="forgotForm">
-                    <div class="auth-card">
-                        <div class="auth-header">
-                            <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" alt="ManageMo Logo" class="auth-logo">
-                            <h1>Forgot Password?</h1>
-                            <p>Enter your email to receive reset instructions.</p>
-                        </div>
-
-                        <?php if ($forgot_success): ?>
-                            <div class="alert alert-success">
-                                <span><i class="fas fa-check-circle"></i> <?php echo $forgot_success; ?></span>
-                                <button type="button" class="btn-close" onclick="this.parentElement.style.display='none';">&times;</button>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if ($forgot_error): ?>
-                            <div class="alert alert-danger">
-                                <span><i class="fas fa-exclamation-circle"></i> <?php echo $forgot_error; ?></span>
-                                <button type="button" class="btn-close" onclick="this.parentElement.style.display='none';">&times;</button>
-                            </div>
-                        <?php endif; ?>
-
-                        <form method="POST" action="">
-                            <div class="form-group">
-                                <label for="forgot_email">Email Address</label>
-                                <input type="email" class="form-control" id="forgot_email" name="forgot_email" required
-                                       placeholder="your@email.com"
-                                       value="<?php echo isset($_POST['forgot_email']) ? htmlspecialchars($_POST['forgot_email']) : ''; ?>">
-                            </div>
-
-                            <p style="font-size: 13px; color: #7F8C8D; margin-bottom: 22px;">
-                                <i class="fas fa-info-circle" style="color: #8B0000;"></i>
-                                Enter the email address associated with your account and we'll send you a link to reset your password.
-                            </p>
-
-                            <button type="submit" name="forgot_submit" class="btn-auth">
-                                <i class="fas fa-paper-plane me-2"></i>Send Reset Link
-                            </button>
-
-                            <div class="auth-toggle">
-                                <a onclick="toggleForm()"><i class="fas fa-arrow-left"></i> <strong>Back to Sign In</strong></a>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+        <!-- Left: image panel -->
+        <div class="login-left">
+            <div class="login-left-top">
+                <span class="login-left-tag">Asset Management</span>
+            </div>
+            <div class="login-left-bottom">
+                <div class="login-left-heading">Pampanga State<br>University</div>
+                <p class="login-left-sub">ManageMo tracks and manages all university assets across 8 PSU campuses with real-time updates and QR code generation.</p>
             </div>
         </div>
 
-        <!-- Promo Section -->
-        <div class="auth-right" id="authRight">
-            <div class="promo-content">
-                <h2 class="promo-heading">Pampanga State University</h2>
-                <p class="promo-text">ManageMo tracks and manages all university assets across 8 PSU campuses with real-time updates, QR code generation, and comprehensive reporting.</p>
-                
-                <div class="features-list">
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-boxes"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h4>Asset Tracking</h4>
-                            <p>Monitor 2,500+ items</p>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-qrcode"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h4>QR Codes</h4>
-                            <p>Quick identification</p>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-building"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h4>Multi-Campus</h4>
-                            <p>8 PSU campuses</p>
-                        </div>
-                    </div>
-                    
-                    <div class="feature-item">
-                        <div class="feature-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h4>Analytics</h4>
-                            <p>Real-time insights</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+        <!-- Right: form panel -->
+        <div class="login-right">
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            <div class="login-logo">
+                <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" alt="ManageMo">
+                <span class="login-logo-name">ManageMo</span>
+            </div>
+
+            <!-- Login Form -->
+            <div id="loginPanel">
+                <div class="login-heading">Welcome Back</div>
+                <p class="login-sub">Enter your email and password to access your account</p>
+
+                <?php if ($error && isset($_POST['login_submit'])): ?>
+                <div class="login-alert login-alert-danger">
+                    <span><i class="fas fa-exclamation-circle me-1"></i><?php echo htmlspecialchars($error); ?></span>
+                    <button class="login-alert-close" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                <?php endif; ?>
+
+                <form method="POST" action="">
+                    <div class="login-field">
+                        <label class="login-label">Email</label>
+                        <input type="email" name="email" class="login-input" placeholder="Enter your email" required
+                               value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                    </div>
+                    <div class="login-field">
+                        <label class="login-label">Password</label>
+                        <div class="login-input-wrap">
+                            <input type="password" name="password" id="loginPassword" class="login-input" placeholder="Enter your password" required style="padding-right:36px;">
+                            <button type="button" class="login-eye" onclick="togglePw('loginPassword', this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="login-row">
+                        <label class="login-remember">
+                            <input type="checkbox" name="remember"> Remember me
+                        </label>
+                        <button type="button" class="login-forgot" onclick="showForgot()">Forgot Password</button>
+                    </div>
+                    <button type="submit" name="login_submit" class="login-btn">Sign In</button>
+                </form>
+            </div>
+
+            <!-- Forgot Password Form -->
+            <div id="forgotPanel" style="display:none;">
+                <div class="login-heading">Reset Password</div>
+                <p class="login-sub">Enter your email to receive reset instructions</p>
+
+                <?php if ($forgot_success): ?>
+                <div class="login-alert login-alert-success">
+                    <span><i class="fas fa-check-circle me-1"></i><?php echo htmlspecialchars($forgot_success); ?></span>
+                    <button class="login-alert-close" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($forgot_error): ?>
+                <div class="login-alert login-alert-danger">
+                    <span><i class="fas fa-exclamation-circle me-1"></i><?php echo htmlspecialchars($forgot_error); ?></span>
+                    <button class="login-alert-close" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                <?php endif; ?>
+
+                <form method="POST" action="">
+                    <div class="login-field">
+                        <label class="login-label">Email Address</label>
+                        <input type="email" name="forgot_email" class="login-input" placeholder="Enter your email" required
+                               value="<?php echo isset($_POST['forgot_email']) ? htmlspecialchars($_POST['forgot_email']) : ''; ?>">
+                    </div>
+                    <p style="font-size:0.78rem;color:#999;margin-bottom:20px;">
+                        We'll send you a link to reset your password.
+                    </p>
+                    <button type="submit" name="forgot_submit" class="login-btn">Send Reset Link</button>
+                </form>
+
+                <button class="login-back" onclick="showLogin()">
+                    <i class="fas fa-arrow-left"></i> Back to Sign In
+                </button>
+            </div>
+
+        </div><!-- /login-right -->
+    </div><!-- /login-card -->
+
     <script>
-        function toggleForm() {
-            const loginForm = document.getElementById('loginForm');
-            const forgotForm = document.getElementById('forgotForm');
-            const authLeft = document.getElementById('authLeft');
-            const authRight = document.getElementById('authRight');
-            
-            loginForm.classList.toggle('hidden');
-            forgotForm.classList.toggle('hidden');
-            authLeft.classList.toggle('signup-active');
-            authRight.classList.toggle('signup-active');
+        function togglePw(id, btn) {
+            var input = document.getElementById(id);
+            var showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            btn.innerHTML = showing ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
         }
-        
-        function updatePasswordStrength() {
-            const password = document.getElementById('password_signup').value;
-            const strengthBar = document.getElementById('strengthBar');
-            let strength = 0;
-            
-            if (password.length >= 6) strength += 25;
-            if (password.length >= 8) strength += 25;
-            if (/[A-Z]/.test(password)) strength += 25;
-            if (/[0-9]/.test(password)) strength += 25;
-            
-            strengthBar.style.width = strength + '%';
-            
-            if (strength <= 25) strengthBar.style.background = '#E74C3C';
-            else if (strength <= 50) strengthBar.style.background = '#F39C12';
-            else if (strength <= 75) strengthBar.style.background = '#F1C40F';
-            else strengthBar.style.background = '#27AE60';
+
+        function showForgot() {
+            document.getElementById('loginPanel').style.display  = 'none';
+            document.getElementById('forgotPanel').style.display = 'block';
         }
-        
-        function validateSignupForm() {
-            const password = document.getElementById('password_signup').value;
-            const confirmPassword = document.getElementById('confirm_password').value;
-            
-            if (password !== confirmPassword) {
-                alert('Passwords do not match!');
-                return false;
-            }
-            if (password.length < 6) {
-                alert('Password must be at least 6 characters long!');
-                return false;
-            }
-            return true;
+
+        function showLogin() {
+            document.getElementById('forgotPanel').style.display = 'none';
+            document.getElementById('loginPanel').style.display  = 'block';
         }
 
         <?php if ($forgot_success || $forgot_error): ?>
-        // Auto-show forgot password panel when there's a response
-        document.addEventListener('DOMContentLoaded', function() { toggleForm(); });
+        document.addEventListener('DOMContentLoaded', showForgot);
         <?php endif; ?>
     </script>
 </body>

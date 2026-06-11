@@ -81,10 +81,9 @@ displayMessage();
 <style>
 /* ===== ADMIN INVENTORY ===== */
 .ai-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:22px 24px; margin-bottom:20px;
 }
 .ai-card-title {
@@ -103,9 +102,8 @@ displayMessage();
 /* Toolbar */
 .ai-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
 .ai-filter-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
     padding:16px 20px; margin-bottom:16px;
     display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px;
 }
@@ -113,22 +111,22 @@ displayMessage();
 
 /* Buttons */
 .ai-btn-primary {
-    background:linear-gradient(135deg,#8B0000,#b91c1c) !important;
-    border:none !important; border-radius:11px !important;
+    background:#8B0000 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; color:#fff !important;
     padding:9px 18px !important; font-size:0.87rem !important;
-    box-shadow:0 4px 12px rgba(139,0,0,0.22) !important;
-    transition:transform 0.15s, box-shadow 0.15s !important;
+    box-shadow:none !important;
+    transition:background 0.15s !important;
     text-decoration:none; display:inline-flex; align-items:center; gap:7px;
 }
-.ai-btn-primary:hover { color:#fff !important; transform:translateY(-1px) !important; box-shadow:0 6px 18px rgba(139,0,0,0.30) !important; }
+.ai-btn-primary:hover { color:#fff !important; background:#6B0000 !important; }
 .ai-btn-secondary {
-    background:rgba(0,0,0,0.06) !important; border:1px solid rgba(0,0,0,0.10) !important;
-    border-radius:11px !important; font-weight:600 !important; color:rgba(0,0,0,0.55) !important;
+    background:#f7f7f7 !important; border:1px solid #e5e7eb !important;
+    border-radius:6px !important; font-weight:600 !important; color:#555 !important;
     padding:9px 16px !important; font-size:0.87rem !important;
     text-decoration:none; display:inline-flex; align-items:center; gap:7px;
 }
-.ai-btn-secondary:hover { color:#1a1d23 !important; background:rgba(0,0,0,0.09) !important; }
+.ai-btn-secondary:hover { color:#111 !important; background:#eee !important; }
 
 .ai-btn-sm {
     padding:5px 11px; font-size:0.78rem; border-radius:8px;
@@ -145,10 +143,9 @@ displayMessage();
 
 /* Table */
 .ai-table-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     overflow:hidden;
 }
 .ai-table { width:100%; border-collapse:collapse; }
@@ -167,7 +164,7 @@ displayMessage();
 
 .ai-badge {
     display:inline-flex; align-items:center;
-    padding:3px 10px; border-radius:20px; font-size:0.74rem; font-weight:700;
+    padding:3px 8px; border-radius:4px; font-size:0.74rem; font-weight:700;
 }
 .ai-badge-success    { background:rgba(34,197,94,0.12);  color:#15803d; }
 .ai-badge-warning    { background:rgba(245,158,11,0.12); color:#b45309; }
@@ -326,7 +323,7 @@ displayMessage();
                 <label class="form-label">Description</label>
                 <textarea class="form-control" name="description" rows="3"><?php echo htmlspecialchars($item['description']); ?></textarea>
             </div>
-            <div class="mb-4 px-3 py-2" style="background:rgba(139,0,0,0.05);border-radius:10px;">
+            <div class="mb-4 px-3 py-2" style="background:rgba(139,0,0,0.05);border-radius:6px;border:1px solid rgba(139,0,0,0.08);">
                 <?php $edit_unit_qrs = getItemUnitQRCodes($item); ?>
                 <small class="text-muted">QR Codes (<?php echo count($edit_unit_qrs); ?> unit<?php echo count($edit_unit_qrs) > 1 ? 's' : ''; ?>): </small>
                 <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;">
@@ -526,7 +523,7 @@ displayMessage();
                     $ic = getCampus($item['campus_id']);
                     $unit_qrs = getItemUnitQRCodes($item);
         ?>
-        <div class="ai-item-card" style="background: rgba(255,255,255,0.72); backdrop-filter: blur(16px); border: 1px solid rgba(0,0,0,0.07); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.07); transition: all 0.2s;">
+        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                 <div>
                     <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
@@ -585,7 +582,7 @@ displayMessage();
                     $ic = getCampus($item['campus_id']);
                     $unit_qrs = getItemUnitQRCodes($item);
         ?>
-        <div class="ai-item-card" style="background: rgba(255,255,255,0.72); backdrop-filter: blur(16px); border: 1px solid rgba(0,0,0,0.07); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.07); transition: all 0.2s;">
+        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                 <div>
                     <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
@@ -660,7 +657,7 @@ displayMessage();
                     $ic = getCampus($item['campus_id']);
                     $unit_qrs = getItemUnitQRCodes($item);
         ?>
-        <div class="ai-item-card" style="background: rgba(255,255,255,0.72); backdrop-filter: blur(16px); border: 1px solid rgba(0,0,0,0.07); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.07); transition: all 0.2s;">
+        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                 <div>
                     <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
@@ -735,7 +732,7 @@ displayMessage();
                     $ic = getCampus($item['campus_id']);
                     $unit_qrs = getItemUnitQRCodes($item);
         ?>
-        <div class="ai-item-card" style="background: rgba(255,255,255,0.72); backdrop-filter: blur(16px); border: 1px solid rgba(0,0,0,0.07); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.07); transition: all 0.2s;">
+        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                 <div>
                     <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
@@ -811,7 +808,7 @@ displayMessage();
                     $owner_name = $owner_user ? htmlspecialchars($owner_user['full_name']) : 'Unknown User';
                     $campus_info = getCampus($item['campus_id']);
         ?>
-        <div class="ai-item-card" style="background: linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(255,255,255,0.72) 100%); backdrop-filter: blur(16px); border: 1px solid rgba(59,130,246,0.15); border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(59,130,246,0.10); transition: all 0.2s;">
+        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
                 <div>
                     <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
@@ -887,8 +884,8 @@ displayMessage();
 <!-- Item Detail Modal -->
 <div class="modal fade" id="detailModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable modal-lg">
-        <div class="modal-content" style="border-radius:18px; border:1px solid rgba(0,0,0,0.07);">
-            <div class="modal-header" style="border-bottom:1px solid rgba(0,0,0,0.07);">
+        <div class="modal-content" style="border-radius:8px; border:1px solid #e5e7eb;">
+            <div class="modal-header" style="border-bottom:1px solid #e5e7eb;">
                 <div>
                     <h5 class="modal-title" id="detailModalTitle" style="font-size:1.1rem; font-weight:700; margin-bottom: 4px;"></h5>
                     <small id="detailModalCategory" style="color: rgba(0,0,0,0.50);"></small>
@@ -897,7 +894,7 @@ displayMessage();
             </div>
             <div class="modal-body">
                 <!-- Item Information -->
-                <div style="background: rgba(0,0,0,0.03); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+                <div style="background: #f7f7f7; border-radius: 6px; border: 1px solid #e5e7eb; padding: 16px; margin-bottom: 20px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                         <div>
                             <div style="font-size: 0.75rem; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Campus</div>
@@ -956,8 +953,9 @@ displayMessage();
     gap: 12px;
     margin-bottom: 24px;
     padding: 6px;
-    background: rgba(0,0,0,0.04);
-    border-radius: 14px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     flex-wrap: wrap;
 }
 
@@ -970,8 +968,8 @@ displayMessage();
     text-decoration: none;
     font-size: 0.82rem;
     font-weight: 600;
-    border-radius: 10px;
-    transition: all 0.18s ease;
+    border-radius: 6px;
+    transition: all 0.15s;
     cursor: pointer;
     white-space: nowrap;
     background: transparent;
@@ -992,20 +990,21 @@ displayMessage();
     padding: 0 5px;
     background: rgba(0,0,0,0.08);
     color: rgba(0,0,0,0.55);
-    border-radius: 20px;
+    border-radius: 4px;
     font-size: 0.72rem;
     font-weight: 700;
 }
 
 .ai-tab:hover {
     color: rgba(0,0,0,0.75);
-    background: rgba(255,255,255,0.7);
+    background: #fff;
 }
 
 .ai-tab-active {
     color: #8B0000;
     background: #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+    box-shadow: none;
+    border: 1px solid #e5e7eb;
 }
 
 .ai-tab-active .ai-tab-badge {
@@ -1038,7 +1037,7 @@ function openDetailModal(item, units) {
     units.forEach(function(qr, idx) {
         var col = document.createElement('div');
         col.className = 'col-6 col-md-4 text-center';
-        col.innerHTML = '<div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:16px;transition: all 0.2s;">'
+        col.innerHTML = '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;">'
             + '<img src="' + apiBase + encodeURIComponent(qr) + '" alt="' + qr + '" style="width:120px;height:120px;border-radius:6px; object-fit: contain; margin-bottom: 8px;">'
             + '<div style="font-size:0.7rem;font-family:monospace;word-break:break-all;margin:8px 0;color:rgba(0,0,0,0.50);background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;">' + qr + '</div>'
             + '<div style="font-size:0.8rem;font-weight:700;color:#8B0000;margin-top:4px;">Unit ' + (idx+1) + '</div>'
@@ -1058,7 +1057,7 @@ function openQRModal(itemId, itemName, units) {
     units.forEach(function(qr, idx) {
         var col = document.createElement('div');
         col.className = 'col-6 col-md-4 col-lg-3 text-center';
-        col.innerHTML = '<div style="background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:12px;">'
+        col.innerHTML = '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;">'
             + '<img src="' + apiBase + encodeURIComponent(qr) + '" alt="' + qr + '" style="width:100px;height:100px;border-radius:6px;">'
             + '<div style="font-size:0.65rem;font-family:monospace;word-break:break-all;margin-top:6px;color:rgba(0,0,0,0.50);">' + qr + '</div>'
             + '<div style="font-size:0.70rem;font-weight:700;color:#8B0000;margin-top:3px;">Unit ' + (idx+1) + '</div>'
@@ -1144,8 +1143,8 @@ function showOwnedItemDetails(item, ownerName) {
 <!-- User-Owned Item Detail Modal -->
 <div class="modal fade" id="ownedItemModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:18px; border:1px solid rgba(0,0,0,0.07);">
-            <div class="modal-header" style="border-bottom:1px solid rgba(0,0,0,0.07); background: linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(255,255,255,0.5) 100%);">
+        <div class="modal-content" style="border-radius:8px; border:1px solid #e5e7eb;">
+            <div class="modal-header" style="border-bottom:1px solid #e5e7eb; background: #fff;">
                 <div>
                     <h5 class="modal-title" id="ownedItemModalTitle" style="font-size:1.15rem; font-weight:700; margin-bottom: 4px;"></h5>
                     <small id="ownedItemModalCategory" style="color: rgba(0,0,0,0.50);"></small>
@@ -1154,7 +1153,7 @@ function showOwnedItemDetails(item, ownerName) {
             </div>
             <div class="modal-body" style="padding: 28px;">
                 <!-- Owner Info -->
-                <div style="background: rgba(59,130,246,0.08); border-left: 4px solid #3b82f6; padding: 16px; border-radius: 10px; margin-bottom: 24px;">
+                <div style="background: #f0f5ff; border-left: 3px solid #3b82f6; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                         <div>
                             <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Owner</div>

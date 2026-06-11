@@ -136,12 +136,11 @@ $all_borrows = getBorrowRecords();
 }
 .inv-title-icon {
     width: 40px; height: 40px;
-    background: linear-gradient(135deg, #8B0000, #b91c1c);
-    border-radius: 11px;
+    background: #8B0000;
+    border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     color: #fff;
     font-size: 1rem;
-    box-shadow: 0 4px 12px rgba(139,0,0,0.25);
     flex-shrink: 0;
 }
 .inv-campus-badge {
@@ -166,15 +165,12 @@ $all_borrows = getBorrowRecords();
     align-items: center;
     gap: 7px;
     padding: 8px 16px;
-    border-radius: 12px;
+    border-radius: 6px;
     font-size: 0.82rem;
     font-weight: 700;
-    background: rgba(255,255,255,0.70);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(0,0,0,0.07);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    color: #1a1d23;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    color: #111;
 }
 .inv-stat-dot {
     width: 8px; height: 8px;
@@ -184,12 +180,9 @@ $all_borrows = getBorrowRecords();
 
 /* Filter card */
 .inv-filter-card {
-    background: rgba(255,255,255,0.70);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(0,0,0,0.07);
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     padding: 18px 20px;
     margin-bottom: 22px;
 }
@@ -204,37 +197,35 @@ $all_borrows = getBorrowRecords();
 }
 .inv-filter-card .form-control,
 .inv-filter-card .form-select {
-    border-radius: 10px !important;
+    border-radius: 6px !important;
     font-size: 0.87rem !important;
     height: 40px;
 }
 .inv-search-btn {
     height: 40px;
-    background: linear-gradient(135deg, #8B0000, #b91c1c) !important;
+    background: #8B0000 !important;
     border: none !important;
-    border-radius: 10px !important;
+    border-radius: 6px !important;
     font-weight: 600 !important;
     font-size: 0.87rem !important;
     color: #fff !important;
-    box-shadow: 0 4px 12px rgba(139,0,0,0.22) !important;
-    transition: transform 0.15s, box-shadow 0.15s !important;
+    transition: background 0.15s !important;
 }
 .inv-search-btn:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 18px rgba(139,0,0,0.30) !important;
+    background: #7a0000 !important;
 }
 .inv-reset-btn {
     height: 40px;
-    background: rgba(0,0,0,0.06) !important;
-    border: 1px solid rgba(0,0,0,0.10) !important;
-    border-radius: 10px !important;
+    background: #f7f7f7 !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 6px !important;
     font-weight: 600 !important;
     font-size: 0.87rem !important;
-    color: rgba(0,0,0,0.55) !important;
+    color: #555 !important;
 }
 .inv-reset-btn:hover {
-    background: rgba(0,0,0,0.10) !important;
-    color: #1a1d23 !important;
+    background: #e5e7eb !important;
+    color: #111 !important;
 }
 .inv-results-count {
     font-size: 0.80rem;
@@ -244,22 +235,18 @@ $all_borrows = getBorrowRecords();
 
 /* Item cards */
 .inv-card {
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(0,0,0,0.07);
-    border-radius: 18px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     overflow: hidden;
-    transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+    transition: border-color 0.15s;
     height: 100%;
     display: flex;
     flex-direction: column;
 }
 .inv-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 36px rgba(0,0,0,0.12);
-    border-color: rgba(139,0,0,0.15);
+    border-color: rgba(139,0,0,0.25);
 }
 .inv-card-top {
     padding: 16px 16px 12px;
@@ -269,10 +256,7 @@ $all_borrows = getBorrowRecords();
     gap: 12px;
 }
 .inv-card-icon {
-    width: 44px; height: 44px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, rgba(139,0,0,0.12), rgba(185,28,28,0.08));
-    border: 1px solid rgba(139,0,0,0.12);
+    width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
     color: #8B0000;
     font-size: 1.1rem;
@@ -328,11 +312,9 @@ $all_borrows = getBorrowRecords();
 }
 .inv-info-row:last-of-type { border-bottom: none; }
 .inv-info-icon {
-    width: 22px; height: 22px;
-    border-radius: 6px;
-    background: rgba(0,0,0,0.05);
+    width: 18px; height: 18px;
     display: flex; align-items: center; justify-content: center;
-    color: rgba(0,0,0,0.40);
+    color: #999;
     font-size: 0.65rem;
     flex-shrink: 0;
 }
@@ -377,32 +359,30 @@ $all_borrows = getBorrowRecords();
 .inv-borrow-btn {
     width: 100%;
     padding: 9px 16px !important;
-    border-radius: 10px !important;
+    border-radius: 6px !important;
     font-weight: 700 !important;
     font-size: 0.85rem !important;
-    background: linear-gradient(135deg, #8B0000, #b91c1c) !important;
+    background: #8B0000 !important;
     border: none !important;
     color: #fff !important;
-    box-shadow: 0 4px 12px rgba(139,0,0,0.20) !important;
-    transition: transform 0.15s, box-shadow 0.15s !important;
+    transition: background 0.15s !important;
     text-decoration: none !important;
     display: flex; align-items: center; justify-content: center; gap: 7px;
 }
 .inv-borrow-btn:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 18px rgba(139,0,0,0.30) !important;
+    background: #7a0000 !important;
     color: #fff !important;
     text-decoration: none !important;
 }
 .inv-disabled-btn {
     width: 100%;
     padding: 9px 16px;
-    border-radius: 10px;
+    border-radius: 6px;
     font-weight: 600;
     font-size: 0.85rem;
-    background: rgba(0,0,0,0.06);
-    border: 1px solid rgba(0,0,0,0.09);
-    color: rgba(0,0,0,0.38);
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
+    color: #999;
     text-align: center;
     cursor: default;
     display: flex; align-items: center; justify-content: center; gap: 7px;
@@ -423,20 +403,17 @@ $all_borrows = getBorrowRecords();
 .inv-empty {
     text-align: center;
     padding: 60px 20px;
-    background: rgba(255,255,255,0.60);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(0,0,0,0.07);
-    border-radius: 18px;
-    color: rgba(0,0,0,0.38);
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    color: #999;
 }
 .inv-empty-icon {
-    width: 64px; height: 64px;
-    background: rgba(0,0,0,0.05);
-    border-radius: 18px;
+    width: 56px; height: 56px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.8rem;
     margin: 0 auto 16px;
-    color: rgba(0,0,0,0.25);
+    color: #999;
 }
 .inv-empty h5 { color: rgba(0,0,0,0.45); font-size: 1rem; margin: 0 0 6px; }
 .inv-empty p  { font-size: 0.85rem; margin: 0; }
@@ -740,7 +717,7 @@ $all_borrows = getBorrowRecords();
             <?php foreach ($user_owned_items as $item):
                 $campus_info = getCampus($item['campus_id']);
             ?>
-            <div class="inv-card" style="background: linear-gradient(135deg, rgba(139,0,0,0.05) 0%, rgba(255,255,255,0.72) 100%); border: 1px solid rgba(139,0,0,0.10);">
+            <div class="inv-card" style="border-color: rgba(139,0,0,0.15);">
                 <!-- Top -->
                 <div class="inv-card-top">
                     <div class="inv-card-icon" style="background: rgba(139,0,0,0.10); color: #8B0000;">
@@ -812,8 +789,8 @@ $all_borrows = getBorrowRecords();
 <!-- Owned Item Detail Modal -->
 <div class="modal fade" id="ownedItemDetailModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content" style="border-radius:18px; border:1px solid rgba(0,0,0,0.07);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #8B0000, #b91c1c); color: #fff; border:none; border-radius: 18px 18px 0 0;">
+        <div class="modal-content" style="border-radius:8px; border:1px solid #e5e7eb;">
+            <div class="modal-header" style="background: #8B0000; color: #fff; border:none; border-radius: 8px 8px 0 0;">
                 <div>
                     <h5 class="modal-title" id="ownedModalTitle" style="font-size:1.1rem; font-weight:700; margin-bottom: 4px; color: #fff;"></h5>
                     <small id="ownedModalCategory" style="color: rgba(255,255,255,0.80);"></small>

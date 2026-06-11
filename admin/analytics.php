@@ -23,53 +23,46 @@ $campuses = getAllCampuses();
 @media(max-width:540px){ .an-stat-grid{ grid-template-columns:1fr; } }
 
 .an-stat-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07); padding:20px;
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06); padding:20px;
     display:flex; align-items:center; gap:16px;
 }
 .an-stat-icon {
-    width:44px; height:44px; border-radius:13px;
+    width:36px; height:36px;
     display:flex; align-items:center; justify-content:center;
-    font-size:1.2rem; color:#fff; flex-shrink:0;
+    font-size:1.2rem; flex-shrink:0;
 }
 .an-stat-value { font-size:1.75rem; font-weight:900; color:#1a1d23; line-height:1; }
 .an-stat-label { font-size:0.76rem; font-weight:600; color:rgba(0,0,0,0.42); margin-top:4px; }
 
 .an-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07); padding:22px 24px; margin-bottom:20px;
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06); padding:22px 24px; margin-bottom:20px;
 }
 .an-card-title {
     font-size:0.93rem; font-weight:800; color:#1a1d23;
     margin-bottom:16px; display:flex; align-items:center; gap:10px;
 }
 .an-card-icon {
-    width:32px; height:32px; border-radius:9px;
-    background:linear-gradient(135deg,#8B0000,#b91c1c);
-    box-shadow:0 3px 8px rgba(139,0,0,0.22);
     display:flex; align-items:center; justify-content:center;
-    color:#fff; font-size:0.8rem; flex-shrink:0;
+    color:#8B0000; font-size:1rem; flex-shrink:0;
 }
 
 /* Filter card */
 .an-filter-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
     padding:16px 20px; margin-bottom:20px;
     display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px;
 }
 .an-filter-label { font-size:0.71rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:rgba(0,0,0,0.36); margin-bottom:5px; }
 .an-btn-primary {
-    background:linear-gradient(135deg,#8B0000,#b91c1c) !important;
-    border:none !important; border-radius:11px !important;
+    background:#8B0000 !important;
+    border:none !important; border-radius:6px !important;
     font-weight:700 !important; color:#fff !important;
     padding:9px 18px !important; font-size:0.87rem !important;
-    box-shadow:0 4px 12px rgba(139,0,0,0.22) !important;
 }
 
 /* Stat rows */
@@ -89,7 +82,7 @@ $campuses = getAllCampuses();
 
 .an-badge {
     display:inline-flex; align-items:center;
-    padding:3px 10px; border-radius:20px; font-size:0.74rem; font-weight:700;
+    padding:3px 10px; border-radius:4px; font-size:0.74rem; font-weight:700;
 }
 .an-badge-success   { background:rgba(34,197,94,0.12);  color:#15803d; }
 .an-badge-warning   { background:rgba(245,158,11,0.12); color:#b45309; }
@@ -98,7 +91,7 @@ $campuses = getAllCampuses();
 .an-badge-primary   { background:rgba(139,0,0,0.10);     color:#8B0000; }
 .an-badge-secondary { background:rgba(0,0,0,0.07);       color:rgba(0,0,0,0.50); }
 
-.an-value-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:rgba(139,0,0,0.04); border-radius:10px; margin-top:14px; }
+.an-value-row { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#f7f7f7; border-radius:6px; margin-top:14px; }
 .an-value-row span:first-child { font-size:0.87rem; color:rgba(0,0,0,0.55); font-weight:600; }
 .an-value-row span:last-child  { font-size:1rem;    color:#8B0000; font-weight:800; }
 </style>
@@ -171,25 +164,25 @@ arsort($category_counts);
 <!-- Stat cards -->
 <div class="an-stat-grid">
     <div class="an-stat-card">
-        <div class="an-stat-icon" style="background:linear-gradient(135deg,#8B0000,#b91c1c);box-shadow:0 4px 12px rgba(139,0,0,0.25);">
+        <div class="an-stat-icon" style="color:#8B0000;">
             <i class="fas fa-warehouse"></i>
         </div>
         <div><div class="an-stat-value"><?php echo $inv_total; ?></div><div class="an-stat-label">Total Items</div></div>
     </div>
     <div class="an-stat-card">
-        <div class="an-stat-icon" style="background:linear-gradient(135deg,#166534,#15803d);box-shadow:0 4px 12px rgba(22,101,52,0.25);">
+        <div class="an-stat-icon" style="color:#15803d;">
             <i class="fas fa-check-circle"></i>
         </div>
         <div><div class="an-stat-value"><?php echo $inv_available; ?></div><div class="an-stat-label">Available</div></div>
     </div>
     <div class="an-stat-card">
-        <div class="an-stat-icon" style="background:linear-gradient(135deg,#b45309,#f59e0b);box-shadow:0 4px 12px rgba(180,83,9,0.25);">
+        <div class="an-stat-icon" style="color:#b45309;">
             <i class="fas fa-share-alt"></i>
         </div>
         <div><div class="an-stat-value"><?php echo $inv_borrowed; ?></div><div class="an-stat-label">Borrowed</div></div>
     </div>
     <div class="an-stat-card">
-        <div class="an-stat-icon" style="background:linear-gradient(135deg,#991b1b,#dc2626);box-shadow:0 4px 12px rgba(153,27,27,0.25);">
+        <div class="an-stat-icon" style="color:#dc2626;">
             <i class="fas fa-exclamation-triangle"></i>
         </div>
         <div><div class="an-stat-value"><?php echo $req_critical; ?></div><div class="an-stat-label">Critical Requests</div></div>

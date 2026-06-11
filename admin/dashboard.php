@@ -95,279 +95,169 @@ $all_inventory_json = json_encode($all_inventory);
 $all_requests_json = json_encode($all_requests);
 ?>
 
+<?php
+// Compute per-campus maintenance totals for charts
+$campus_names_js   = [];
+$campus_totals_js  = [];
+$campus_borrowed_js = [];
+$campus_maint_js   = [];
+foreach ($campus_stats as $cs) {
+    $campus_names_js[]    = $cs['name'];
+    $campus_totals_js[]   = $cs['stats']['total'];
+    $campus_borrowed_js[] = $cs['stats']['borrowed'];
+    $campus_maint_js[]    = $cs['stats']['maintenance'];
+}
+$maintenance_total = array_sum($campus_maint_js);
+$computed_available = $total_items - $borrowed_items - $maintenance_total;
+?>
 <style>
-/* =====================================================
-   ADMIN DASHBOARD — PREMIUM REDESIGN
-   ===================================================== */
-
-/* Animations */
-@keyframes slideUp   { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-@keyframes fadeIn    { from { opacity:0; } to { opacity:1; } }
-@keyframes iconBounce{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-4px); } }
-@keyframes iconWiggle{ 0%,100%{ transform:rotate(0deg); } 25%{ transform:rotate(-3deg); } 75%{ transform:rotate(3deg); } }
-@keyframes pulseGlow { 0%,100%{ box-shadow:0 0 0 0 rgba(139,0,0,.4); } 50%{ box-shadow:0 0 0 12px rgba(139,0,0,0); } }
-
-/* ── Page header ── */
-.adash-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 36px; gap: 16px;
-    animation: slideUp .5s ease;
-    padding-bottom: 16px; border-bottom:2px solid rgba(139,0,0,.08);
-}
-.adash-header-left h1 {
-    font-size: 2rem; font-weight: 950; color: #0f172a;
-    margin: 0 0 6px; letter-spacing: -.8px;
-}
-.adash-header-left p { margin:0; font-size:.95rem; color:#64748b; font-weight:500; }
-.adash-header-right {
-    display: flex; align-items: center; gap: 12px;
-    background: linear-gradient(135deg,#fff 0%,#f9fafb 100%);
-    border: 1.5px solid rgba(139,0,0,.12);
-    border-radius: 16px; padding: 12px 22px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.08);
-}
-.adash-header-right .date-day {
-    font-size: 1.5rem; font-weight: 950; color: #0f172a; line-height:1;
-}
-.adash-header-right .date-rest { font-size:.78rem; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
-
 /* ── KPI grid ── */
 .adash-kpi-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 18px; margin-bottom: 32px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px; margin-bottom: 24px;
 }
-@media(max-width:1400px){ .adash-kpi-grid{ grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); } }
 @media(max-width:1000px){ .adash-kpi-grid{ grid-template-columns:repeat(2,1fr); } }
 @media(max-width:600px) { .adash-kpi-grid{ grid-template-columns:1fr; } }
 
 .adash-kpi {
-    background: linear-gradient(135deg, #fff 0%, #f9fafb 100%);
-    border-radius: 24px;
-    border: 1.5px solid rgba(0,0,0,.08);
-    box-shadow: 0 4px 20px rgba(0,0,0,.08);
-    padding: 26px 24px 24px;
-    display: flex; align-items: flex-start; gap: 18px;
-    transition: all .3s cubic-bezier(.4, 0, .2, 1);
-    animation: slideUp .5s ease both;
-    position: relative; overflow: hidden;
+    background: #fff;
+    border-radius: 8px;
+    border: 1.5px solid var(--kpi-color, #8B0000);
+    padding: 20px;
+    display: flex; align-items: flex-start; gap: 14px;
 }
-.adash-kpi::before {
-    content:''; position:absolute; top:-50%; right:-50%; width:200px; height:200px;
-    background: radial-gradient(circle, var(--kpi-accent, #8B0000) 0%, transparent 70%);
-    opacity: .06; border-radius:50%; transition: all .4s ease;
-}
-.adash-kpi:nth-child(1){ animation-delay:.05s; }
-.adash-kpi:nth-child(2){ animation-delay:.10s; }
-.adash-kpi:nth-child(3){ animation-delay:.15s; }
-.adash-kpi:nth-child(4){ animation-delay:.20s; }
-.adash-kpi:hover { 
-    transform: translateY(-8px); 
-    box-shadow: 0 12px 32px rgba(0,0,0,.12);
-    border-color: var(--kpi-accent, #8B0000);
-}
-.adash-kpi:hover::before {
-    top:-30%; right:-30%; opacity:.12;
-}
-
 .adash-kpi-icon {
     display: flex; align-items: center; justify-content: center;
     font-size: 1rem; flex-shrink: 0;
     color: var(--kpi-color, #8B0000);
 }
 .adash-kpi-body { flex: 1; min-width: 0; }
-.adash-kpi-val  { font-size: 2.4rem; font-weight: 950; color: #0f172a; line-height:1; letter-spacing:-1px; }
-.adash-kpi-label{ font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; margin-top:8px; }
-.adash-kpi-sub  { font-size:.8rem; color:#cbd5e1; margin-top:6px; font-weight:500; }
-.adash-kpi-sub strong { color: var(--kpi-color, #8B0000); font-weight:750; }
+.adash-kpi-val   { font-size: 2rem; font-weight: 800; color: #111; line-height:1; letter-spacing:-1px; }
+.adash-kpi-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#999; margin-top:6px; }
 
 /* ── Generic card ── */
 .adash-card {
-    background: #fff; border-radius: 24px;
-    border: 1.5px solid rgba(0,0,0,.08);
-    box-shadow: 0 4px 20px rgba(0,0,0,.08);
-    padding: 28px; margin-bottom: 24px;
-    transition: all .3s cubic-bezier(.4, 0, .2, 1);
-    animation: slideUp .5s ease both;
-    position: relative; overflow: hidden;
-}
-.adash-card::before {
-    content:''; position:absolute; top:0; right:0; width:1px; height:100%;
-    background: linear-gradient(to bottom, rgba(139,0,0,.2), transparent);
-}
-.adash-card:hover { 
-    box-shadow: 0 8px 32px rgba(0,0,0,.12);
-    border-color: rgba(139,0,0,.2);
-    transform: translateY(-2px);
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    padding: 22px;
+    margin-bottom: 18px;
 }
 .adash-card-head {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 24px; gap: 12px; padding-bottom: 16px;
-    border-bottom: 1.5px solid #f1f5f9;
+    margin-bottom: 18px; gap: 12px; padding-bottom: 14px;
+    border-bottom: 1px solid #f0f0f0;
 }
 .adash-card-title {
-    display: flex; align-items: center; gap: 14px;
-    font-size: 1.05rem; font-weight: 800; color: #0f172a; letter-spacing:-.3px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.92rem; font-weight: 700; color: #111;
 }
 .adash-card-icon {
     display: flex; align-items: center; justify-content: center;
-    font-size: .85rem; color: #8B0000; flex-shrink:0;
+    font-size: .82rem; color: #8B0000; flex-shrink:0;
 }
 
 /* ── Table ── */
 .adash-table { width:100%; border-collapse:collapse; }
 .adash-table th {
-    padding: 12px 16px; font-size:.7rem; font-weight:750;
-    text-transform:uppercase; letter-spacing:.6px; color:#94a3b8;
-    border-bottom: 2px solid #f1f5f9; background:#fafbfc;
+    padding: 10px 14px; font-size:.69rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.4px; color:#999;
+    border-bottom: 1px solid #e5e7eb; background:#f7f7f7;
     white-space: nowrap;
 }
 .adash-table td {
-    padding: 14px 16px; font-size:.9rem; color:#374151;
-    border-bottom: 1px solid #f1f5f9; vertical-align:middle;
-    transition: all .2s ease;
+    padding: 12px 14px; font-size:.875rem; color:#555;
+    border-bottom: 1px solid #f0f0f0; vertical-align:middle;
 }
 .adash-table tr:last-child td { border-bottom:none; }
-.adash-table tbody tr { 
-    transition: all .2s ease;
-}
-.adash-table tbody tr:nth-child(odd) { background:#fafbfc; }
-.adash-table tbody tr:hover { 
-    background: linear-gradient(90deg, rgba(139,0,0,.04) 0%, transparent 100%);
-}
-.adash-table tbody tr:hover td {
-    color: #0f172a;
-}
+.adash-table tbody tr:hover td { background:#f7f7f7; color:#111; }
 
 /* ── Badges ── */
 .adash-badge {
-    display:inline-flex; align-items:center; gap:6px;
-    padding:6px 13px; border-radius:8px;
-    font-size:.73rem; font-weight:750; text-transform:uppercase; letter-spacing:.4px;
-    border: 1.2px solid;
-    transition: all .2s ease;
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 9px; border-radius:4px;
+    font-size:.70rem; font-weight:700; text-transform:uppercase; letter-spacing:.3px;
 }
-.adash-badge i { font-size:.65rem; }
-.b-green  { background:rgba(34,197,94,.12);  color:#15803d; border-color:rgba(34,197,94,.3); }
-.b-amber  { background:rgba(245,158,11,.12); color:#b45309; border-color:rgba(245,158,11,.3); }
-.b-red    { background:rgba(239,68,68,.12);  color:#dc2626; border-color:rgba(239,68,68,.3); }
-.b-blue   { background:rgba(59,130,246,.12); color:#1d4ed8; border-color:rgba(59,130,246,.3); }
-.b-gray   { background:rgba(0,0,0,.08);      color:#64748b; border-color:rgba(0,0,0,.12); }
+.adash-badge i { font-size:.60rem; }
+.b-green  { background:rgba(22,163,74,.10);  color:#15803d; }
+.b-amber  { background:rgba(217,119,6,.10);  color:#b45309; }
+.b-red    { background:rgba(220,38,38,.10);  color:#dc2626; }
+.b-blue   { background:rgba(37,99,235,.10);  color:#1d4ed8; }
+.b-gray   { background:#f0f0f0;              color:#555; }
 
-/* ── Request summary bars ── */
+/* ── Chart legend ── */
+.chart-legend { display:flex; flex-wrap:wrap; gap:10px 18px; margin-top:14px; }
+.chart-legend-item { display:flex; align-items:center; gap:7px; font-size:.78rem; font-weight:600; color:#555; }
+.chart-legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+/* ── Donut center label ── */
+.donut-wrap { position:relative; }
+.donut-center {
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none;
+}
+.donut-center-val  { font-size:1.6rem; font-weight:800; color:#111; line-height:1; }
+.donut-center-lbl  { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#999; margin-top:3px; }
+
+/* ── Request stat rows ── */
 .req-stat-item {
-    display:flex; align-items:center; gap:16px;
-    padding:16px 18px; border-radius:14px; background:linear-gradient(135deg,#fafbfc,#f9fafb);
-    border: 1.2px solid #f1f5f9; margin-bottom:12px; 
-    transition: all .3s cubic-bezier(.4, 0, .2, 1);
-    position:relative; overflow:hidden;
+    display:flex; align-items:center; gap:14px;
+    padding:10px 12px;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    margin-bottom:8px;
+    position:relative;
+    background: #fff;
 }
 .req-stat-item::before {
     content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
-    background: var(--dot-color, #8B0000); transition: width .3s ease;
+    background: var(--dot-color, #8B0000);
+    border-radius: 6px 0 0 6px;
 }
 .req-stat-item:last-child { margin-bottom:0; }
-.req-stat-item:hover { 
-    background: linear-gradient(135deg,#fff,#f9fafb);
-    border-color: var(--dot-color, #8B0000);
-    transform: translateX(4px);
-    box-shadow: 0 4px 12px rgba(0,0,0,.08);
-}
-.req-stat-item:hover::before { width:6px; }
-.req-stat-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; box-shadow: 0 0 8px currentColor; }
-.req-stat-label { flex:1; font-size:.9rem; font-weight:600; color:#374151; }
-.req-stat-count { font-size:1.35rem; font-weight:950; color:#0f172a; }
+.req-stat-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background: var(--dot-color, #8B0000); }
+.req-stat-label { flex:1; font-size:.82rem; font-weight:600; color:#555; }
+.req-stat-count { font-size:1.1rem; font-weight:800; color:#111; }
 
 /* ── Quick action buttons ── */
-.qa-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.qa-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .qa-btn {
-    display:flex; align-items:center; gap:14px; padding:16px 18px;
-    border-radius:16px; border:1.5px solid #f1f5f9; 
-    background: linear-gradient(135deg,#fff,#f9fafb);
-    text-decoration:none; color:#374151; font-size:.9rem; font-weight:600;
-    transition: all .3s cubic-bezier(.4, 0, .2, 1); 
-    position:relative; overflow:hidden;
+    display:flex; align-items:center; gap:12px; padding:14px 16px;
+    border-radius:6px; border:1px solid #e5e7eb;
+    background: #fff;
+    text-decoration:none; color:#555; font-size:.875rem; font-weight:600;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.qa-btn::before {
-    content:''; position:absolute; inset:0;
-    background: radial-gradient(circle at var(--x, 0) var(--y, 0), rgba(139,0,0,.1) 0%, transparent 50%);
-    opacity:0; transition: opacity .3s ease;
-}
-.qa-btn::after { 
-    content:'\f054'; font-family:'Font Awesome 6 Free'; font-weight:900;
-    position:absolute; right:18px; font-size:.7rem; color:#cbd5e1; 
-    transition: transform .3s cubic-bezier(.4, 0, .2, 1), color .3s ease;
-}
-.qa-btn:hover { 
-    border-color:rgba(139,0,0,.25); 
-    background: linear-gradient(135deg,#fff,#fef9f9);
-    color:#0f172a;
-    box-shadow: 0 8px 24px rgba(139,0,0,.12); 
-    transform:translateY(-4px); 
-}
-.qa-btn:hover::before { opacity:1; }
-.qa-btn:hover::after { color:#8B0000; transform:translateX(4px); }
-.qa-btn-icon { 
-    width:42px; height:42px; border-radius:12px;
-    display:flex; align-items:center; justify-content:center; 
-    font-size:.95rem; flex-shrink:0;
-    transition: all .3s ease;
-}
-.qa-btn:hover .qa-btn-icon { transform: scale(1.1) rotate(5deg); }
+.qa-btn:hover { background:#f7f7f7; border-color:#bbb; color:#111; text-decoration:none; }
+.qa-btn-icon { font-size:.9rem; flex-shrink:0; width:18px; text-align:center; }
 
 /* ── View-all link ── */
 .adash-viewall {
-    display:inline-flex; align-items:center; gap:7px;
-    font-size:.82rem; font-weight:750; color:#8B0000; text-decoration:none;
-    padding:8px 14px; border-radius:10px; border:1.5px solid rgba(139,0,0,.2);
-    transition: all .3s ease;
-    position: relative; overflow:hidden;
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:.80rem; font-weight:600; color:#555; text-decoration:none;
+    padding:6px 12px; border-radius:5px; border:1px solid #e5e7eb;
+    transition: background 0.15s, color 0.15s;
 }
-.adash-viewall::before {
-    content:''; position:absolute; inset:0;
-    background: linear-gradient(90deg,transparent,rgba(139,0,0,.1),transparent);
-    transform: translateX(-100%); transition: transform .3s ease;
-}
-.adash-viewall:hover { 
-    background:rgba(139,0,0,.08); 
-    color:#8B0000;
-    border-color: rgba(139,0,0,.4);
-    box-shadow: 0 4px 12px rgba(139,0,0,.1);
-}
-.adash-viewall:hover::before { transform: translateX(100%); }
+.adash-viewall:hover { background:#f7f7f7; color:#111; text-decoration:none; }
 
-/* ── Activity item (recent lists) ── */
+/* ── Activity item ── */
 .act-item {
-    display:flex; align-items:center; gap:14px;
-    padding:14px 0; border-bottom:1px solid #f1f5f9;
-    transition: all .2s ease;
-}
-.act-item:hover { 
-    background: rgba(139,0,0,.02);
-    padding-left: 8px;
-    padding-right: -8px;
+    display:flex; align-items:center; gap:12px;
+    padding:12px 0; border-bottom:1px solid #f0f0f0;
 }
 .act-item:last-child { border-bottom:none; padding-bottom:0; }
-.act-avatar {
-    width:42px; height:42px; border-radius:12px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center;
-    font-size:.8rem; font-weight:850; color:#fff;
-    background: linear-gradient(135deg,#8B0000,#b91c1c);
-    box-shadow: 0 4px 12px rgba(139,0,0,.25);
-    transition: all .3s ease;
-}
-.act-item:hover .act-avatar { transform: scale(1.08); box-shadow: 0 6px 16px rgba(139,0,0,.3); }
+.act-avatar { font-size:.82rem; flex-shrink:0; color:#999; width:18px; text-align:center; }
 .act-body { flex:1; min-width:0; }
-.act-name { font-size:.9rem; font-weight:750; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.act-sub  { font-size:.78rem; color:#94a3b8; margin-top:2px; }
+.act-name { font-size:.875rem; font-weight:700; color:#111; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.act-sub  { font-size:.76rem; color:#999; margin-top:2px; }
 .act-right{ text-align:right; flex-shrink:0; }
-.act-date { font-size:.76rem; color:#cbd5e1; font-weight:700; white-space:nowrap; }
+.act-date { font-size:.74rem; color:#bbb; font-weight:600; white-space:nowrap; }
 
 @media(max-width:768px){
-    .adash { padding:24px 18px 60px; }
-    .adash-header { flex-direction:column; align-items:flex-start; border:none; padding-bottom:0; margin-bottom:24px; }
     .qa-grid { grid-template-columns:1fr; }
-    .adash-kpi-grid { gap:12px; }
-    .adash-kpi { padding:20px; gap:14px; }
+    .adash-kpi-grid { gap:10px; }
 }
 </style>
 
@@ -375,35 +265,35 @@ $all_requests_json = json_encode($all_requests);
 
     <!-- ── KPI Cards ── -->
     <div class="adash-kpi-grid">
-        <div class="adash-kpi" style="--kpi-accent:#8B0000;--kpi-color:#b91c1c;">
+        <div class="adash-kpi" style="--kpi-color:#b91c1c;">
             <div class="adash-kpi-icon"><i class="fas fa-warehouse"></i></div>
             <div class="adash-kpi-body">
                 <div class="adash-kpi-val"><?php echo $total_items; ?></div>
                 <div class="adash-kpi-label">Total Items</div>
             </div>
         </div>
-        <div class="adash-kpi" style="--kpi-accent:#22c55e;--kpi-color:#15c649;">
+        <div class="adash-kpi" style="--kpi-color:#15803d;">
             <div class="adash-kpi-icon"><i class="fas fa-check-circle"></i></div>
             <div class="adash-kpi-body">
-                <div class="adash-kpi-val"><?php echo $available_items; ?></div>
+                <div class="adash-kpi-val"><?php echo $computed_available; ?></div>
                 <div class="adash-kpi-label">Available</div>
             </div>
         </div>
-        <div class="adash-kpi" style="--kpi-accent:#f59e0b;--kpi-color:#d97706;">
+        <div class="adash-kpi" style="--kpi-color:#d97706;">
             <div class="adash-kpi-icon"><i class="fas fa-share-alt"></i></div>
             <div class="adash-kpi-body">
                 <div class="adash-kpi-val"><?php echo $borrowed_items; ?></div>
                 <div class="adash-kpi-label">Borrowed</div>
             </div>
         </div>
-        <div class="adash-kpi" style="--kpi-accent:#3b82f6;--kpi-color:#2563eb;">
+        <div class="adash-kpi" style="--kpi-color:#2563eb;">
             <div class="adash-kpi-icon"><i class="fas fa-tools"></i></div>
             <div class="adash-kpi-body">
-                <div class="adash-kpi-val"><?php echo $total_items - $available_items - $borrowed_items; ?></div>
+                <div class="adash-kpi-val"><?php echo $maintenance_total; ?></div>
                 <div class="adash-kpi-label">Maintenance</div>
             </div>
         </div>
-        <div class="adash-kpi" style="--kpi-accent:#8b5cf6;--kpi-color:#7c3aed;">
+        <div class="adash-kpi" style="--kpi-color:#7c3aed;">
             <div class="adash-kpi-icon"><i class="fas fa-user-check"></i></div>
             <div class="adash-kpi-body">
                 <div class="adash-kpi-val"><?php echo $total_owned_items; ?></div>
@@ -412,14 +302,25 @@ $all_requests_json = json_encode($all_requests);
         </div>
     </div>
 
-    <!-- ── Campus Summary ── -->
-    <div class="adash-card" style="animation-delay:.05s;">
+    <!-- ── Campus Inventory Bar Chart ── -->
+    <div class="adash-card" style="margin-bottom:18px;">
         <div class="adash-card-head">
             <div class="adash-card-title">
                 <span class="adash-card-icon"><i class="fas fa-building"></i></span>
-                Campus Inventory Summary
+                Campus Inventory Overview
             </div>
             <a href="inventory-campus.php" class="adash-viewall"><i class="fas fa-arrow-right"></i> View All</a>
+        </div>
+        <canvas id="campusBar" height="80"></canvas>
+    </div>
+
+    <!-- ── Campus Summary Table ── -->
+    <div class="adash-card" style="margin-bottom:18px;">
+        <div class="adash-card-head">
+            <div class="adash-card-title">
+                <span class="adash-card-icon"><i class="fas fa-table"></i></span>
+                Campus Summary
+            </div>
         </div>
         <div class="table-responsive">
             <table class="adash-table">
@@ -432,13 +333,9 @@ $all_requests_json = json_encode($all_requests);
                     <th></th>
                 </tr></thead>
                 <tbody>
-                    <?php foreach ($campus_stats as $campus):
-                        $util = $campus['stats']['total'] > 0 ? round(($campus['stats']['borrowed'] / $campus['stats']['total']) * 100) : 0;
-                    ?>
+                    <?php foreach ($campus_stats as $campus): ?>
                     <tr>
-                        <td>
-                            <div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($campus['name']); ?></div>
-                        </td>
+                        <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($campus['name']); ?></div></td>
                         <td><span style="font-weight:800;color:#0f172a;font-size:.95rem;"><?php echo $campus['stats']['total']; ?></span></td>
                         <td><span class="adash-badge b-amber"><i class="fas fa-circle"></i><?php echo $campus['stats']['borrowed']; ?></span></td>
                         <td><span class="adash-badge b-green"><i class="fas fa-circle"></i><?php echo $campus['stats']['requested']; ?></span></td>
@@ -451,42 +348,82 @@ $all_requests_json = json_encode($all_requests);
         </div>
     </div>
 
-    <!-- ── Request Summary + Quick Actions ── -->
+    <!-- ── Charts Row ── -->
     <div class="row g-4 mb-4">
-        <div class="col-lg-5">
-            <div class="adash-card h-100" style="margin-bottom:0;animation-delay:.10s;">
+
+        <!-- Item Status Doughnut -->
+        <div class="col-lg-4">
+            <div class="adash-card h-100" style="margin-bottom:0;">
+                <div class="adash-card-head">
+                    <div class="adash-card-title">
+                        <span class="adash-card-icon"><i class="fas fa-chart-pie"></i></span>
+                        Item Status
+                    </div>
+                </div>
+                <div class="donut-wrap" style="max-width:200px;margin:0 auto;">
+                    <canvas id="statusDonut" height="200"></canvas>
+                    <div class="donut-center">
+                        <div class="donut-center-val"><?php echo $total_items; ?></div>
+                        <div class="donut-center-lbl">Total</div>
+                    </div>
+                </div>
+                <div class="chart-legend justify-content-center">
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#15803d;"></div>Available</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#d97706;"></div>Borrowed</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#2563eb;"></div>Maintenance</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Request Status Doughnut -->
+        <div class="col-lg-4">
+            <div class="adash-card h-100" style="margin-bottom:0;">
                 <div class="adash-card-head">
                     <div class="adash-card-title">
                         <span class="adash-card-icon"><i class="fas fa-tasks"></i></span>
-                        Request Summary
+                        Request Status
                     </div>
                     <a href="requests.php" class="adash-viewall"><i class="fas fa-arrow-right"></i> Manage</a>
                 </div>
-                <div>
+                <div class="donut-wrap" style="max-width:200px;margin:0 auto;">
+                    <canvas id="requestDonut" height="200"></canvas>
+                    <div class="donut-center">
+                        <div class="donut-center-val"><?php echo $pending + $approved + $disapproved; ?></div>
+                        <div class="donut-center-lbl">Total</div>
+                    </div>
+                </div>
+                <div class="chart-legend justify-content-center">
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#b45309;"></div>Pending</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#15803d;"></div>Approved</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#dc2626;"></div>Disapproved</div>
+                </div>
+                <div class="mt-3">
                     <div class="req-stat-item" style="--dot-color:#b45309;">
                         <div class="req-stat-dot" style="background:#b45309;"></div>
-                        <span class="req-stat-label"><i class="fas fa-hourglass-half me-2" style="color:#b45309;"></i>Pending Review</span>
+                        <span class="req-stat-label">Pending Review</span>
                         <span class="req-stat-count"><?php echo $pending; ?></span>
                     </div>
                     <div class="req-stat-item" style="--dot-color:#15803d;">
                         <div class="req-stat-dot" style="background:#15803d;"></div>
-                        <span class="req-stat-label"><i class="fas fa-check-circle me-2" style="color:#15803d;"></i>Approved</span>
+                        <span class="req-stat-label">Approved</span>
                         <span class="req-stat-count"><?php echo $approved; ?></span>
                     </div>
                     <div class="req-stat-item" style="--dot-color:#dc2626;">
                         <div class="req-stat-dot" style="background:#dc2626;"></div>
-                        <span class="req-stat-label"><i class="fas fa-times-circle me-2" style="color:#dc2626;"></i>Disapproved</span>
+                        <span class="req-stat-label">Disapproved</span>
                         <span class="req-stat-count"><?php echo $disapproved; ?></span>
                     </div>
                 </div>
                 <a href="requests.php" class="adash-viewall mt-3 w-100 justify-content-center d-flex"
-                   style="background:linear-gradient(135deg,#8B0000,#b91c1c);color:#fff;border-color:transparent;padding:13px 18px;border-radius:14px;font-size:.88rem;box-shadow:0 4px 12px rgba(139,0,0,.25);">
+                   style="background:#8B0000;color:#fff;border-color:#8B0000;padding:10px 18px;font-size:.84rem;">
                     <i class="fas fa-list-check me-2"></i> Review All Requests
                 </a>
             </div>
         </div>
-        <div class="col-lg-7">
-            <div class="adash-card h-100" style="margin-bottom:0;animation-delay:.15s;">
+
+        <!-- Quick Actions -->
+        <div class="col-lg-4">
+            <div class="adash-card h-100" style="margin-bottom:0;">
                 <div class="adash-card-head">
                     <div class="adash-card-title">
                         <span class="adash-card-icon"><i class="fas fa-bolt"></i></span>
@@ -495,28 +432,28 @@ $all_requests_json = json_encode($all_requests);
                 </div>
                 <div class="qa-grid">
                     <a href="inventory.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="background:linear-gradient(135deg,rgba(139,0,0,.15),rgba(139,0,0,.08));color:#8B0000;"><i class="fas fa-warehouse"></i></div>
-                        <div><div style="font-weight:700;font-size:.88rem;color:#0f172a;">Manage Inventory</div><div style="font-size:.75rem;color:#94a3b8;margin-top:2px;">View all items</div></div>
+                        <div class="qa-btn-icon" style="color:#8B0000;"><i class="fas fa-warehouse"></i></div>
+                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Manage Inventory</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">View all items</div></div>
                     </a>
                     <a href="inventory.php?action=add" class="qa-btn">
-                        <div class="qa-btn-icon" style="background:linear-gradient(135deg,rgba(34,197,94,.15),rgba(34,197,94,.08));color:#15803d;"><i class="fas fa-plus-circle"></i></div>
-                        <div><div style="font-weight:700;font-size:.88rem;color:#0f172a;">Add New Item</div><div style="font-size:.75rem;color:#94a3b8;margin-top:2px;">Register asset</div></div>
+                        <div class="qa-btn-icon" style="color:#15803d;"><i class="fas fa-plus-circle"></i></div>
+                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Add New Item</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Register asset</div></div>
                     </a>
                     <a href="requests.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.08));color:#b45309;"><i class="fas fa-clipboard-check"></i></div>
-                        <div><div style="font-weight:700;font-size:.88rem;color:#0f172a;">Review Requests</div><div style="font-size:.75rem;color:#94a3b8;margin-top:2px;"><?php echo $pending; ?> pending</div></div>
+                        <div class="qa-btn-icon" style="color:#b45309;"><i class="fas fa-clipboard-check"></i></div>
+                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Review Requests</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;"><?php echo $pending; ?> pending</div></div>
                     </a>
                     <a href="analytics.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.08));color:#1d4ed8;"><i class="fas fa-chart-bar"></i></div>
-                        <div><div style="font-weight:700;font-size:.88rem;color:#0f172a;">Analytics</div><div style="font-size:.75rem;color:#94a3b8;margin-top:2px;">Reports &amp; insights</div></div>
+                        <div class="qa-btn-icon" style="color:#1d4ed8;"><i class="fas fa-chart-bar"></i></div>
+                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Analytics</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Reports &amp; insights</div></div>
                     </a>
                     <a href="inventory-campus.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(168,85,247,.08));color:#7c3aed;"><i class="fas fa-map-marked-alt"></i></div>
-                        <div><div style="font-weight:700;font-size:.88rem;color:#0f172a;">By Campus</div><div style="font-size:.75rem;color:#94a3b8;margin-top:2px;">Campus breakdown</div></div>
+                        <div class="qa-btn-icon" style="color:#7c3aed;"><i class="fas fa-map-marked-alt"></i></div>
+                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">By Campus</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Campus breakdown</div></div>
                     </a>
                     <a href="settings.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="background:linear-gradient(135deg,rgba(100,116,139,.15),rgba(100,116,139,.08));color:#64748b;"><i class="fas fa-cog"></i></div>
-                        <div><div style="font-weight:700;font-size:.88rem;color:#0f172a;">Settings</div><div style="font-size:.75rem;color:#94a3b8;margin-top:2px;">System config</div></div>
+                        <div class="qa-btn-icon" style="color:#64748b;"><i class="fas fa-cog"></i></div>
+                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Settings</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">System config</div></div>
                     </a>
                 </div>
             </div>
@@ -526,7 +463,7 @@ $all_requests_json = json_encode($all_requests);
     <!-- ── Recent Requests + Recent Items ── -->
     <div class="row g-4">
         <div class="col-lg-6">
-            <div class="adash-card" style="margin-bottom:0;animation-delay:.20s;">
+            <div class="adash-card" style="margin-bottom:0;">
                 <div class="adash-card-head">
                     <div class="adash-card-title">
                         <span class="adash-card-icon"><i class="fas fa-clock"></i></span>
@@ -537,12 +474,9 @@ $all_requests_json = json_encode($all_requests);
                 <?php foreach ($recent_requests as $req):
                     $sc_map = ['pending'=>'b-amber','approved'=>'b-green','disapproved'=>'b-red','delivered'=>'b-blue'];
                     $sc = $sc_map[$req['status']] ?? 'b-gray';
-                    $initials = strtoupper(substr($req['full_name'], 0, 1));
-                    $colors = ['#8B0000','#1d4ed8','#15803d','#b45309','#7c3aed'];
-                    $col = $colors[crc32($req['user_id']) % count($colors)];
                 ?>
                 <div class="act-item">
-                    <div class="act-avatar" style="background:<?php echo $col; ?>;"><?php echo $initials; ?></div>
+                    <div class="act-avatar"><i class="fas fa-user"></i></div>
                     <div class="act-body">
                         <div class="act-name"><?php echo htmlspecialchars($req['full_name']); ?></div>
                         <div class="act-sub">
@@ -559,7 +493,7 @@ $all_requests_json = json_encode($all_requests);
             </div>
         </div>
         <div class="col-lg-6">
-            <div class="adash-card" style="margin-bottom:0;animation-delay:.25s;">
+            <div class="adash-card" style="margin-bottom:0;">
                 <div class="adash-card-head">
                     <div class="adash-card-title">
                         <span class="adash-card-icon"><i class="fas fa-plus-circle"></i></span>
@@ -574,9 +508,7 @@ $all_requests_json = json_encode($all_requests);
                     $status_class = $item['status'] === 'available' ? 'b-green' : ($item['status'] === 'borrowed' ? 'b-amber' : 'b-blue');
                 ?>
                 <div class="act-item">
-                    <div class="act-avatar" style="background:linear-gradient(135deg,#64748b,#475569);">
-                        <i class="fas <?php echo $iconf; ?>" style="font-size:.85rem;"></i>
-                    </div>
+                    <div class="act-avatar"><i class="fas <?php echo $iconf; ?>"></i></div>
                     <div class="act-body">
                         <div class="act-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
                         <div class="act-sub"><?php echo htmlspecialchars($ic['name']); ?> &bull; <?php echo htmlspecialchars($item['category']); ?></div>
@@ -629,8 +561,8 @@ $all_requests_json = json_encode($all_requests);
 .campus-modal-header {
     position: sticky;
     top: 0;
-    background: linear-gradient(135deg, #fff 0%, #f9fafb 100%);
-    border-bottom: 1.5px solid #f1f5f9;
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
     padding: 28px;
     display: flex;
     align-items: flex-start;
@@ -687,28 +619,28 @@ $all_requests_json = json_encode($all_requests);
 }
 
 .campus-section-title {
-    font-size: .85rem;
-    font-weight: 750;
+    font-size: .72rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .6px;
-    color: #94a3b8;
-    margin-bottom: 12px;
+    letter-spacing: .5px;
+    color: #999;
+    margin-bottom: 10px;
     padding-bottom: 8px;
-    border-bottom: 1.5px solid #f1f5f9;
+    border-bottom: 1px solid #f0f0f0;
 }
 
 .campus-stat-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 14px;
 }
 
 .campus-stat-box {
-    background: linear-gradient(135deg, #fafbfc, #f9fafb);
-    border: 1.2px solid #f1f5f9;
-    border-radius: 12px;
-    padding: 14px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px;
     text-align: center;
 }
 
@@ -729,9 +661,9 @@ $all_requests_json = json_encode($all_requests);
 }
 
 .campus-info {
-    background: linear-gradient(135deg, #fafbfc, #f9fafb);
-    border: 1.2px solid #f1f5f9;
-    border-radius: 12px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
     padding: 14px;
     font-size: .9rem;
     line-height: 1.6;
@@ -745,9 +677,9 @@ $all_requests_json = json_encode($all_requests);
 }
 
 .campus-list-item {
-    background: linear-gradient(135deg, #fafbfc, #f9fafb);
-    border: 1.2px solid #f1f5f9;
-    border-radius: 10px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
     padding: 12px;
     font-size: .8rem;
     color: #374151;
@@ -777,9 +709,9 @@ $all_requests_json = json_encode($all_requests);
 }
 
 .campus-item {
-    background: linear-gradient(135deg, #fafbfc, #f9fafb);
-    border: 1.2px solid #f1f5f9;
-    border-radius: 10px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
     padding: 12px 14px;
     font-size: .85rem;
     color: #374151;
@@ -896,6 +828,7 @@ $all_requests_json = json_encode($all_requests);
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 const campusesData = <?php echo $modal_campuses_json; ?>;
 const inventoryData = <?php echo $all_inventory_json; ?>;
@@ -991,6 +924,108 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeCampusModal();
     }
+});
+
+// ── Charts ──
+document.addEventListener('DOMContentLoaded', function () {
+    const chartDefaults = {
+        plugins: { legend: { display: false }, tooltip: { callbacks: {} } },
+        animation: { duration: 600 }
+    };
+
+    // Item Status Doughnut
+    new Chart(document.getElementById('statusDonut'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Available', 'Borrowed', 'Maintenance'],
+            datasets: [{
+                data: [<?php echo $computed_available; ?>, <?php echo $borrowed_items; ?>, <?php echo $maintenance_total; ?>],
+                backgroundColor: ['#15803d', '#d97706', '#2563eb'],
+                borderWidth: 0,
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            cutout: '72%',
+            plugins: { legend: { display: false } },
+            animation: { duration: 600 }
+        }
+    });
+
+    // Request Status Doughnut
+    new Chart(document.getElementById('requestDonut'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Pending', 'Approved', 'Disapproved'],
+            datasets: [{
+                data: [<?php echo $pending; ?>, <?php echo $approved; ?>, <?php echo $disapproved; ?>],
+                backgroundColor: ['#d97706', '#15803d', '#dc2626'],
+                borderWidth: 0,
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            cutout: '72%',
+            plugins: { legend: { display: false } },
+            animation: { duration: 600 }
+        }
+    });
+
+    // Campus Inventory Bar Chart
+    new Chart(document.getElementById('campusBar'), {
+        type: 'bar',
+        data: {
+            labels: <?php echo json_encode($campus_names_js); ?>,
+            datasets: [
+                {
+                    label: 'Total',
+                    data: <?php echo json_encode($campus_totals_js); ?>,
+                    backgroundColor: 'rgba(139,0,0,0.15)',
+                    borderColor: '#8B0000',
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Borrowed',
+                    data: <?php echo json_encode($campus_borrowed_js); ?>,
+                    backgroundColor: 'rgba(217,119,6,0.15)',
+                    borderColor: '#d97706',
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Maintenance',
+                    data: <?php echo json_encode($campus_maint_js); ?>,
+                    backgroundColor: 'rgba(37,99,235,0.15)',
+                    borderColor: '#2563eb',
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: { font: { size: 11, weight: '600' }, color: '#555', boxWidth: 10, padding: 16 }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 }, color: '#888' }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f0f0f0' },
+                    ticks: { font: { size: 11 }, color: '#888', stepSize: 1 }
+                }
+            },
+            animation: { duration: 600 }
+        }
+    });
 });
 </script>
 

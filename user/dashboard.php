@@ -149,10 +149,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </div>
         </div>
         <div class="col min-width-0">
-            <div class="ud-stat-card ud-stat-purple h-100" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); border: none;">
-                <div class="ud-stat-icon"><i class="fas fa-user-check" style="color: #fff;"></i></div>
-                <div class="ud-stat-value" style="color: #fff;"><?php echo $owned_items_count; ?></div>
-                <div class="ud-stat-label" style="color: rgba(255,255,255,0.85);">My Owned Items</div>
+            <div class="ud-stat-card h-100" style="--ud-kpi-color:#7c3aed;">
+                <div class="ud-stat-icon"><i class="fas fa-user-check"></i></div>
+                <div class="ud-stat-value"><?php echo $owned_items_count; ?></div>
+                <div class="ud-stat-label">My Owned Items</div>
             </div>
         </div>
     </div>
@@ -167,7 +167,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
                 <div class="ud-card-body">
                     <a href="inventory.php" class="ud-action-btn">
-                        <span class="ud-action-icon" style="background:#e8f0fe;color:#1a73e8;"><i class="fas fa-warehouse"></i></span>
+                        <span class="ud-action-icon" style="color:#1a73e8;"><i class="fas fa-warehouse"></i></span>
                         <span class="ud-action-text">
                             <strong>Browse Inventory</strong>
                             <small>View available campus items</small>
@@ -175,7 +175,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <i class="fas fa-chevron-right ud-action-arrow"></i>
                     </a>
                     <a href="requests.php" class="ud-action-btn">
-                        <span class="ud-action-icon" style="background:#e6f4ea;color:#34a853;"><i class="fas fa-paper-plane"></i></span>
+                        <span class="ud-action-icon" style="color:#34a853;"><i class="fas fa-paper-plane"></i></span>
                         <span class="ud-action-text">
                             <strong>Submit Request</strong>
                             <small>Borrow, service, or item request</small>
@@ -183,7 +183,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <i class="fas fa-chevron-right ud-action-arrow"></i>
                     </a>
                     <a href="borrow-records.php" class="ud-action-btn">
-                        <span class="ud-action-icon" style="background:#fce8b2;color:#f9ab00;"><i class="fas fa-history"></i></span>
+                        <span class="ud-action-icon" style="color:#f9ab00;"><i class="fas fa-history"></i></span>
                         <span class="ud-action-text">
                             <strong>Borrow Records</strong>
                             <small>Check your borrowing history</small>
@@ -191,7 +191,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <i class="fas fa-chevron-right ud-action-arrow"></i>
                     </a>
                     <a href="settings.php" class="ud-action-btn">
-                        <span class="ud-action-icon" style="background:#fce4ec;color:#e91e63;"><i class="fas fa-cog"></i></span>
+                        <span class="ud-action-icon" style="color:#e91e63;"><i class="fas fa-cog"></i></span>
                         <span class="ud-action-text">
                             <strong>Settings</strong>
                             <small>Manage your profile</small>
@@ -273,7 +273,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     ];
                     foreach ($status_rows as $row): ?>
                     <div class="ud-inv-row">
-                        <span class="ud-inv-icon" style="background:<?php echo $row['bg']; ?>;color:<?php echo $row['color']; ?>;"><i class="fas <?php echo $row['icon']; ?>"></i></span>
+                        <span class="ud-inv-icon" style="color:<?php echo $row['color']; ?>;"><i class="fas <?php echo $row['icon']; ?>"></i></span>
                         <span class="ud-inv-label"><?php echo $row['label']; ?></span>
                         <div class="ud-inv-bar-wrap">
                             <div class="ud-inv-bar" style="width:<?php echo ($inventory_result['total'] > 0 ? round($row['count']/$inventory_result['total']*100) : 0); ?>%;background:<?php echo $row['color']; ?>;"></div>
@@ -282,7 +282,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     </div>
                     <?php endforeach; ?>
                     <div class="mt-2 text-center">
-                        <a href="inventory.php" class="btn btn-sm" style="background:#f3f4f8;color:#374151;border-radius:8px;font-size:0.8rem;">
+                        <a href="inventory.php" class="btn btn-sm" style="background:#f7f7f7;color:#374151;border:1px solid #e5e7eb;border-radius:6px;font-size:0.8rem;">
                             <i class="fas fa-eye me-1"></i> View Full Inventory
                         </a>
                     </div>
@@ -458,7 +458,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 <style>
 /* ================================================
-   GLASSMORPHISM USER DASHBOARD — LIGHT THEME
+   USER DASHBOARD — FLAT/MINIMAL
    ================================================ */
 
 .main-wrapper.ud-page {
@@ -466,24 +466,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     min-height: 100vh;
 }
 
-/* Glass mixin — reused on all panels */
-.ud-glass {
-    background: rgba(255,255,255,0.68);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(0,0,0,0.07);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.6);
-    border-radius: 18px;
-}
-
 /* ---- Welcome Banner ---- */
 .ud-welcome-banner {
-    background: linear-gradient(135deg, rgba(139,0,0,0.82) 0%, rgba(183,28,28,0.75) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.22);
-    box-shadow: 0 8px 32px rgba(139,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.15);
-    border-radius: 18px;
+    background: #8B0000;
+    border: 1px solid #7a0000;
+    border-radius: 8px;
     padding: 22px 26px;
     display: flex;
     align-items: center;
@@ -499,9 +486,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .ud-welcome-avatar {
     width: 52px;
     height: 52px;
-    background: rgba(255,255,255,0.22);
-    border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 14px;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.30);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -513,7 +500,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     font-weight: 700;
     margin: 0 0 4px;
     color: #ffffff !important;
-    text-shadow: 0 1px 6px rgba(0,0,0,0.2);
 }
 .ud-welcome-sub {
     font-size: 0.82rem;
@@ -524,75 +510,40 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    background: rgba(255,255,255,0.18);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1.5px solid rgba(255,255,255,0.38);
+    background: rgba(255,255,255,0.15);
+    border: 1.5px solid rgba(255,255,255,0.35);
     color: #fff !important;
-    border-radius: 14px;
+    border-radius: 6px;
     padding: 10px 22px 10px 10px;
     font-size: 0.88rem;
     font-weight: 700;
     text-decoration: none !important;
     white-space: nowrap;
-    transition: transform 0.18s, box-shadow 0.18s, background 0.18s, border-color 0.18s;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.25);
+    transition: background 0.15s, border-color 0.15s;
     letter-spacing: 0.2px;
 }
 .ud-new-request-icon {
     width: 32px;
     height: 32px;
-    background: rgba(255,255,255,0.22);
-    border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 9px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
     font-size: 0.8rem;
     flex-shrink: 0;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
-    transition: transform 0.18s, background 0.18s;
 }
 .ud-new-request-btn:hover {
-    background: rgba(255,255,255,0.30);
-    border-color: rgba(255,255,255,0.55);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.3);
-    transform: translateY(-1px);
+    background: rgba(255,255,255,0.25);
+    border-color: rgba(255,255,255,0.50);
     color: #fff !important;
     text-decoration: none !important;
-}
-.ud-new-request-btn:hover .ud-new-request-icon {
-    transform: rotate(90deg);
-    background: rgba(255,255,255,0.32);
-}
-
-/* ---- Icon Animations ---- */
-@keyframes iconBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
-}
-@keyframes iconPulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.08); opacity: 0.95; }
-}
-@keyframes iconFloat {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-6px); }
-}
-@keyframes iconSpin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-@keyframes iconWiggle {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-2deg); }
-    75% { transform: rotate(2deg); }
 }
 
 /* ---- Stat Cards ---- */
 .ud-stat-card {
-    border-radius: 16px;
+    border-radius: 8px;
     padding: 22px 20px;
     display: flex;
     flex-direction: column;
@@ -600,56 +551,44 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     gap: 6px;
     position: relative;
     overflow: hidden;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.28);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25);
-    color: #fff;
+    background: #fff;
+    border: 1.5px solid var(--ud-kpi-color, #8B0000);
+    color: #111;
     height: 100%;
     min-height: 130px;
     justify-content: space-between;
 }
-.ud-stat-card::before {
-    content: '';
-    position: absolute;
-    top: -30px; right: -20px;
-    width: 90px; height: 90px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.12);
-}
-.ud-stat-blue   { background: linear-gradient(135deg, rgba(26,115,232,0.70), rgba(13,71,161,0.80)); }
-.ud-stat-green  { background: linear-gradient(135deg, rgba(52,168,83,0.70),  rgba(30,126,52,0.80)); }
-.ud-stat-orange { background: linear-gradient(135deg, rgba(249,171,0,0.70),  rgba(230,81,0,0.80));  }
-.ud-stat-red    { background: linear-gradient(135deg, rgba(229,62,62,0.70),  rgba(127,29,29,0.80)); }
-.ud-stat-icon   { font-size: 1.5rem; opacity: 0.85; animation: iconBounce 2s ease-in-out infinite; }
-.ud-stat-value  { font-size: 2.1rem; font-weight: 800; line-height: 1; text-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-.ud-stat-label  { font-size: 0.78rem; font-weight: 500; opacity: 0.88; }
+.ud-stat-blue   { --ud-kpi-color: #1a73e8; }
+.ud-stat-green  { --ud-kpi-color: #34a853; }
+.ud-stat-orange { --ud-kpi-color: #e65100; }
+.ud-stat-red    { --ud-kpi-color: #c62828; }
+.ud-stat-icon   { font-size: 1.5rem; color: var(--ud-kpi-color, #8B0000); }
+.ud-stat-value  { font-size: 2.1rem; font-weight: 800; line-height: 1; color: #111; }
+.ud-stat-label  { font-size: 0.78rem; font-weight: 500; color: #999; }
 
-/* ---- Glass Cards ---- */
+/* ---- Cards ---- */
 .ud-card {
-    background: rgba(255,255,255,0.68);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(0,0,0,0.07);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.6);
-    border-radius: 18px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 .ud-card-header {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 15px 18px;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
+    border-bottom: 1px solid #e5e7eb;
     font-size: 0.93rem;
     font-weight: 700;
     color: #1a1d23;
 }
-.ud-card-icon { font-size: 1rem; animation: iconWiggle 1.5s ease-in-out infinite; }
+.ud-card-icon { font-size: 1rem; }
 .ud-card-link {
     font-size: 0.78rem;
     font-weight: 500;
-    color: rgba(139,0,0,0.82);
+    color: #8B0000;
     text-decoration: none;
 }
 .ud-card-link:hover { color: #7f0000; text-decoration: underline; }
@@ -661,31 +600,26 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     align-items: center;
     gap: 12px;
     padding: 10px 8px;
-    border-radius: 12px;
+    border-radius: 6px;
     text-decoration: none;
     color: #374151;
-    transition: background 0.18s;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    transition: background 0.15s;
+    border-bottom: 1px solid #e5e7eb;
 }
 .ud-action-btn:last-child { border-bottom: none; }
 .ud-action-btn:hover {
-    background: rgba(0,0,0,0.04);
+    background: #f7f7f7;
     text-decoration: none;
-    color: #1a1d23;
+    color: #111;
 }
 .ud-action-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.95rem;
     flex-shrink: 0;
-    transition: transform 0.3s ease;
-}
-.ud-action-btn:hover .ud-action-icon {
-    animation: iconPulse 0.6s ease-in-out;
 }
 .ud-action-text {
     flex: 1;
@@ -694,9 +628,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     font-size: 0.88rem;
     line-height: 1.3;
 }
-.ud-action-text strong { color: #1a1d23; }
-.ud-action-text small  { color: rgba(0,0,0,0.45); font-size: 0.75rem; }
-.ud-action-arrow { color: rgba(0,0,0,0.25); font-size: 0.75rem; }
+.ud-action-text strong { color: #111; }
+.ud-action-text small  { color: #555; font-size: 0.75rem; }
+.ud-action-arrow { color: #999; font-size: 0.75rem; }
 
 /* ---- Summary rows ---- */
 .ud-summary-row {
@@ -704,18 +638,17 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     align-items: center;
     justify-content: space-between;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
+    border-bottom: 1px solid #e5e7eb;
     font-size: 0.88rem;
 }
 .ud-summary-row:last-of-type { border-bottom: none; }
-.ud-summary-label { color: rgba(0,0,0,0.58); display: flex; align-items: center; }
-.ud-summary-val   { font-weight: 700; font-size: 1rem; color: #1a1d23; }
+.ud-summary-label { color: #555; display: flex; align-items: center; }
+.ud-summary-val   { font-weight: 700; font-size: 1rem; color: #111; }
 .ud-summary-badge {
     font-weight: 700;
     font-size: 0.82rem;
     padding: 3px 10px;
-    border-radius: 20px;
-    backdrop-filter: blur(6px);
+    border-radius: 4px;
 }
 
 /* ---- Progress bar ---- */
@@ -723,18 +656,18 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .ud-progress-bar {
     display: flex;
     height: 8px;
-    border-radius: 99px;
+    border-radius: 4px;
     overflow: hidden;
-    background: rgba(0,0,0,0.08);
+    background: #e5e7eb;
     gap: 2px;
 }
-.ud-progress-seg { border-radius: 99px; transition: width 0.4s; }
+.ud-progress-seg { border-radius: 4px; transition: width 0.4s; }
 .ud-progress-legend {
     display: flex;
     gap: 12px;
     margin-top: 6px;
     font-size: 0.72rem;
-    color: rgba(0,0,0,0.45);
+    color: #999;
 }
 .ud-dot {
     display: inline-block;
@@ -749,24 +682,22 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     align-items: center;
     gap: 10px;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(0,0,0,0.07);
+    border-bottom: 1px solid #e5e7eb;
 }
 .ud-inv-row:last-of-type { border-bottom: none; }
 .ud-inv-icon {
-    width: 30px; height: 30px;
-    border-radius: 8px;
+    width: 24px; height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 0.8rem;
     flex-shrink: 0;
-    background: rgba(0,0,0,0.06) !important;
-    color: rgba(0,0,0,0.55) !important;
+    color: #555;
 }
-.ud-inv-label    { font-size: 0.84rem; color: rgba(0,0,0,0.60); width: 90px; flex-shrink: 0; }
-.ud-inv-bar-wrap { flex: 1; background: rgba(0,0,0,0.08); border-radius: 99px; height: 6px; overflow: hidden; }
-.ud-inv-bar      { height: 100%; border-radius: 99px; transition: width 0.4s; min-width: 2px; }
-.ud-inv-count    { font-weight: 700; font-size: 0.85rem; color: #1a1d23; width: 24px; text-align: right; flex-shrink: 0; }
+.ud-inv-label    { font-size: 0.84rem; color: #555; width: 90px; flex-shrink: 0; }
+.ud-inv-bar-wrap { flex: 1; background: #e5e7eb; border-radius: 4px; height: 6px; overflow: hidden; }
+.ud-inv-bar      { height: 100%; border-radius: 4px; transition: width 0.4s; min-width: 2px; }
+.ud-inv-count    { font-weight: 700; font-size: 0.85rem; color: #111; width: 24px; text-align: right; flex-shrink: 0; }
 
 /* ---- Table — override Bootstrap defaults ---- */
 .ud-table,
@@ -781,45 +712,44 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 }
 .table-responsive { background: transparent !important; }
 .ud-table thead tr {
-    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+    border-bottom: 1px solid #e5e7eb !important;
 }
 .ud-table thead th {
     font-size: 0.78rem;
     font-weight: 600;
-    color: rgba(0,0,0,0.45) !important;
+    color: #999 !important;
     text-transform: uppercase;
     letter-spacing: 0.4px;
     padding: 10px 14px;
-    background: rgba(0,0,0,0.03) !important;
+    background: #f7f7f7 !important;
     border: none !important;
 }
 .ud-table tbody td {
     padding: 10px 14px;
     font-size: 0.86rem;
-    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+    border-bottom: 1px solid #e5e7eb !important;
     border-top: none !important;
     vertical-align: middle;
     color: #374151 !important;
     background: transparent !important;
 }
 .ud-table tbody tr:last-child td { border-bottom: none !important; }
-.ud-table tbody tr:hover td { background: rgba(0,0,0,0.03) !important; }
+.ud-table tbody tr:hover td { background: #f7f7f7 !important; }
 .ud-code {
-    background: rgba(0,0,0,0.07);
-    color: #1a1d23;
+    background: #f7f7f7;
+    color: #111;
     padding: 2px 7px;
-    border-radius: 5px;
+    border-radius: 4px;
     font-size: 0.78rem;
-    border: 1px solid rgba(0,0,0,0.10);
+    border: 1px solid #e5e7eb;
 }
 .ud-pill {
     display: inline-block;
     padding: 3px 10px;
-    border-radius: 20px;
+    border-radius: 4px;
     font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
-    backdrop-filter: blur(6px);
 }
 .ud-table .ud-pill,
 .ud-summary-badge {
@@ -833,20 +763,17 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     align-items: center;
     gap: 12px;
     padding: 10px 18px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid #e5e7eb;
     font-size: 0.86rem;
 }
 .ud-item-row:last-child { border-bottom: none; }
-.ud-item-row:hover { background: rgba(0,0,0,0.03); }
+.ud-item-row:hover { background: #f7f7f7; }
 .ud-item-cat-icon {
-    width: 34px; height: 34px;
-    background: rgba(0,0,0,0.06);
-    border: 1px solid rgba(0,0,0,0.09);
-    border-radius: 8px;
+    width: 28px; height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(0,0,0,0.55);
+    color: #555;
     font-size: 0.85rem;
     flex-shrink: 0;
 }
@@ -862,29 +789,28 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 0.87rem;
-    color: #1a1d23;
+    color: #111;
 }
-.ud-item-info small { color: rgba(0,0,0,0.45); font-size: 0.75rem; }
+.ud-item-info small { color: #555; font-size: 0.75rem; }
 
 /* ---- Empty state ---- */
 .ud-empty-state {
     text-align: center;
     padding: 32px 16px;
-    color: rgba(0,0,0,0.38);
+    color: #999;
 }
 .ud-empty-state i   { font-size: 2rem; margin-bottom: 8px; display: block; }
 .ud-empty-state p   { font-size: 0.88rem; margin: 0 0 12px; }
 
 /* view-inventory button inside card */
 .ud-card .btn {
-    background: rgba(0,0,0,0.06);
-    color: rgba(0,0,0,0.70);
-    border: 1px solid rgba(0,0,0,0.10);
-    backdrop-filter: blur(6px);
+    background: #f7f7f7;
+    color: #555;
+    border: 1px solid #e5e7eb;
 }
 .ud-card .btn:hover {
-    background: rgba(0,0,0,0.10);
-    color: #1a1d23;
+    background: #e5e7eb;
+    color: #111;
 }
 
 @media (max-width: 576px) {

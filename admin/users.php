@@ -112,14 +112,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .um-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px; }
 @media(max-width:576px){ .um-stats { grid-template-columns:1fr; } }
 .um-stat-card {
-    background:rgba(255,255,255,0.72);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:16px;
-    box-shadow:0 3px 14px rgba(0,0,0,0.06);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:18px 20px; display:flex; align-items:center; gap:14px;
 }
 .um-stat-icon {
-    width:44px; height:44px; border-radius:13px; flex-shrink:0;
+    width:36px; height:36px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center; font-size:1.1rem;
 }
 .um-stat-val { font-size:1.55rem; font-weight:900; line-height:1; color:#1a1d23; }
@@ -137,18 +136,16 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .um-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
 
 .um-user-card {
-    background:rgba(255,255,255,0.75);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 3px 16px rgba(0,0,0,0.06);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:20px; display:flex; flex-direction:column; gap:14px;
-    transition:transform 0.15s, box-shadow 0.15s;
 }
-.um-user-card:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,0,0,0.10); }
+.um-user-card:hover { border-color:#d1d5db; }
 
 .um-card-top { display:flex; align-items:flex-start; gap:13px; }
 .um-avatar {
-    width:46px; height:46px; border-radius:14px; flex-shrink:0;
+    width:46px; height:46px; border-radius:8px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
     font-weight:900; font-size:1.05rem; color:#fff;
 }
@@ -176,7 +173,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 /* Badges */
 .um-badge {
     display:inline-flex; align-items:center; gap:4px;
-    padding:3px 10px; border-radius:20px;
+    padding:3px 10px; border-radius:4px;
     font-size:0.72rem; font-weight:700;
 }
 .um-badge-admin   { background:rgba(139,0,0,0.10); color:#8B0000; }
@@ -187,15 +184,15 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 /* Buttons */
 .um-btn {
     display:inline-flex; align-items:center; gap:5px;
-    padding:6px 14px; border-radius:9px; border:none;
+    padding:6px 14px; border-radius:6px; border:none;
     font-size:0.78rem; font-weight:700; cursor:pointer;
-    text-decoration:none; transition:all 0.15s;
+    text-decoration:none; transition:background 0.15s;
 }
 .um-btn-primary {
-    background:linear-gradient(135deg,var(--um-red),var(--um-red2));
-    color:#fff !important; box-shadow:0 3px 12px rgba(139,0,0,0.25);
+    background:#8B0000;
+    color:#fff !important;
 }
-.um-btn-primary:hover { color:#fff !important; transform:translateY(-1px); box-shadow:0 5px 18px rgba(139,0,0,0.30); }
+.um-btn-primary:hover { color:#fff !important; background:#6b0000; }
 .um-btn-secondary {
     background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.55) !important;
     border:1px solid rgba(0,0,0,0.09);
@@ -209,10 +206,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 /* Form */
 .um-form-card {
-    background:rgba(255,255,255,0.75);
-    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(0,0,0,0.07); border-radius:18px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.07);
+    background:#fff;
+    border:1px solid #e5e7eb; border-radius:8px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
     padding:26px 28px; margin-bottom:16px;
 }
 .um-form-section {
@@ -228,13 +224,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 }
 .um-form-req { color:#dc2626; margin-left:2px; }
 .um-tip-card {
-    background:rgba(139,0,0,0.04);
-    border:1px solid rgba(139,0,0,0.10); border-radius:14px;
+    background:#f7f7f7;
+    border:1px solid #e5e7eb; border-radius:8px;
     padding:18px 20px;
 }
 .um-tip-item { display:flex; gap:10px; margin-bottom:12px; font-size:0.80rem; color:#374151; }
 .um-tip-item:last-child { margin-bottom:0; }
-.um-tip-dot { width:22px; height:22px; border-radius:7px; background:rgba(139,0,0,0.10); color:var(--um-red); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:0.72rem; margin-top:1px; }
+.um-tip-dot { width:22px; height:22px; border-radius:4px; background:rgba(139,0,0,0.08); color:var(--um-red); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:0.72rem; margin-top:1px; }
 </style>
 
 <div class="container-fluid mt-4 pb-4">

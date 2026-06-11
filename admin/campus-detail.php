@@ -29,23 +29,23 @@ if ($campus_id == 1) {
 ?>
 <style>
 /* Campus Detail Page */
-.cd-wrapper { padding: 40px 32px 60px; background: linear-gradient(135deg,#fafbfc 0%,#f5f8fb 100%); min-height: 100vh; }
+.cd-wrapper { padding: 40px 32px 60px; background: #f7f7f7; min-height: 100vh; }
 
 .cd-header {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 32px; gap: 20px;
-    padding-bottom: 20px; border-bottom: 2px solid rgba(139,0,0,.1);
+    padding-bottom: 20px; border-bottom: 2px solid #e5e7eb;
 }
 .cd-header-left h1 {
     font-size: 2.2rem; font-weight: 950; color: #0f172a;
     margin: 0 0 8px; letter-spacing: -.8px;
 }
 .cd-header-left p {
-    margin: 0; font-size: .95rem; color: #64748b; font-weight: 500;
+    margin: 0; font-size: .95rem; color: #555; font-weight: 500;
 }
 .cd-breadcrumb {
     display: flex; align-items: center; gap: 8px;
-    font-size: .85rem; color: #94a3b8;
+    font-size: .85rem; color: #999;
 }
 .cd-breadcrumb a {
     color: #8B0000; text-decoration: none; font-weight: 600;
@@ -57,34 +57,20 @@ if ($campus_id == 1) {
 @media(max-width:1024px) { .cd-grid { grid-template-columns: 1fr; } }
 
 .cd-card {
-    background: #fff; border-radius: 24px;
-    border: 1.5px solid rgba(0,0,0,.08);
-    box-shadow: 0 4px 20px rgba(0,0,0,.08);
+    background: #fff; border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
     padding: 28px;
-    animation: slideUp .5s ease both;
-    transition: all .3s ease;
     position: relative; overflow: hidden;
-}
-.cd-card:hover {
-    box-shadow: 0 8px 32px rgba(0,0,0,.12);
-    transform: translateY(-2px);
-}
-.cd-card::before {
-    content: ''; position: absolute; top: 0; right: 0; width: 1px; height: 100%;
-    background: linear-gradient(to bottom, rgba(139,0,0,.2), transparent);
 }
 
 .cd-card-head {
     display: flex; align-items: center; gap: 14px;
     margin-bottom: 24px; padding-bottom: 16px;
-    border-bottom: 1.5px solid #f1f5f9;
+    border-bottom: 1px solid #e5e7eb;
 }
 .cd-card-icon {
-    display: flex; align-items: center; justify-content: center;
-    font-size: .85rem; color: #fff; flex-shrink: 0;
-    background: linear-gradient(135deg, #8B0000, #b91c1c);
-    width: 42px; height: 42px; border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(139,0,0,.2);
+    font-size: .85rem; color: #8B0000; flex-shrink: 0;
 }
 .cd-card-title {
     font-size: 1.1rem; font-weight: 800; color: #0f172a; letter-spacing: -.3px;
@@ -92,44 +78,38 @@ if ($campus_id == 1) {
 
 .cd-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
 .cd-stat-box {
-    background: linear-gradient(135deg, #fafbfc, #f9fafb);
-    border: 1.2px solid #f1f5f9;
-    border-radius: 12px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
     padding: 16px;
     text-align: center;
-    transition: all .2s ease;
+    transition: border-color .2s ease;
 }
 .cd-stat-box:hover {
     border-color: rgba(139,0,0,.3);
-    background: #fff;
 }
 .cd-stat-val { font-size: 2rem; font-weight: 950; color: #0f172a; line-height: 1; }
-.cd-stat-lbl { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; margin-top: 6px; }
+.cd-stat-lbl { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #999; margin-top: 6px; }
 
 .cd-list { display: flex; flex-direction: column; gap: 8px; }
 .cd-list-item {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 14px; border-radius: 10px;
-    background: linear-gradient(135deg, #fafbfc, #f9fafb);
-    border: 1.2px solid #f1f5f9;
+    padding: 12px 14px; border-radius: 6px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
     font-size: .9rem; color: #374151;
-    transition: all .2s ease;
+    transition: border-color .2s ease;
     cursor: default;
 }
 .cd-list-item:hover {
-    background: linear-gradient(135deg, #fff, #fef9f9);
     border-color: rgba(139,0,0,.2);
-    transform: translateX(4px);
 }
 .cd-list-icon {
-    display: flex; align-items: center; justify-content: center;
-    font-size: .75rem; color: #8B0000; flex-shrink: 0;
-    width: 28px; height: 28px; border-radius: 8px;
-    background: rgba(139,0,0,.1);
+    font-size: .85rem; color: #8B0000; flex-shrink: 0;
 }
 .cd-list-text { flex: 1; min-width: 0; }
 .cd-list-name { font-weight: 700; color: #0f172a; margin-bottom: 2px; }
-.cd-list-sub { font-size: .75rem; color: #94a3b8; }
+.cd-list-sub { font-size: .75rem; color: #999; }
 
 .cd-section {
     margin-bottom: 32px;
@@ -137,15 +117,11 @@ if ($campus_id == 1) {
 .cd-section-title {
     font-size: 1.2rem; font-weight: 850; color: #0f172a;
     margin-bottom: 16px; padding-bottom: 12px;
-    border-bottom: 2px solid #f1f5f9;
+    border-bottom: 2px solid #e5e7eb;
     display: flex; align-items: center; gap: 10px;
 }
 .cd-section-icon {
-    display: flex; align-items: center; justify-content: center;
-    font-size: .8rem; color: #fff; flex-shrink: 0;
-    background: linear-gradient(135deg, #8B0000, #b91c1c);
-    width: 32px; height: 32px; border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(139,0,0,.2);
+    font-size: .9rem; color: #8B0000; flex-shrink: 0;
 }
 
 .cd-inventory-summary {
@@ -154,23 +130,17 @@ if ($campus_id == 1) {
 }
 .cd-inv-badge {
     display: flex; flex-direction: column; align-items: center;
-    padding: 16px 14px; border-radius: 12px;
-    background: linear-gradient(135deg, #fafbfc, #f9fafb);
-    border: 1.2px solid #f1f5f9;
+    padding: 16px 14px; border-radius: 6px;
+    background: #f7f7f7;
+    border: 1px solid #e5e7eb;
     text-align: center;
-    transition: all .2s ease;
+    transition: border-color .2s ease;
 }
 .cd-inv-badge:hover {
-    background: #fff;
     border-color: rgba(139,0,0,.2);
 }
 .cd-inv-val { font-size: 1.8rem; font-weight: 950; color: #0f172a; line-height: 1; }
-.cd-inv-lbl { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; margin-top: 6px; }
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+.cd-inv-lbl { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #999; margin-top: 6px; }
 
 @media(max-width:768px) {
     .cd-wrapper { padding: 24px 18px 60px; }
