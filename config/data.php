@@ -502,6 +502,13 @@ function getBorrowRecords() {
         ['id' => 10, 'user_id' => 2, 'inventory_id' => 21, 'borrow_date' => '2026-06-22', 'expected_return_date' => '2026-06-30', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'CHTM culinary event service',             'created_at' => '2026-06-22 07:00:00'],
         ['id' => 11, 'user_id' => 4, 'inventory_id' => 19, 'borrow_date' => '2026-06-18', 'expected_return_date' => '2026-07-02', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'Server maintenance and system testing',   'created_at' => '2026-06-18 09:00:00'],
         ['id' => 12, 'user_id' => 3, 'inventory_id' => 20, 'borrow_date' => '2026-06-20', 'expected_return_date' => '2026-07-07', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'Engineering workshop project',            'created_at' => '2026-06-20 10:00:00'],
+        // --- Multi-unit borrows ---
+        ['id' => 13, 'user_id' => 3, 'inventory_id' => 1,  'borrow_date' => '2026-06-20', 'expected_return_date' => '2026-06-27', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'Extra chairs for department seminar',      'created_at' => '2026-06-20 09:30:00'],
+        ['id' => 14, 'user_id' => 4, 'inventory_id' => 1,  'borrow_date' => '2026-06-21', 'expected_return_date' => '2026-07-03', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'Conference room setup for board meeting',  'created_at' => '2026-06-21 08:00:00'],
+        ['id' => 15, 'user_id' => 4, 'inventory_id' => 18, 'borrow_date' => '2026-06-22', 'expected_return_date' => '2026-07-01', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'Accounting finals week — extra units',     'created_at' => '2026-06-22 10:00:00'],
+        ['id' => 16, 'user_id' => 3, 'inventory_id' => 18, 'borrow_date' => '2026-06-22', 'expected_return_date' => '2026-07-05', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'CPA review class practice set',            'created_at' => '2026-06-22 11:00:00'],
+        ['id' => 17, 'user_id' => 2, 'inventory_id' => 21, 'borrow_date' => '2026-06-22', 'expected_return_date' => '2026-07-04', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'Second cart for catering event overflow',  'created_at' => '2026-06-22 07:30:00'],
+        ['id' => 18, 'user_id' => 4, 'inventory_id' => 17, 'borrow_date' => '2026-06-22', 'expected_return_date' => '2026-07-10', 'actual_return_date' => NULL, 'status' => 'active',  'notes' => 'CEA capstone project — second workstation', 'created_at' => '2026-06-22 09:00:00'],
     ];
 }
 

@@ -59,6 +59,32 @@ foreach ($available_items as $item) {
     $catalog_by_category[$category][] = $item;
 }
 
+// Borrow catalog includes available + borrowed items so users can see upcoming availability
+$borrow_records_all = getBorrowRecords();
+$item_avail_data = [];
+foreach ($borrow_records_all as $br) {
+    if (in_array($br['status'], ['active', 'overdue']) && empty($br['actual_return_date'])) {
+        $iid = $br['inventory_id'];
+        if (!isset($item_avail_data[$iid])) $item_avail_data[$iid] = [];
+        $item_avail_data[$iid][] = [
+            'return_date' => $br['expected_return_date'],
+            'is_overdue'  => $br['status'] === 'overdue',
+        ];
+    }
+}
+$item_avail_json = json_encode($item_avail_data);
+
+$borrow_catalog = [];
+$borrowable = array_filter($all_inventory, function($item) {
+    return in_array($item['status'], ['available', 'borrowed']);
+});
+usort($borrowable, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
+foreach ($borrowable as $item) {
+    $cat = $item['category'] ?? 'Other';
+    if (!isset($borrow_catalog[$cat])) $borrow_catalog[$cat] = [];
+    $borrow_catalog[$cat][] = $item;
+}
+
 displayMessage();
 ?>
 
@@ -300,6 +326,193 @@ displayMessage();
 .rq-cart-error { display:none; color:#dc2626; font-size:0.80rem; font-weight:600; margin-top:8px; padding:8px 12px; background:rgba(239,68,68,0.08); border-radius:9px; }
 .rq-sum-preview-item { display:flex; align-items:flex-start; gap:7px; padding:5px 0; }
 .rq-sum-preview-num { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:5px; background:rgba(139,0,0,0.12); color:#8B0000; font-size:0.60rem; font-weight:800; flex-shrink:0; margin-top:1px; }
+
+/* ── Item Availability Calendar ── */
+.iac-outer {
+    border-top: 1px solid #e5e7eb;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    background: #fafafa;
+}
+.iac-bar {
+    padding: 11px 16px;
+    font-size: 0.80rem;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    line-height: 1.5;
+}
+.iac-bar-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+}
+.iac-bar-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+}
+.iac-bar-chips-label {
+    font-size: 0.70rem;
+    color: #a16207;
+    font-weight: 600;
+    margin-right: 2px;
+}
+.iac-ret-chip {
+    font-size: 0.70rem;
+    font-weight: 600;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fbbf24;
+    border-radius: 20px;
+    padding: 2px 9px;
+    white-space: nowrap;
+}
+.iac-bar-borrowed {
+    background: linear-gradient(135deg, #fff8ed 0%, #fff3e0 100%);
+    color: #7c4a00;
+    border-bottom: 1px solid #fde68a;
+}
+.iac-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px 0;
+}
+.iac-cal-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8B0000;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.iac-cal-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.iac-cal-nav span {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #111;
+    min-width: 100px;
+    text-align: center;
+}
+.iac-cal-nav button {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #555; font-size: 0.65rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    transition: background 0.15s, border-color 0.15s;
+}
+.iac-cal-nav button:hover { background: #f3f4f6; border-color: #d1d5db; }
+.iac-cal-panel { padding: 10px 14px 6px; }
+.iac-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+.iac-dow {
+    text-align: center;
+    font-size: 0.58rem;
+    font-weight: 700;
+    color: #9ca3af;
+    padding: 4px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.iac-cell {
+    text-align: center;
+    font-size: 0.73rem;
+    padding: 6px 2px 5px;
+    border-radius: 7px;
+    line-height: 1.2;
+    color: #374151;
+    transition: transform 0.1s;
+}
+.iac-cell:not(:empty):hover { transform: scale(1.12); }
+.iac-cell.iac-past { color: #d1d5db; }
+.iac-cell.iac-today {
+    font-weight: 800;
+    outline: 2px solid #8B0000;
+    outline-offset: -2px;
+    border-radius: 7px;
+}
+.iac-cell.iac-unavail {
+    background: #fee2e2;
+    color: #b91c1c;
+    text-decoration: line-through;
+    text-decoration-color: #f87171;
+}
+.iac-cell.iac-today.iac-unavail {
+    background: #fca5a5;
+    color: #7f1d1d;
+    outline-color: #dc2626;
+}
+.iac-cell.iac-returns {
+    background: linear-gradient(135deg, #fef9c3, #fef3c7);
+    color: #92400e;
+    font-weight: 700;
+    border: 1px solid #fbbf24;
+    box-shadow: 0 1px 3px rgba(251,191,36,0.25);
+    position: relative;
+}
+.iac-cell.iac-returns::after {
+    content: '↵';
+    display: block;
+    font-size: 0.52rem;
+    line-height: 1;
+    color: #d97706;
+    margin-top: 1px;
+}
+.iac-cell.iac-avail {
+    background: #dcfce7;
+    color: #15803d;
+    font-weight: 600;
+}
+.iac-cell.iac-today.iac-avail {
+    background: #8B0000;
+    color: #fff;
+    outline-color: #8B0000;
+}
+.iac-cell.iac-today:not(.iac-unavail):not(.iac-returns):not(.iac-avail) {
+    background: #8B0000;
+    color: #fff;
+    outline-color: #8B0000;
+}
+.iac-legend {
+    display: flex;
+    gap: 8px;
+    padding: 8px 14px 12px;
+    border-top: 1px solid #f0f0f0;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.iac-leg-item {
+    font-size: 0.68rem;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 3px 9px;
+}
+.iac-leg-dot {
+    width: 9px; height: 9px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    display: inline-block;
+}
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -416,23 +629,36 @@ displayMessage();
                             <select class="form-select" id="borrow_catalog_select" name="borrow_item_name"
                                     onchange="handleCatalogChange(this); updateSummary();" required>
                                 <option value="">— Select an item —</option>
-                                <?php 
-                                if (count($catalog_by_category) > 0) {
-                                    foreach ($catalog_by_category as $category => $items): 
-                                        if (count($items) > 0):
-                                ?>
+                                <?php foreach ($borrow_catalog as $category => $items):
+                                    if (!count($items)) continue; ?>
                                 <optgroup label="<?php echo htmlspecialchars($category); ?>">
-                                    <?php foreach ($items as $ci): ?>
-                                    <option value="<?php echo htmlspecialchars($ci['item_name']); ?>" data-item-id="<?php echo $ci['id']; ?>" <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
-                                        <?php echo htmlspecialchars($ci['item_name']); ?>
+                                    <?php foreach ($items as $ci):
+                                        $isBorrowed = $ci['status'] === 'borrowed';
+                                        $qty = $ci['quantity'] ?? 0;
+                                        $borrowedRecords = $item_avail_data[$ci['id']] ?? [];
+                                        $borrowedCount = count($borrowedRecords);
+                                        $availableQty = max(0, $qty - $borrowedCount);
+                                        if ($isBorrowed && $borrowedCount > 0) {
+                                            $retDates = array_map(function($r) {
+                                                return date('M j', strtotime($r['return_date']));
+                                            }, $borrowedRecords);
+                                            sort($retDates);
+                                            $qtyLabel = ' (' . $borrowedCount . ' of ' . $qty . ' borrowed — returns ' . implode(', ', $retDates) . ')';
+                                        } else {
+                                            $qtyLabel = ' (qty: ' . $qty . ')';
+                                        }
+                                    ?>
+                                    <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
+                                            data-item-id="<?php echo $ci['id']; ?>"
+                                            data-status="<?php echo $ci['status']; ?>"
+                                            data-quantity="<?php echo $qty; ?>"
+                                            data-available="<?php echo $availableQty; ?>"
+                                            <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
+                                        <?php echo htmlspecialchars($ci['item_name'] . $qtyLabel); ?>
                                     </option>
                                     <?php endforeach; ?>
                                 </optgroup>
-                                <?php 
-                                        endif;
-                                    endforeach; 
-                                }
-                                ?>
+                                <?php endforeach; ?>
                                 <option value="__custom__">✏️ Other (specify custom item)</option>
                             </select>
                         </div>
@@ -698,6 +924,25 @@ displayMessage();
                     Requests are reviewed by the admin. You will be notified once a decision is made.
                 </div>
             </div>
+
+            <!-- Item Availability Calendar -->
+            <div id="iac-wrap" class="iac-outer" style="display:none;">
+                <div id="iac-status-bar" class="iac-bar"></div>
+                <div class="iac-cal-header">
+                    <div class="iac-cal-title">
+                        <i class="fas fa-calendar-days"></i> Availability
+                    </div>
+                    <div class="iac-cal-nav" id="iac-nav"></div>
+                </div>
+                <div class="iac-cal-panel">
+                    <div id="iac-cal-grid"></div>
+                </div>
+                <div class="iac-legend">
+                    <span class="iac-leg-item"><span class="iac-leg-dot" style="background:#fee2e2;border:1px solid #fca5a5;"></span>Unavailable</span>
+                    <span class="iac-leg-item"><span class="iac-leg-dot" style="background:#fef3c7;border:1px solid #fbbf24;"></span>Returns</span>
+                    <span class="iac-leg-item"><span class="iac-leg-dot" style="background:#dcfce7;border:1px solid #86efac;"></span>Available</span>
+                </div>
+            </div>
         </div>
 
     </div><!-- /.rq-layout -->
@@ -740,6 +985,9 @@ function updateRequestType(type) {
     ['borrow_fields','item_fields','service_fields'].forEach(id => {
         document.getElementById(id).style.display = 'none';
     });
+    // Hide availability calendar whenever request type changes
+    var iacWrap = document.getElementById('iac-wrap');
+    if (iacWrap) iacWrap.style.display = 'none';
     ['borrow_catalog_select','expected_return_date','borrow_quantity','item_description','quantity','item_id','service_type','service_description'].forEach(id => {
         document.getElementById(id).removeAttribute('required');
     });
@@ -780,7 +1028,133 @@ function handleCatalogChange(select) {
         wrap.style.display = 'none'; input.removeAttribute('required'); input.value = '';
         select.setAttribute('required','required');
     }
+
+    // Cap quantity input to available stock
+    var qtyInput = document.getElementById('borrow_quantity');
+    var opt = select.options[select.selectedIndex];
+    var available = parseInt(opt && opt.getAttribute('data-available')) || 1;
+    if (select.value && select.value !== '__custom__') {
+        qtyInput.max = available;
+        qtyInput.title = 'Maximum available: ' + available;
+        if (parseInt(qtyInput.value) > available) qtyInput.value = available;
+        if (available < 1) qtyInput.value = 0;
+    } else {
+        qtyInput.removeAttribute('max');
+        qtyInput.removeAttribute('title');
+    }
+
+    renderItemAvailCal(select);
 }
+
+/* ── Item Availability Calendar ── */
+var itemAvailData   = <?php echo $item_avail_json; ?>;
+var iacCurrentId    = null;
+var iacViewDate     = new Date(); iacViewDate.setDate(1);
+var IAC_MONTHS      = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var IAC_DAYS        = ['S','M','T','W','T','F','S'];
+
+function iacPad(n) { return String(n).padStart(2,'0'); }
+function iacDS(y, m, d) { return y + '-' + iacPad(m+1) + '-' + iacPad(d); }
+
+function renderItemAvailCal(select) {
+    var wrap = document.getElementById('iac-wrap');
+    if (!select.value || select.value === '__custom__') {
+        wrap.style.display = 'none';
+        iacCurrentId = null;
+        return;
+    }
+    var opt      = select.options[select.selectedIndex];
+    var itemId   = parseInt(opt.getAttribute('data-item-id'));
+    var status   = opt.getAttribute('data-status');
+    var totalQty = parseInt(opt.getAttribute('data-quantity')) || 0;
+    if (!itemId || status !== 'borrowed') {
+        wrap.style.display = 'none';
+        iacCurrentId = null;
+        return;
+    }
+    iacCurrentId = itemId;
+
+    var records = itemAvailData[itemId] || [];
+    var bar     = document.getElementById('iac-status-bar');
+
+    // Sort records by return date ascending
+    records = records.slice().sort(function(a, b) { return a.return_date.localeCompare(b.return_date); });
+
+    var retChips = records.map(function(r) {
+        var d = new Date(r.return_date + 'T00:00:00');
+        var lbl = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+        return '<span class="iac-ret-chip">' + lbl + '</span>';
+    }).join('');
+    bar.innerHTML = '<div class="iac-bar-top">'
+                  + '<i class="fas fa-clock"></i>'
+                  + '<span><strong>' + records.length + ' of ' + totalQty + ' units currently borrowed</strong></span>'
+                  + '</div>'
+                  + '<div class="iac-bar-chips"><span class="iac-bar-chips-label">Expected returns:</span>' + retChips + '</div>';
+    bar.className = 'iac-bar iac-bar-borrowed';
+
+    // Navigate to the month of the earliest return
+    var earliest = new Date(records[0].return_date + 'T00:00:00');
+    iacViewDate  = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+
+    wrap.style.display = 'block';
+    renderIacGrid(records);
+}
+
+function renderIacGrid(records) {
+    var y  = iacViewDate.getFullYear(), m = iacViewDate.getMonth();
+    var now = new Date();
+    var todayStr = iacDS(now.getFullYear(), now.getMonth(), now.getDate());
+    var todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var firstDay = new Date(y, m, 1).getDay();
+    var daysInMo = new Date(y, m+1, 0).getDate();
+
+    // Build a Set of all return date strings
+    var retStrSet = {};
+    var lastRetDate = null;
+    (records || []).forEach(function(r) {
+        retStrSet[r.return_date] = true;
+        var d = new Date(r.return_date + 'T00:00:00');
+        if (!lastRetDate || d > lastRetDate) lastRetDate = d;
+    });
+
+    document.getElementById('iac-nav').innerHTML =
+        '<button onclick="iacNav(-1)"><i class="fas fa-chevron-left"></i></button>' +
+        '<span>' + IAC_MONTHS[m] + ' ' + y + '</span>' +
+        '<button onclick="iacNav(1)"><i class="fas fa-chevron-right"></i></button>';
+
+    var h = '<div class="iac-grid">';
+    IAC_DAYS.forEach(function(d) { h += '<div class="iac-dow">' + d + '</div>'; });
+    for (var i = 0; i < firstDay; i++) h += '<div class="iac-cell"></div>';
+
+    for (var d = 1; d <= daysInMo; d++) {
+        var ds       = iacDS(y, m, d);
+        var cellDate = new Date(y, m, d);
+        var isToday  = ds === todayStr;
+        var isPast   = cellDate < todayMid;
+        var cls      = 'iac-cell';
+
+        if (retStrSet[ds]) {
+            cls += ' iac-returns';
+        } else if (isPast) {
+            cls += ' iac-past';
+        } else if (lastRetDate && cellDate < lastRetDate) {
+            cls += ' iac-unavail';
+        } else if (lastRetDate && cellDate > lastRetDate) {
+            cls += ' iac-avail';
+        }
+        if (isToday) cls += ' iac-today';
+
+        h += '<div class="' + cls + '">' + d + '</div>';
+    }
+    h += '</div>';
+
+    document.getElementById('iac-cal-grid').innerHTML = h;
+}
+
+window.iacNav = function(dir) {
+    iacViewDate = new Date(iacViewDate.getFullYear(), iacViewDate.getMonth() + dir, 1);
+    renderIacGrid(iacCurrentId ? (itemAvailData[iacCurrentId] || []) : []);
+};
 function handleItemCatalogChange(select) {
     var customWrap  = document.getElementById('custom_item_req_wrap');
     var customInput = document.getElementById('custom_item_req_name');
