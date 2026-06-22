@@ -87,6 +87,26 @@ $owned_items_total = array_reduce($user_owned_items, function($carry, $item) {
     return $carry + $item['quantity'];
 }, 0);
 
+// Build item return map from borrow records (for calendar + item cards)
+$item_return_map = [];
+foreach ($all_borrow as $br) {
+    if (in_array($br['status'], ['active', 'overdue']) && empty($br['actual_return_date'])) {
+        $iid = $br['inventory_id'];
+        if (!isset($item_return_map[$iid])) $item_return_map[$iid] = $br['expected_return_date'];
+    }
+}
+
+// Calendar events: date => [item names returning that day] (campus items only)
+$cal_events = [];
+foreach ($campus_inventory as $item) {
+    if (isset($item_return_map[$item['id']])) {
+        $d = $item_return_map[$item['id']];
+        if (!isset($cal_events[$d])) $cal_events[$d] = [];
+        $cal_events[$d][] = ['name' => $item['item_name'], 'category' => $item['category'] ?? 'Other'];
+    }
+}
+$cal_events_json = json_encode($cal_events);
+
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
@@ -153,6 +173,35 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="ud-stat-icon"><i class="fas fa-user-check"></i></div>
                 <div class="ud-stat-value"><?php echo $owned_items_count; ?></div>
                 <div class="ud-stat-label">My Owned Items</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== RETURN SCHEDULE CALENDAR (main focus) ===== -->
+    <div class="row g-3 mb-4">
+        <!-- Full Calendar -->
+        <div class="col-lg-8">
+            <div class="ud-card">
+                <div class="fc-card-header">
+                    <div class="fc-header-left">
+                        <i class="fas fa-calendar-alt" style="color:#8B0000;font-size:1rem;"></i>
+                        <span class="fc-header-title">Return Schedule</span>
+                        <span class="fc-header-sub">Borrowed item return dates</span>
+                    </div>
+                    <div id="fcNavWrap" class="fc-header-nav"></div>
+                </div>
+                <div id="fullCal"></div>
+            </div>
+        </div>
+        <!-- Schedule Sidebar -->
+        <div class="col-lg-4">
+            <div class="ud-card h-100 d-flex flex-column">
+                <div class="ud-card-header">
+                    <i class="fas fa-list-ul ud-card-icon" style="color:#8B0000;"></i>
+                    <span id="fcSidebarTitle">Upcoming Returns</span>
+                </div>
+                <div class="ud-card-body p-0 flex-grow-1 overflow-auto" id="fcSidebar"></div>
+                <div id="fcLegend" class="fc-legend-wrap"></div>
             </div>
         </div>
     </div>
@@ -289,6 +338,96 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Browse & Reserve Items -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="ud-card">
+                <div class="ud-card-header">
+                    <i class="fas fa-th-list ud-card-icon" style="color:rgba(139,0,0,0.80);"></i>
+                    <span>Browse &amp; Reserve Items</span>
+                    <a href="inventory.php" class="ud-card-link ms-auto">Full inventory <i class="fas fa-arrow-right ms-1"></i></a>
+                </div>
+                <div class="ud-card-body">
+                    <?php
+                    $ib_categories = [];
+                    foreach ($campus_inventory as $ci) {
+                        $cat = $ci['category'] ?? 'Other';
+                        if (!in_array($cat, $ib_categories)) $ib_categories[] = $cat;
+                    }
+                    ?>
+                    <div class="ib-filter-bar">
+                        <button class="ib-filter-btn active" onclick="filterIbItems('all',this)">All</button>
+                        <?php foreach ($ib_categories as $cat): ?>
+                        <button class="ib-filter-btn" onclick="filterIbItems('<?php echo htmlspecialchars(addslashes($cat)); ?>',this)"><?php echo htmlspecialchars($cat); ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="ib-list" id="ibList">
+                    <?php
+                    $ib_cat_icons = [
+                        'Electronics'      => 'fa-laptop',
+                        'Furniture'        => 'fa-chair',
+                        'Equipment'        => 'fa-tools',
+                        'Supplies'         => 'fa-box',
+                        'Appliances'       => 'fa-plug',
+                        'Security'         => 'fa-shield-alt',
+                        'Office Equipment' => 'fa-print',
+                    ];
+                    $ib_status_cfg = [
+                        'available'   => ['bg' => '#d1fae5', 'color' => '#065f46', 'label' => 'Available'],
+                        'borrowed'    => ['bg' => '#dbeafe', 'color' => '#1e40af', 'label' => 'Borrowed'],
+                        'damaged'     => ['bg' => '#fee2e2', 'color' => '#991b1b', 'label' => 'Damaged'],
+                        'maintenance' => ['bg' => '#fef3c7', 'color' => '#92400e', 'label' => 'Maintenance'],
+                        'requested'   => ['bg' => '#f3e8ff', 'color' => '#6b21a8', 'label' => 'Requested'],
+                    ];
+                    foreach ($campus_inventory as $item):
+                        $avail_qty = ($item['status'] === 'available') ? (int)$item['quantity'] : 0;
+                        $total_qty = (int)$item['quantity'];
+                        $return_date = $item_return_map[$item['id']] ?? null;
+                        $sc = $ib_status_cfg[$item['status']] ?? ['bg' => '#f3f4f8', 'color' => '#374151', 'label' => ucfirst($item['status'])];
+                        $iicon = $ib_cat_icons[$item['category']] ?? 'fa-cube';
+                    ?>
+                    <div class="ib-item" data-category="<?php echo htmlspecialchars($item['category']); ?>">
+                        <span class="ib-item-icon"><i class="fas <?php echo $iicon; ?>"></i></span>
+                        <div class="ib-item-info">
+                            <div class="ib-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                            <div class="ib-item-meta">
+                                <span><?php echo htmlspecialchars($item['category']); ?></span>
+                                <?php if (!empty($item['location'])): ?>
+                                <span class="ib-meta-sep">&middot;</span>
+                                <span class="ib-meta-loc"><?php echo htmlspecialchars($item['location']); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php if ($return_date): ?>
+                            <div class="ib-return-tag">
+                                <i class="fas fa-calendar-check"></i>
+                                Returns <?php echo date('M j, Y', strtotime($return_date)); ?>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="ib-item-right">
+                            <div class="ib-qty-wrap">
+                                <span class="ib-qty-num <?php echo $avail_qty > 0 ? 'ib-qty-ok' : 'ib-qty-zero'; ?>"><?php echo $avail_qty; ?></span>
+                                <span class="ib-qty-of">/ <?php echo $total_qty; ?> avail.</span>
+                            </div>
+                            <span class="ud-pill" style="background:<?php echo $sc['bg']; ?>;color:<?php echo $sc['color']; ?>;"><?php echo $sc['label']; ?></span>
+                            <?php if ($item['status'] === 'available'): ?>
+                            <a href="requests.php?item_id=<?php echo (int)$item['id']; ?>" class="ib-reserve-btn">
+                                <i class="fas fa-bookmark me-1"></i>Reserve
+                            </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($campus_inventory)): ?>
+                    <div class="ud-empty-state"><i class="fas fa-box-open"></i><p>No items found for your campus.</p></div>
+                    <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Recent Requests & Recent Inventory -->
@@ -818,6 +957,515 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     .ud-new-request-btn { width: 100%; text-align: center; }
     .ud-stat-value { font-size: 1.6rem; }
 }
+
+/* ---- Item Browser ---- */
+.ib-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.ib-filter-btn {
+    padding: 4px 14px;
+    border-radius: 20px;
+    border: 1px solid #e5e7eb;
+    background: #f7f7f7;
+    color: #374151;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ib-filter-btn.active,
+.ib-filter-btn:hover {
+    background: #8B0000;
+    color: #fff;
+    border-color: #8B0000;
+}
+.ib-list {
+    max-height: 390px;
+    overflow-y: auto;
+    margin: 0 -18px;
+}
+.ib-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    border-bottom: 1px solid #e5e7eb;
+    transition: background 0.12s;
+}
+.ib-item:last-child { border-bottom: none; }
+.ib-item:hover { background: #f7f7f7; }
+.ib-item-icon {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8B0000;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+    background: rgba(139,0,0,0.06);
+    border-radius: 7px;
+}
+.ib-item-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.ib-item-name {
+    font-size: 0.87rem;
+    font-weight: 600;
+    color: #111;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ib-item-meta {
+    font-size: 0.74rem;
+    color: #888;
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+.ib-meta-sep { color: #ccc; }
+.ib-meta-loc {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+.ib-return-tag {
+    font-size: 0.71rem;
+    color: #1558b0;
+    background: #e8f0fe;
+    border-radius: 4px;
+    padding: 2px 7px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: fit-content;
+    margin-top: 2px;
+}
+.ib-item-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+    flex-shrink: 0;
+}
+.ib-qty-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+}
+.ib-qty-num { font-size: 1.05rem; font-weight: 800; line-height: 1; }
+.ib-qty-ok   { color: #15803d; }
+.ib-qty-zero { color: #bbb; }
+.ib-qty-of   { font-size: 0.72rem; color: #999; }
+.ib-reserve-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 11px;
+    background: #8B0000;
+    color: #fff !important;
+    border-radius: 5px;
+    font-size: 0.73rem;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.ib-reserve-btn:hover { background: #6b0000; }
+
+/* ---- Full Calendar ---- */
+.fc-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid #e5e7eb;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.fc-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.fc-header-title { font-size: 0.97rem; font-weight: 700; color: #111; }
+.fc-header-sub { font-size: 0.76rem; color: #999; }
+.fc-header-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.fc-nav-btn {
+    background: none;
+    border: 1px solid #e5e7eb;
+    border-radius: 5px;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #555; font-size: 0.65rem;
+    transition: background 0.12s;
+}
+.fc-nav-btn:hover { background: #f7f7f7; }
+.fc-month-label { font-size: 0.9rem; font-weight: 700; color: #111; min-width: 130px; text-align: center; }
+.fc-today-btn {
+    background: none;
+    border: 1px solid #e5e7eb;
+    border-radius: 5px;
+    padding: 3px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+.fc-today-btn:hover { background: #8B0000; color: #fff; border-color: #8B0000; }
+.fc-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-top: 1px solid #e5e7eb;
+    border-left: 1px solid #e5e7eb;
+}
+.fc-col-hdr {
+    text-align: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #aaa;
+    padding: 8px 0;
+    background: #fafafa;
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+.fc-cell {
+    min-height: 80px;
+    padding: 5px 5px 4px;
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    position: relative;
+    transition: background 0.1s;
+}
+.fc-cell-empty { background: #fafafa; }
+.fc-cell.fc-past  { background: #fafafa; }
+.fc-cell.fc-weekend { background: #fcfcfc; }
+.fc-cell.fc-has-events { cursor: pointer; }
+.fc-cell.fc-has-events:hover { background: #fff8f8; }
+.fc-cell.fc-today  { background: #fff6f6; }
+.fc-cell.fc-selected { background: #fef2f2 !important; outline: 2px solid #8B0000; outline-offset: -2px; }
+.fc-day-num {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #555;
+    display: inline-flex;
+    width: 22px; height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.fc-cell.fc-past .fc-day-num { color: #ccc; }
+.fc-today-num { background: #8B0000 !important; color: #fff !important; font-weight: 800; }
+.fc-ev-chip {
+    font-size: 0.67rem;
+    font-weight: 500;
+    padding: 2px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    line-height: 1.4;
+}
+.fc-ev-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+.fc-ev-more { font-size: 0.63rem; color: #aaa; font-weight: 500; padding-left: 4px; }
+
+/* ---- Calendar Sidebar ---- */
+.fc-side-empty {
+    text-align: center;
+    padding: 32px 16px;
+    color: #bbb;
+}
+.fc-side-empty i { font-size: 2rem; margin-bottom: 10px; display: block; }
+.fc-side-empty p { font-size: 0.83rem; margin: 0; }
+.fc-side-row {
+    display: flex;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: background 0.1s;
+    align-items: flex-start;
+}
+.fc-side-row:last-child { border-bottom: none; }
+.fc-side-row:hover { background: #f7f7f7; }
+.fc-side-date-col { flex-shrink: 0; min-width: 76px; }
+.fc-side-date { font-size: 0.77rem; font-weight: 700; color: #374151; }
+.fc-side-badge {
+    display: inline-block;
+    font-size: 0.63rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-top: 3px;
+}
+.fc-side-today { background: #fef2f2; color: #8B0000; }
+.fc-side-soon  { background: #fefce8; color: #713f12; }
+.fc-side-items { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.fc-side-item {
+    font-size: 0.77rem;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.fc-side-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.fc-side-daydetail { padding: 16px 16px 8px; }
+.fc-side-daylabel {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #111;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.fc-side-detail-item {
+    padding: 9px 10px;
+    border-left: 3px solid #e5e7eb;
+    margin-bottom: 8px;
+    background: #f9f9f9;
+    border-radius: 0 5px 5px 0;
+}
+.fc-side-detail-name { font-size: 0.84rem; font-weight: 600; color: #111; }
+.fc-side-detail-cat  { font-size: 0.72rem; margin-top: 2px; }
+.fc-back-btn {
+    margin-top: 4px;
+    background: none;
+    border: none;
+    color: #8B0000;
+    font-size: 0.77rem;
+    cursor: pointer;
+    padding: 10px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.fc-back-btn:hover { text-decoration: underline; }
+.fc-legend-wrap {
+    padding: 10px 16px;
+    border-top: 1px solid #e5e7eb;
+}
+.fc-legend-inner { display: flex; flex-wrap: wrap; gap: 8px; }
+.fc-legend-item {
+    font-size: 0.70rem;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.fc-legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 </style>
+
+<script>
+// ---- Item Browser Category Filter ----
+function filterIbItems(cat, btn) {
+    document.querySelectorAll('.ib-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.querySelectorAll('#ibList .ib-item').forEach(function(item) {
+        item.style.display = (cat === 'all' || item.dataset.category === cat) ? 'flex' : 'none';
+    });
+}
+
+// ---- Full Visual Calendar ----
+(function () {
+    var events = <?php echo $cal_events_json; ?>;
+    var viewDate = new Date(); viewDate.setDate(1);
+    var selectedDate = null;
+
+    var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    var CAT_COLORS = {
+        'Electronics':      {bg:'#dbeafe', color:'#1e40af'},
+        'Furniture':        {bg:'#fef3c7', color:'#92400e'},
+        'Equipment':        {bg:'#dcfce7', color:'#166534'},
+        'Supplies':         {bg:'#f3e8ff', color:'#6b21a8'},
+        'Appliances':       {bg:'#ccfbf1', color:'#0f766e'},
+        'Security':         {bg:'#ffe4e6', color:'#9f1239'},
+        'Office Equipment': {bg:'#e0f2fe', color:'#0369a1'},
+    };
+    var DEF_COL = {bg:'#f3f4f6', color:'#374151'};
+    function catColor(cat) { return CAT_COLORS[cat] || DEF_COL; }
+
+    function pad(n) { return String(n).padStart(2,'0'); }
+    function toDS(y,m,d) { return y+'-'+pad(m+1)+'-'+pad(d); }
+
+    function render() {
+        var y = viewDate.getFullYear(), m = viewDate.getMonth();
+        var now    = new Date();
+        var todayStr  = toDS(now.getFullYear(), now.getMonth(), now.getDate());
+        var todayMid  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var firstDay  = new Date(y, m, 1).getDay();
+        var daysInMo  = new Date(y, m+1, 0).getDate();
+
+        // Nav bar
+        document.getElementById('fcNavWrap').innerHTML =
+            '<button class="fc-nav-btn" onclick="fcNav(-1)"><i class="fas fa-chevron-left"></i></button>'
+          + '<span class="fc-month-label">' + MONTHS[m] + ' ' + y + '</span>'
+          + '<button class="fc-nav-btn" onclick="fcNav(1)"><i class="fas fa-chevron-right"></i></button>'
+          + '<button class="fc-today-btn" onclick="fcGoToday()">Today</button>';
+
+        // Grid
+        var h = '<div class="fc-grid">';
+        DAYS.forEach(function(d) { h += '<div class="fc-col-hdr">'+d+'</div>'; });
+        for (var i=0; i<firstDay; i++) h += '<div class="fc-cell fc-cell-empty"></div>';
+
+        for (var d=1; d<=daysInMo; d++) {
+            var ds      = toDS(y, m, d);
+            var dayEvs  = events[ds] || [];
+            var isToday = ds === todayStr;
+            var isPast  = new Date(y, m, d) < todayMid;
+            var isSel   = ds === selectedDate;
+            var dow     = (firstDay + d - 1) % 7;
+            var isWknd  = dow === 0 || dow === 6;
+
+            var cls = 'fc-cell';
+            if (isToday)           cls += ' fc-today';
+            if (isPast && !isToday) cls += ' fc-past';
+            if (isSel)             cls += ' fc-selected';
+            if (isWknd)            cls += ' fc-weekend';
+            if (dayEvs.length)     cls += ' fc-has-events';
+
+            var click = dayEvs.length ? ' onclick="fcSelectDay(\''+ds+'\')"' : '';
+            h += '<div class="'+cls+'"'+click+'>';
+            h += '<span class="fc-day-num'+(isToday?' fc-today-num':'')+'">'+d+'</span>';
+
+            dayEvs.slice(0,2).forEach(function(ev) {
+                var c = catColor(ev.category);
+                h += '<div class="fc-ev-chip" style="background:'+c.bg+';color:'+c.color+';">'
+                   + '<span class="fc-ev-dot" style="background:'+c.color+';"></span>'+ev.name+'</div>';
+            });
+            if (dayEvs.length > 2) h += '<div class="fc-ev-more">+' + (dayEvs.length-2) + ' more</div>';
+            h += '</div>';
+        }
+        h += '</div>';
+        document.getElementById('fullCal').innerHTML = h;
+
+        renderLegend();
+        if (selectedDate) renderDayDetail(selectedDate);
+        else renderUpcoming();
+    }
+
+    function renderLegend() {
+        var usedCats = {};
+        Object.values(events).forEach(function(evList) {
+            evList.forEach(function(ev) { usedCats[ev.category] = true; });
+        });
+        var cats = Object.keys(usedCats);
+        if (!cats.length) { document.getElementById('fcLegend').innerHTML = ''; return; }
+        var h = '<div class="fc-legend-inner">';
+        cats.forEach(function(cat) {
+            var c = catColor(cat);
+            h += '<span class="fc-legend-item"><span class="fc-legend-dot" style="background:'+c.color+';"></span>'+cat+'</span>';
+        });
+        document.getElementById('fcLegend').innerHTML = h + '</div>';
+    }
+
+    function renderUpcoming() {
+        document.getElementById('fcSidebarTitle').textContent = 'Upcoming Returns';
+        var now2 = new Date(); now2.setHours(0,0,0,0);
+        var upcoming = Object.keys(events)
+            .filter(function(d){ return new Date(d+'T00:00:00') >= now2; })
+            .sort().slice(0, 8);
+
+        if (!upcoming.length) {
+            document.getElementById('fcSidebar').innerHTML =
+                '<div class="fc-side-empty"><i class="fas fa-calendar-check"></i><p>No upcoming returns.</p></div>';
+            return;
+        }
+        var h = '';
+        upcoming.forEach(function(ds) {
+            var dt   = new Date(ds+'T00:00:00');
+            var lbl  = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+            var now3 = new Date(); now3.setHours(0,0,0,0);
+            var diff = Math.round((dt - now3)/(864e5));
+            var badge = '';
+            if (diff === 0)      badge = '<span class="fc-side-badge fc-side-today">Today</span>';
+            else if (diff === 1) badge = '<span class="fc-side-badge fc-side-soon">Tomorrow</span>';
+            else if (diff <= 3)  badge = '<span class="fc-side-badge fc-side-soon">In '+diff+' days</span>';
+
+            h += '<div class="fc-side-row" onclick="fcSelectDay(\''+ds+'\')">'
+               + '<div class="fc-side-date-col"><div class="fc-side-date">'+lbl+'</div>'+badge+'</div>'
+               + '<div class="fc-side-items">';
+            events[ds].forEach(function(ev) {
+                var c = catColor(ev.category);
+                h += '<div class="fc-side-item"><span class="fc-side-dot" style="background:'+c.color+';"></span>'+ev.name+'</div>';
+            });
+            h += '</div></div>';
+        });
+        document.getElementById('fcSidebar').innerHTML = h;
+    }
+
+    function renderDayDetail(ds) {
+        var dt  = new Date(ds+'T00:00:00');
+        var lbl = dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+        document.getElementById('fcSidebarTitle').textContent =
+            dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        var evs = events[ds] || [];
+        var h = '<div class="fc-side-daydetail"><div class="fc-side-daylabel">'+lbl+'</div>';
+        evs.forEach(function(ev) {
+            var c = catColor(ev.category);
+            h += '<div class="fc-side-detail-item" style="border-left-color:'+c.color+';">'
+               + '<div class="fc-side-detail-name">'+ev.name+'</div>'
+               + '<div class="fc-side-detail-cat" style="color:'+c.color+';">'+ev.category+'</div>'
+               + '</div>';
+        });
+        h += '</div><button class="fc-back-btn" onclick="fcClearDay()">'
+           + '<i class="fas fa-arrow-left"></i>All upcoming</button>';
+        document.getElementById('fcSidebar').innerHTML = h;
+    }
+
+    window.fcNav = function(dir) {
+        viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth()+dir, 1);
+        selectedDate = null;
+        render();
+    };
+    window.fcGoToday = function() {
+        var t = new Date();
+        viewDate = new Date(t.getFullYear(), t.getMonth(), 1);
+        selectedDate = null;
+        render();
+    };
+    window.fcSelectDay = function(ds) {
+        selectedDate = ds;
+        render();
+    };
+    window.fcClearDay = function() {
+        selectedDate = null;
+        document.querySelectorAll('.fc-cell.fc-selected').forEach(function(el){ el.classList.remove('fc-selected'); });
+        document.getElementById('fcSidebarTitle').textContent = 'Upcoming Returns';
+        renderUpcoming();
+    };
+
+    render();
+})();
+</script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>

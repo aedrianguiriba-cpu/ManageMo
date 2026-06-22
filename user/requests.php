@@ -498,9 +498,9 @@ displayMessage();
                                 <?php foreach ($catalog_by_category as $category => $items): ?>
                                 <optgroup label="<?php echo htmlspecialchars($category); ?>">
                                     <?php foreach ($items as $ci): ?>
-                                    <option value="<?php echo htmlspecialchars($ci['name']); ?>"
-                                            data-desc="<?php echo htmlspecialchars($ci['description']); ?>">
-                                        <?php echo htmlspecialchars($ci['name']); ?>
+                                    <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
+                                            data-desc="<?php echo htmlspecialchars($ci['description'] ?? ''); ?>">
+                                        <?php echo htmlspecialchars($ci['item_name']); ?>
                                     </option>
                                     <?php endforeach; ?>
                                 </optgroup>
