@@ -139,7 +139,7 @@ Three request types (selected via radio buttons):
   c) Service  — request maintenance/repair/service on an existing item
 
 Form fields (vary by type):
-  Borrow:  inventory item, expected return date, urgency, reason
+  Borrow:  inventory item, quantity, expected return date, urgency, reason
   Item:    item description, quantity, urgency, reason
   Service: inventory item, service type, description, urgency
 
@@ -147,6 +147,52 @@ Note: Approval letter upload has been removed. Requests are submitted directly.
 
 Server-side:
   - Request stored (mock: session flash message shown on redirect).
+
+Borrow Item Catalog ($borrow_catalog):
+  - Includes BOTH available and borrowed items (not just available).
+  - Items grouped by category inside optgroup elements.
+  - Each option displays:
+      "<Item Name> (X of Y borrowed — returns Mon D, Mon D)" for borrowed items
+      "<Item Name> (qty: Y)" for available items
+  - data-item-id, data-status, data-quantity, data-available attributes on each
+    option enable JS-side behavior.
+  - $item_avail_data (PHP) maps inventory_id → array of active borrow records,
+    each with { return_date, is_overdue }. Multiple records exist when multiple
+    units of the same item are borrowed simultaneously.
+
+Quantity cap:
+  - handleCatalogChange() reads data-available from the selected option and sets
+    the quantity input's max attribute to (total qty − borrowed count).
+  - If the current value exceeds the new max it is automatically clamped down.
+  - Tooltip on the input shows "Maximum available: N".
+
+Item Availability Calendar (#iac-wrap):
+  - Shown only when a BORROWED item is selected from the borrow dropdown.
+  - Hidden automatically when switching request types (Borrow/Item/Service).
+  - Hidden when an available item is selected.
+
+  Status bar (two-row layout):
+    Row 1: clock icon + "X of Y units currently borrowed"
+    Row 2: "Expected returns:" label + amber pill chips, one per return date
+           (sorted ascending, wrap-friendly).
+
+  Calendar header: maroon "AVAILABILITY" title (left) + month nav buttons (right).
+  Calendar grid:
+    - iac-past    — past days (muted grey)
+    - iac-unavail — future days before the last return date (red, strikethrough)
+    - iac-returns — each expected return date (amber gradient, border, ↵ indicator)
+    - iac-avail   — days after all items returned (green fill)
+    - iac-today   — today ring (maroon outline); overrides fill when applicable
+
+  Legend pills at bottom: Unavailable | Returns | Available
+
+  Navigation: iacNav(dir) moves one month; auto-navigates to earliest return month
+  on item select. itemAvailData JS variable holds the PHP-generated $item_avail_json.
+
+  CSS classes: .iac-outer, .iac-bar, .iac-bar-top, .iac-bar-chips, .iac-ret-chip,
+               .iac-bar-borrowed, .iac-cal-header, .iac-cal-title, .iac-cal-nav,
+               .iac-cal-panel, .iac-grid, .iac-dow, .iac-cell, .iac-legend,
+               .iac-leg-item, .iac-leg-dot
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 4: REQUEST MANAGEMENT / APPROVAL  (admin/requests.php)
@@ -223,13 +269,56 @@ Sections (top to bottom):
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 7: USER DASHBOARD  (user/dashboard.php)
 ────────────────────────────────────────────────────────────────────────────────
-Sections:
+Sections (top to bottom):
   1. Welcome Banner — maroon banner with campus name, date, "New Request" button.
+
   2. KPI Cards — Campus Items, Available, Active Borrows, Pending, My Owned Items.
      White background with colored border per card.
-  3. Quick Actions | Request Summary | Campus Inventory Breakdown (3 columns).
-  4. Recent Requests table + Campus Items list.
-  5. My Owned Items list.
+
+  3. Return Schedule Calendar (hero section, col-lg-8) + Sidebar (col-lg-4)
+     The calendar is the main visual focus of the dashboard.
+
+     Calendar (#fullCal):
+       - Pure-JS monthly calendar (no third-party library).
+       - Cells are 80px tall; up to 2 event chips per day + overflow indicator.
+       - Event chips (fc-ev-chip) are color-coded by category:
+           Electronics    #dbeafe / #1e40af
+           Furniture      #fef3c7 / #92400e
+           Equipment      #dcfce7 / #166534
+           Supplies       #f3e8ff / #6b21a8
+           Appliances     #ccfbf1 / #0f766e
+           Security       #ffe4e6 / #9f1239
+           Office Equipment #e0f2fe / #0369a1
+       - Today highlighted with maroon circle (fc-today-num).
+       - Clicking a day highlights it (fc-selected, maroon outline) and updates the
+         sidebar to list items returning on that date.
+       - Navigation: fcNav(dir), fcGoToday() global JS functions.
+       - Data source: $cal_events_json (PHP) — map of YYYY-MM-DD → [{name, category}]
+         built from active/overdue borrow records with future expected_return_dates.
+
+     Sidebar (#fcSidebar + #fcLegend):
+       - Title updates to show selected date or "Select a date".
+       - Lists all items returning on the selected day with category badges.
+       - Category color legend at the bottom.
+
+  4. Quick Actions | Request Summary | Campus Inventory Breakdown (3 columns).
+
+  5. Browse & Reserve Items (full-width, col-12):
+     - Category filter buttons at the top.
+     - Item cards show: name, category badge, available quantity (green if > 0),
+       borrowed return date chip (blue, if currently borrowed), Reserve button
+       (maroon, links to requests.php?item_id=X).
+     - filterIbItems(cat, btn) JS function handles category filtering.
+     - $campus_inventory filtered to current user's campus_id.
+
+  6. Recent Requests table + Campus Items list.
+
+  7. My Owned Items list.
+
+  PHP data computation (top of file):
+    $item_return_map — maps inventory_id → earliest active/overdue expected_return_date
+    $cal_events      — maps YYYY-MM-DD   → [{name, category}] for calendar rendering
+    $cal_events_json — JSON-encoded $cal_events passed to JS
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 8: BORROW MANAGEMENT  (implicit via borrow-records + admin/requests)
@@ -243,6 +332,19 @@ Each record has:
 Overdue logic: status='active' AND expected_return_date < today.
 Return process: admin sets actual_return_date → status = 'returned' →
                 inventory item status reverts to 'available'.
+
+Multi-unit borrows:
+  A single inventory item (e.g. qty=5) may have multiple simultaneous active borrow
+  records — one per borrowed unit. The borrowed count = number of active records
+  for that inventory_id. Available count = item quantity − borrowed count.
+
+Sample borrow data (config/data.php, IDs 5–18, campus_id=1):
+  IDs 5–12:  Single-unit borrows across 8 items (Jun–Jul 2026 return dates)
+  IDs 13–18: Multi-unit borrows demonstrating multiple records per item:
+    Wooden Chair (qty 5)          — 3 active records → returns Jun 24, Jun 27, Jul 3
+    Accounting Calculator (qty 10) — 3 active records → returns Jun 28, Jul 1, Jul 5
+    Food Service Cart (qty 3)      — 2 active records → returns Jun 30, Jul 4
+    CAD Workstation (qty 2)        — 2 active records → returns Jun 26, Jul 10
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 9: ANALYTICS  (admin/analytics.php)
