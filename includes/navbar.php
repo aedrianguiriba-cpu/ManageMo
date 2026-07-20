@@ -72,6 +72,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?php echo $current_page === 'condemnation.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>admin/condemnation.php" title="Condemnation">
+                    <span class="nav-icon"><i class="fas fa-ban"></i></span>
+                    <span class="nav-text">Condemnation</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?php echo $current_page === 'users.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>admin/users.php" title="Users">
                     <span class="nav-icon"><i class="fas fa-users"></i></span>
                     <span class="nav-text">Users</span>

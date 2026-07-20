@@ -426,6 +426,14 @@ $all_borrows = getBorrowRecords();
     text-decoration: underline dotted;
 }
 .inv-qr-toggle-btn:hover { color: #b91c1c; }
+
+/* Mobile: stack inline 2-col detail grids */
+@media(max-width:576px) {
+    [style*="grid-template-columns: 1fr 1fr"],
+    [style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+}
 </style>
 
 <div class="container-fluid mt-4 pb-4">

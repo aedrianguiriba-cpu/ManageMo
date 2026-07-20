@@ -181,6 +181,14 @@ displayMessage();
     background:rgba(139,0,0,0.07); color:#8B0000;
     border-radius:6px; padding:2px 7px;
 }
+
+/* Mobile: stack inline 2-col grids inside cards */
+@media(max-width:576px) {
+    [style*="grid-template-columns: 1fr 1fr"],
+    [style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+}
 </style>
 
 <div class="container-fluid mt-4 pb-4">

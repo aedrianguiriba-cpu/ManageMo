@@ -59,6 +59,7 @@ ManageMo/
 │   ├── requests.php            Review & approve/disapprove requests
 │   ├── analytics.php           Charts and usage analytics
 │   ├── reports.php             Printable reports
+│   ├── condemnation.php        Condemnation & Disposal lifecycle management
 │   ├── users.php               User management
 │   └── settings.php            System/admin settings
 │
@@ -114,7 +115,7 @@ Each item has:
   campus_id, college_id (Main Campus only), quantity, status, location,
   purchase_date, cost, condition, created_at
 
-Item statuses: available | borrowed | maintenance | damaged | requested
+Item statuses: available | borrowed | maintenance | damaged | requested | condemned | disposed
 
 QR Code system:
   - Every item has a base qr_code_id (e.g. 'QR-A1B2C3D4E5').
@@ -133,41 +134,84 @@ Campus view (admin/inventory-campus.php):
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 3: REQUEST SUBMISSION  (user/requests.php)
 ────────────────────────────────────────────────────────────────────────────────
-Three request types (selected via radio buttons):
+Three request types (selected via type cards at the top):
   a) Borrow   — borrow an existing inventory item temporarily
   b) Item     — request procurement of a new item
   c) Service  — request maintenance/repair/service on an existing item
 
 Form fields (vary by type):
-  Borrow:  inventory item, quantity, expected return date, urgency, reason
-  Item:    item description, quantity, urgency, reason
-  Service: inventory item, service type, description, urgency
+  Borrow:  item (shop grid), quantity, expected return date, urgency, reason
+  Item:    item (shop grid), description, quantity, urgency, reason
+  Service: item (shop grid), service type, description, urgency
+
+Page layout: two-column (.rq-layout) — form card (left) + request summary
+sidebar (right, 300px). Collapses to single column at ≤900px.
 
 Note: Approval letter upload has been removed. Requests are submitted directly.
 
 Server-side:
   - Request stored (mock: session flash message shown on redirect).
 
-Borrow Item Catalog ($borrow_catalog):
+────────────────────────────────
+SHOP-STYLE ITEM SELECTION GRIDS
+────────────────────────────────
+All three request types use a shop-style card grid for item selection instead
+of a plain <select> dropdown. Each grid has:
+  - A hidden <select> (original ID kept for JS compatibility with handleCatalogChange,
+    addToCart, updateSummary, resetStaging)
+  - A search input (live filter)
+  - Category filter pills (horizontal scrolling, wraps on mobile)
+  - A card grid
+
+Grid 1 — Borrow (#bshop-grid, $borrow_catalog):
+  Includes available AND borrowed items. Cards display:
+    - Category icon + color strip (.bshop-icon)
+    - Item name (.bshop-name)
+    - Location chip (.bshop-loc)
+    - Availability badge: "Available (qty)" green or "X borrowed" amber
+    - Expected return date pills (one per active borrow record, sorted asc)
+    - Unit price + status pill in footer
+  selectBorrowCard() / filterShopItems() handle selection & filtering.
+  data-item-id, data-status, data-quantity, data-available on each card.
+  Category filter: filterShopItems(btn) toggles .bshop-cat.active.
+
+Grid 2 — Item Request (#ishop-grid, $catalog_by_category):
+  Available-only items. Cards show name, description chip, category, location.
+  selectItemReqCard() / filterItemShop() handle selection & filtering.
+
+Grid 3 — Service (#sshop-grid, $inventory_items):
+  All campus items regardless of status. Status-colored badge per item.
+  selectServiceCard() / filterServiceShop() handle selection & filtering.
+
+JS function resetStaging() clears all three grids on request type switch.
+
+Category color map ($catMeta in PHP, reused in all three grids):
+  Electronics      icon fa-laptop             color #1e40af  bg #dbeafe
+  Furniture        icon fa-chair              color #92400e  bg #fef3c7
+  Equipment        icon fa-screwdriver-wrench color #166534  bg #dcfce7
+  Supplies         icon fa-boxes-stacked      color #6b21a8  bg #f3e8ff
+  Appliances       icon fa-plug               color #0f766e  bg #ccfbf1
+  Security         icon fa-shield-halved      color #9f1239  bg #ffe4e6
+  Office Equipment icon fa-print              color #0369a1  bg #e0f2fe
+  (default)        icon fa-box                color #6b7280  bg #f3f4f6
+
+PHP data ($borrow_catalog):
   - Includes BOTH available and borrowed items (not just available).
-  - Items grouped by category inside optgroup elements.
-  - Each option displays:
-      "<Item Name> (X of Y borrowed — returns Mon D, Mon D)" for borrowed items
-      "<Item Name> (qty: Y)" for available items
-  - data-item-id, data-status, data-quantity, data-available attributes on each
-    option enable JS-side behavior.
-  - $item_avail_data (PHP) maps inventory_id → array of active borrow records,
+  - Items grouped by category.
+  - $item_avail_data maps inventory_id → array of active borrow records,
     each with { return_date, is_overdue }. Multiple records exist when multiple
     units of the same item are borrowed simultaneously.
 
 Quantity cap:
-  - handleCatalogChange() reads data-available from the selected option and sets
-    the quantity input's max attribute to (total qty − borrowed count).
+  - handleCatalogChange() reads data-available from the selected card/option
+    and sets the quantity input's max attribute to (total qty − borrowed count).
   - If the current value exceeds the new max it is automatically clamped down.
   - Tooltip on the input shows "Maximum available: N".
 
-Item Availability Calendar (#iac-wrap):
-  - Shown only when a BORROWED item is selected from the borrow dropdown.
+─────────────────────────
+ITEM AVAILABILITY CALENDAR
+─────────────────────────
+  - Shown only when a BORROWED item is selected in the borrow grid.
   - Hidden automatically when switching request types (Borrow/Item/Service).
   - Hidden when an available item is selected.
 
@@ -347,7 +391,58 @@ Sample borrow data (config/data.php, IDs 5–18, campus_id=1):
     CAD Workstation (qty 2)        — 2 active records → returns Jun 26, Jul 10
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 9: ANALYTICS  (admin/analytics.php)
+MODULE 9: CONDEMNATION & DISPOSAL  (admin/condemnation.php)
+────────────────────────────────────────────────────────────────────────────────
+Admin-only page for managing the end-of-life lifecycle of damaged and
+maintenance-flagged items.
+
+Three tabs (via ?tab=evaluate|condemned|disposed, default: evaluate):
+  Tab 1 — For Evaluation: items with status = 'damaged' or 'maintenance'
+  Tab 2 — Condemned:      items that have been condemned (session override applied)
+  Tab 3 — Disposed:       items that have been disposed (session override applied)
+
+KPI cards (top of page):
+  For Evaluation  — amber  — count of damaged/maintenance items
+  Condemned       — maroon — count of condemned items
+  Disposed        — grey   — count of disposed items
+  Est. Value at Risk — red — sum of cost for all evaluate+condemned items
+
+Filter bar (below tab nav, submits via GET):
+  - Campus dropdown (all campuses)
+  - Category dropdown
+  - Search text input (filters item name + description)
+  Filters persist across tab switches via hidden <input name="tab">.
+
+Session overrides (mock mode):
+  Mutations are stored in $_SESSION['condemnation_overrides'][$item_id]:
+    condemn: { status:'condemned', reason:string, condemned_at:timestamp }
+    dispose:  { status:'disposed',  disposal_notes:string, disposed_at:timestamp }
+  Restore:  unsets the override → item reverts to its original inventory status.
+
+Actions per item:
+  Evaluate tab: "Condemn" button → opens condemn modal (required reason textarea)
+  Condemned tab: "Dispose" button → opens dispose modal (optional notes)
+                 "Restore" button → POST action=restore → redirects to evaluate tab
+  Disposed tab:  "Restore" button → POST action=restore → redirects to evaluate tab
+
+POST handling (self-posting to condemnation.php):
+  action=condemn  → sets session override { status:'condemned', reason, condemned_at }
+  action=dispose  → merges disposal_notes + disposed_at into existing override
+  action=restore  → unsets $_SESSION['condemnation_overrides'][$item_id]
+  All POST actions redirect to GET to prevent form resubmission.
+
+CSS namespace: all classes prefixed with .cd-*
+  .cd-kpi-row, .cd-kpi-card, .cd-kpi-icon, .cd-kpi-val, .cd-kpi-lbl
+  .cd-tab-nav, .cd-tab-link, .cd-tab-pane
+  .cd-filter-card, .cd-filter-label
+  .cd-table-card, .cd-table
+
+Note: Condemnation status is not persisted to config/data.php — session overrides
+      reset when the session expires. This is consistent with the app's mock-mode
+      design where all mutations are ephemeral.
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 10: ANALYTICS  (admin/analytics.php)
 ────────────────────────────────────────────────────────────────────────────────
 Charts and metrics including:
   - Requests over time (by type)
@@ -357,7 +452,7 @@ Charts and metrics including:
   - Overdue rate
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 10: REPORTS  (admin/reports.php)
+MODULE 11: REPORTS  (admin/reports.php)
 ────────────────────────────────────────────────────────────────────────────────
 Printable tabular reports:
   - Inventory by campus / category / status
@@ -366,7 +461,7 @@ Printable tabular reports:
   - User activity log
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 11: DEPARTMENT & CAMPUS MANAGER  (admin/inventory-campus.php)
+MODULE 12: DEPARTMENT & CAMPUS MANAGER  (admin/inventory-campus.php)
 ────────────────────────────────────────────────────────────────────────────────
 Accessed via "Manage Departments" button on the Campus Inventory page.
 Opens a tabbed modal with three tabs:
@@ -403,7 +498,7 @@ Persistence:
   merge defaults with custom JSON entries automatically.
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 12: QR DELIVERY SCANNER  [PLANNED — MOBILE APP FEATURE]
+MODULE 13: QR DELIVERY SCANNER  [PLANNED — MOBILE APP FEATURE]
 ────────────────────────────────────────────────────────────────────────────────
 NOTE: QR code scanning is NOT implemented in this web application.
       It is reserved for a dedicated companion mobile app.
@@ -421,18 +516,86 @@ QR Code Format:
   - Per-unit: 'QR-A1B2C3D4E5-U01', 'QR-A1B2C3D4E5-U02', ...
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 13: USER MANAGEMENT  (admin/users.php)
+MODULE 14: USER MANAGEMENT  (admin/users.php)
 ────────────────────────────────────────────────────────────────────────────────
 Admin-only. Lists all users (getUsers()).
 Actions: view profile, activate/deactivate, assign campus/college.
 Passwords are never displayed (BCrypt hash only).
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 14: SETTINGS  (user/settings.php, admin/settings.php)
+MODULE 15: SETTINGS  (user/settings.php, admin/settings.php)
 ────────────────────────────────────────────────────────────────────────────────
 User settings: update full_name, phone, password (with current password verify).
 Admin settings: system name, email, campus configuration.
 Changes are session-persisted (mock mode — no persistent write).
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 16: MOBILE RESPONSIVENESS  (css/style.css + per-page <style> blocks)
+────────────────────────────────────────────────────────────────────────────────
+The entire site is responsive and tested on mobile (≥320px) and tablet (≥576px).
+
+Viewport meta tag (includes/header.php):
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+Sidebar behavior on mobile (≤991px):
+  - Sidebar is always a full-screen OVERLAY — it never pushes content.
+  - Default state: sidebar hidden (position:fixed, transform:translateX(-100%)).
+  - Hamburger button (fixed top-left, z-index 1100) appears when sidebar is closed.
+  - Clicking hamburger → sidebar slides in from left, dark backdrop overlay shows.
+  - Clicking X or backdrop → sidebar closes, overlay dismissed.
+  - The base CSS handles this correctly via .sidebar.collapsed { translateX(-100%) }.
+    No mobile-specific CSS override is needed for the sidebar transform — the same
+    JS (setSidebarOpen) and CSS rules apply on all screen sizes.
+
+Key breakpoints in css/style.css:
+  ≤991px (tablet/mobile):
+    - .main-wrapper { margin-left: 0 !important } — no sidebar push
+    - .topbar always at left:0 — sidebar overlays on top via z-index
+    - .topbar padding-left: 58px — clears the fixed hamburger button
+    - .main-wrapper.sidebar-collapsed padding-left/right: 20px
+      (replaces the desktop icon-sidebar 60px padding)
+    - .row > .col.min-width-0: flex: 0 0 50% — stat cards wrap to 2-per-row
+    - Modal dialogs: max-width capped at viewport - 32px
+
+  ≤575px (phones):
+    - .main-wrapper padding-left/right: 12px
+    - .topbar-user-info, .topbar-caret hidden (avatar only visible)
+    - .topbar-title font-size reduced
+    - Tables: smaller font (0.68rem th, 0.82rem td)
+    - Modals: max-width calc(100vw - 20px) with 10px auto margins
+    - Dashboard calendar cells: min-height 54px, fonts reduced
+
+Per-page responsive rules (in each file's <style> block):
+  user/requests.php:
+    - .rq-type-grid: 1 column at ≤600px
+    - #receiving_method_grid: 1 column at ≤600px
+    - .rq-layout: 1 column at ≤900px (form + summary sidebar stack)
+    - .urgency-group: 2 columns at ≤500px
+    - .bshop-grid: 2 columns at ≤900px; 1 column at ≤560px
+
+  user/dashboard.php:
+    - .ud-welcome-banner: column layout at ≤576px
+    - .fc-cell: min-height 54px, fonts reduced at ≤576px
+
+  user/inventory.php + admin/inventory.php:
+    - Inline 1fr 1fr detail grids: stack to 1fr via attribute selector at ≤576px
+
+  admin/requests.php:
+    - .ar-sticker-grid: 2 columns at ≤700px; 1 column at ≤480px
+
+  admin/campus-detail.php:
+    - .cd-stat-grid, .cd-inventory-summary: 1 column at ≤480px
+
+  admin/dashboard.php:
+    - Campus modal .campus-stat-row: 1 column at ≤400px
+
+  admin/condemnation.php:
+    - .cd-kpi-row: flex-wrap; each card min-width:180px (auto-wraps)
+    - .cd-filter-card: flex-wrap (filters stack on small screens)
+
+  admin/analytics.php, admin/users.php, admin/inventory-campus.php,
+  admin/settings.php: all have their own media queries in their <style> blocks
+  collapsing grids at 540–900px breakpoints.
 
 ================================================================================
 DATA RELATIONSHIPS

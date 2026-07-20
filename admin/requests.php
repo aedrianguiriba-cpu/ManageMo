@@ -347,6 +347,8 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
 .ar-sticker-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
 }
+@media(max-width:700px){ .ar-sticker-grid { grid-template-columns: repeat(2,1fr); } }
+@media(max-width:480px){ .ar-sticker-grid { grid-template-columns: 1fr; } }
 /* ── individual label ── */
 .ar-sticker {
     background: #fff; border: 1.5px solid #ccc;

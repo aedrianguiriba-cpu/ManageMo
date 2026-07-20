@@ -676,21 +676,91 @@ footer {
 /* ================================================
    RESPONSIVE
    ================================================ */
+
+/* Desktop: sidebar toggle visible */
 @media (min-width: 992px) {
     .sidebar-toggle-btn { display: flex; }
 }
 
+/* Tablet / mobile: sidebar overlays, content fills full width */
 @media (max-width: 991px) {
-    .sidebar {
-        transform: translateX(-100%);
-        transition: transform 0.25s ease;
-        width: 240px;
-    }
-    .sidebar.collapsed { width: 240px; transform: translateX(0); }
+    /* sidebar stays position:fixed; base CSS handles show/hide via .collapsed */
     .main-wrapper { margin-left: 0 !important; }
+
+    /* Topbar always full-width on mobile — sidebar overlays it */
+    .topbar,
+    .topbar.sidebar-collapsed,
+    .topbar.sidebar-closed {
+        left: 0 !important;
+        padding-left: 58px;
+        padding-right: 16px;
+    }
+
+    /* Remove the desktop icon-sidebar 60px padding; use normal spacing */
+    .main-wrapper.sidebar-collapsed,
+    .main-wrapper.sidebar-closed {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    /* Stat-card equal columns: 2-per-row wrap on tablet */
+    .row > .col.min-width-0 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
+    /* Modal: add horizontal margin */
+    .modal-dialog.modal-lg,
+    .modal-dialog.modal-xl {
+        max-width: calc(100vw - 32px);
+        margin-left: 16px;
+        margin-right: 16px;
+    }
 }
 
-@media (max-width: 768px) {
-    .main-wrapper { padding-top: 10px; }
+/* Small phones (≤575px) */
+@media (max-width: 575px) {
+    /* Tighter content padding */
+    .main-wrapper,
+    .main-wrapper.sidebar-collapsed,
+    .main-wrapper.sidebar-closed {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-bottom: 20px;
+    }
+
+    /* Topbar: tighten padding, hide user text to save space */
+    .topbar,
+    .topbar.sidebar-collapsed,
+    .topbar.sidebar-closed {
+        padding-left: 54px;
+        padding-right: 10px;
+    }
+    .topbar-user-info { display: none; }
+    .topbar-caret { display: none; }
+    .topbar-title { font-size: 0.88rem; }
+
+    /* Stat cards: still 2-per-row on phones */
+    .row > .col.min-width-0 {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
+    /* Buttons: tighter */
     .btn { padding: 6px 12px; font-size: 0.82rem; }
+
+    /* Modals: nearly full-width */
+    .modal-dialog,
+    .modal-dialog.modal-lg,
+    .modal-dialog.modal-xl {
+        margin: 10px auto;
+        max-width: calc(100vw - 20px) !important;
+    }
+
+    /* Tables: smaller font, let table-responsive scroll */
+    .table thead th { font-size: 0.68rem; padding: 8px 10px; }
+    .table td        { font-size: 0.82rem; padding: 8px 10px; }
+
+    /* Footer tighter */
+    footer { margin-top: 20px; }
 }

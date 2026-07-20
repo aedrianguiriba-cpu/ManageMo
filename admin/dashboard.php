@@ -776,18 +776,13 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total;
         width: 95%;
         max-height: 90vh;
     }
-    .campus-modal-header {
-        padding: 20px;
-    }
-    .campus-modal-body {
-        padding: 20px;
-    }
-    .campus-stat-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .campus-list {
-        grid-template-columns: 1fr;
-    }
+    .campus-modal-header { padding: 16px; }
+    .campus-modal-body   { padding: 16px; }
+    .campus-stat-row { grid-template-columns: repeat(2, 1fr); }
+    .campus-list     { grid-template-columns: 1fr; }
+}
+@media(max-width: 400px) {
+    .campus-stat-row { grid-template-columns: 1fr; }
 }
 </style>
 

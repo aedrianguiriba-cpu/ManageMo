@@ -956,6 +956,16 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     .ud-welcome-banner { flex-direction: column; align-items: flex-start; }
     .ud-new-request-btn { width: 100%; text-align: center; }
     .ud-stat-value { font-size: 1.6rem; }
+
+    /* Calendar: tighter cells on small screens */
+    .fc-cell { min-height: 54px; padding: 3px 2px; font-size: 0.65rem; }
+    .fc-day-num { font-size: 0.65rem; width: 18px; height: 18px; }
+    .fc-col-hdr { font-size: 0.58rem; padding: 5px 0; }
+    .fc-ev-chip { font-size: 0.58rem; padding: 1px 3px; }
+
+    /* Item browser list: wrap right section */
+    .ib-item { flex-wrap: wrap; }
+    .ib-item-right { flex-direction: row; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 }
 
 /* ---- Item Browser ---- */

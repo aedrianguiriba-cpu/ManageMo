@@ -130,6 +130,7 @@ displayMessage();
     margin-bottom:0;
 }
 @media(max-width:600px){ .rq-type-grid { grid-template-columns:1fr; } }
+@media(max-width:600px){ #receiving_method_grid { grid-template-columns:1fr !important; } }
 .rq-type-card {
     background:#fff; border:2px solid #e5e7eb; border-radius:8px;
     padding:20px 18px 16px; cursor:pointer;
@@ -513,6 +514,207 @@ displayMessage();
     flex-shrink: 0;
     display: inline-block;
 }
+
+/* ── Borrow Item Shop ── */
+.bshop-wrap { display:flex; flex-direction:column; gap:10px; }
+
+.bshop-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.bshop-search-wrap {
+    position: relative;
+    flex: 1;
+}
+.bshop-search-wrap input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    outline: none;
+    background: #fafafa;
+    transition: border-color 0.15s, background 0.15s;
+    color: #1a1d23;
+}
+.bshop-search-wrap input:focus { border-color: #8B0000; background: #fff; }
+.bshop-search-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    color: #aaa; font-size: 0.75rem; pointer-events: none;
+}
+
+.bshop-cats {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.bshop-cat {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.bshop-cat:hover { border-color: #8B0000; color: #8B0000; }
+.bshop-cat.active { background: #8B0000; border-color: #8B0000; color: #fff; }
+
+.bshop-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    max-height: 460px;
+    overflow-y: auto;
+    padding-right: 2px;
+}
+@media(max-width:900px){ .bshop-grid { grid-template-columns: repeat(2,1fr); } }
+@media(max-width:560px){ .bshop-grid { grid-template-columns: 1fr; } }
+.bshop-grid::-webkit-scrollbar { width: 5px; }
+.bshop-grid::-webkit-scrollbar-track { background: transparent; }
+.bshop-grid::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+
+.bshop-card {
+    position: relative;
+    background: #fff;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px 12px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    user-select: none;
+}
+.bshop-card:hover {
+    border-color: rgba(139,0,0,0.35);
+    box-shadow: 0 2px 8px rgba(139,0,0,0.08);
+    transform: translateY(-1px);
+}
+.bshop-card.bshop-selected {
+    border-color: #8B0000;
+    border-width: 2px;
+    background: rgba(139,0,0,0.025);
+    box-shadow: 0 0 0 3px rgba(139,0,0,0.10);
+}
+
+.bshop-check {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #8B0000;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.55rem;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: all 0.18s;
+    z-index: 2;
+}
+.bshop-card.bshop-selected .bshop-check { opacity: 1; transform: scale(1); }
+
+.bshop-avail-badge {
+    position: absolute;
+    top: 8px; left: 8px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    line-height: 1.6;
+}
+.bshop-avail-ok   { background: #dcfce7; color: #15803d; }
+.bshop-avail-none { background: #fee2e2; color: #991b1b; }
+
+.bshop-icon {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.95rem;
+    margin-top: 20px;
+    flex-shrink: 0;
+}
+.bshop-icon-custom { background: #f3f4f6; color: #6b7280; }
+
+.bshop-name {
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: #1a1d23;
+    line-height: 1.3;
+    margin-top: 6px;
+}
+.bshop-desc {
+    font-size: 0.71rem;
+    color: #9ca3af;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.bshop-loc {
+    font-size: 0.68rem;
+    color: #bbb;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.bshop-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #f3f4f6;
+}
+.bshop-price {
+    font-size: 0.80rem;
+    font-weight: 700;
+    color: #374151;
+    font-variant-numeric: tabular-nums;
+}
+.bshop-status-pill {
+    font-size: 0.63rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.bshop-pill-avail    { background: #dcfce7; color: #15803d; }
+.bshop-pill-borrowed { background: #fef3c7; color: #92400e; }
+.bshop-pill-maint    { background: #e0f2fe; color: #0369a1; }
+.bshop-pill-damaged  { background: #fee2e2; color: #991b1b; }
+.bshop-avail-maint   { background: #e0f2fe; color: #0369a1; }
+.bshop-pill-custom   { background: #f3f4f6; color: #6b7280; }
+
+.bshop-card-custom {
+    border-style: dashed;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    min-height: 120px;
+}
+.bshop-card-custom .bshop-icon { margin-top: 0; }
+.bshop-card-custom .bshop-foot { border-top: none; padding-top: 0; margin-top: 4px; justify-content: center; }
+
+.bshop-empty {
+    grid-column: 1/-1;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    color: #bbb;
+    font-size: 0.82rem;
+    padding: 24px;
+    display: flex;
+}
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -622,45 +824,129 @@ displayMessage();
                 <div id="borrow_fields">
                     <div class="rq-section-title"><i class="fas fa-hand-holding"></i> Borrow Details</div>
 
+                    <?php
+                    // Category icon + color map
+                    $catMeta = [
+                        'Electronics'      => ['icon'=>'fa-laptop',              'color'=>'#1e40af','bg'=>'#dbeafe'],
+                        'Furniture'        => ['icon'=>'fa-chair',               'color'=>'#92400e','bg'=>'#fef3c7'],
+                        'Equipment'        => ['icon'=>'fa-screwdriver-wrench',  'color'=>'#166534','bg'=>'#dcfce7'],
+                        'Supplies'         => ['icon'=>'fa-boxes-stacked',       'color'=>'#6b21a8','bg'=>'#f3e8ff'],
+                        'Appliances'       => ['icon'=>'fa-plug',                'color'=>'#0f766e','bg'=>'#ccfbf1'],
+                        'Security'         => ['icon'=>'fa-shield-halved',       'color'=>'#9f1239','bg'=>'#ffe4e6'],
+                        'Office Equipment' => ['icon'=>'fa-print',               'color'=>'#0369a1','bg'=>'#e0f2fe'],
+                    ];
+                    $defaultMeta = ['icon'=>'fa-box','color'=>'#6b7280','bg'=>'#f3f4f6'];
+                    ?>
+
                     <div class="rq-field">
-                        <label>Item to Borrow <span class="rq-req">*</span><?php if ($auto_fill_item): ?> <span style="font-size:0.65rem; font-weight:700; background:rgba(34,197,94,0.12); color:#15803d; padding:2px 8px; border-radius:12px; border:1px solid rgba(34,197,94,0.22); margin-left:6px;"><i class="fas fa-check-circle me-1"></i>Pre-selected</span><?php endif; ?></label>
-                        <div class="rq-input-wrap">
-                            <i class="fas fa-box rq-input-icon"></i>
-                            <select class="form-select" id="borrow_catalog_select" name="borrow_item_name"
-                                    onchange="handleCatalogChange(this); updateSummary();" required>
-                                <option value="">— Select an item —</option>
+                        <label>Item to Borrow <span class="rq-req">*</span><?php if ($auto_fill_item): ?> <span style="font-size:0.65rem;font-weight:700;background:rgba(34,197,94,0.12);color:#15803d;padding:2px 8px;border-radius:12px;border:1px solid rgba(34,197,94,0.22);margin-left:6px;"><i class="fas fa-check-circle me-1"></i>Pre-selected</span><?php endif; ?></label>
+
+                        <!-- Hidden select (drives existing JS logic unchanged) -->
+                        <select id="borrow_catalog_select" name="borrow_item_name" style="display:none;" required>
+                            <option value="">— Select an item —</option>
+                            <?php foreach ($borrow_catalog as $category => $items):
+                                if (!count($items)) continue; ?>
+                            <optgroup label="<?php echo htmlspecialchars($category); ?>">
+                                <?php foreach ($items as $ci):
+                                    $qty = $ci['quantity'] ?? 0;
+                                    $borrowedRecords = $item_avail_data[$ci['id']] ?? [];
+                                    $borrowedCount = count($borrowedRecords);
+                                    $availableQty = max(0, $qty - $borrowedCount);
+                                ?>
+                                <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
+                                        data-item-id="<?php echo $ci['id']; ?>"
+                                        data-status="<?php echo $ci['status']; ?>"
+                                        data-quantity="<?php echo $qty; ?>"
+                                        data-available="<?php echo $availableQty; ?>"
+                                        <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
+                                    <?php echo htmlspecialchars($ci['item_name']); ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                            <?php endforeach; ?>
+                            <option value="__custom__">Other (custom)</option>
+                        </select>
+
+                        <!-- Shop UI -->
+                        <div class="bshop-wrap">
+                            <!-- Search -->
+                            <div class="bshop-controls">
+                                <div class="bshop-search-wrap">
+                                    <i class="fas fa-search bshop-search-icon"></i>
+                                    <input type="text" id="bshop-search" placeholder="Search items…" oninput="filterShopItems()">
+                                </div>
+                            </div>
+                            <!-- Category pills -->
+                            <div class="bshop-cats" id="bshop-cats">
+                                <button type="button" class="bshop-cat active" data-cat="" onclick="filterShopItems(this)">All</button>
+                                <?php foreach (array_keys($borrow_catalog) as $cat): ?>
+                                <button type="button" class="bshop-cat" data-cat="<?php echo htmlspecialchars($cat); ?>" onclick="filterShopItems(this)"><?php echo htmlspecialchars($cat); ?></button>
+                                <?php endforeach; ?>
+                            </div>
+                            <!-- Card grid -->
+                            <div class="bshop-grid" id="bshop-grid">
                                 <?php foreach ($borrow_catalog as $category => $items):
-                                    if (!count($items)) continue; ?>
-                                <optgroup label="<?php echo htmlspecialchars($category); ?>">
-                                    <?php foreach ($items as $ci):
+                                    foreach ($items as $ci):
                                         $isBorrowed = $ci['status'] === 'borrowed';
                                         $qty = $ci['quantity'] ?? 0;
                                         $borrowedRecords = $item_avail_data[$ci['id']] ?? [];
                                         $borrowedCount = count($borrowedRecords);
                                         $availableQty = max(0, $qty - $borrowedCount);
-                                        if ($isBorrowed && $borrowedCount > 0) {
-                                            $retDates = array_map(function($r) {
-                                                return date('M j', strtotime($r['return_date']));
-                                            }, $borrowedRecords);
+                                        $retDates = [];
+                                        if ($borrowedCount > 0) {
+                                            foreach ($borrowedRecords as $r) $retDates[] = date('M j', strtotime($r['return_date']));
                                             sort($retDates);
-                                            $qtyLabel = ' (' . $borrowedCount . ' of ' . $qty . ' borrowed — returns ' . implode(', ', $retDates) . ')';
-                                        } else {
-                                            $qtyLabel = ' (qty: ' . $qty . ')';
                                         }
-                                    ?>
-                                    <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
-                                            data-item-id="<?php echo $ci['id']; ?>"
-                                            data-status="<?php echo $ci['status']; ?>"
-                                            data-quantity="<?php echo $qty; ?>"
-                                            data-available="<?php echo $availableQty; ?>"
-                                            <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
-                                        <?php echo htmlspecialchars($ci['item_name'] . $qtyLabel); ?>
-                                    </option>
-                                    <?php endforeach; ?>
-                                </optgroup>
-                                <?php endforeach; ?>
-                                <option value="__custom__">✏️ Other (specify custom item)</option>
-                            </select>
+                                        $meta = $catMeta[$category] ?? $defaultMeta;
+                                        $isPreSelected = ($auto_fill_item && $ci['item_name'] === $auto_fill_item);
+                                ?>
+                                <div class="bshop-card<?php echo $isPreSelected ? ' bshop-selected' : ''; ?>"
+                                     data-value="<?php echo htmlspecialchars($ci['item_name']); ?>"
+                                     data-item-id="<?php echo $ci['id']; ?>"
+                                     data-status="<?php echo $ci['status']; ?>"
+                                     data-category="<?php echo htmlspecialchars($category); ?>"
+                                     data-available="<?php echo $availableQty; ?>"
+                                     data-quantity="<?php echo $qty; ?>"
+                                     onclick="selectBorrowCard(this)">
+                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
+                                    <div class="bshop-avail-badge <?php echo $availableQty > 0 ? 'bshop-avail-ok' : 'bshop-avail-none'; ?>">
+                                        <?php echo $availableQty > 0 ? $availableQty . ' avail.' : 'Fully borrowed'; ?>
+                                    </div>
+                                    <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
+                                        <i class="fas <?php echo $meta['icon']; ?>"></i>
+                                    </div>
+                                    <div class="bshop-name"><?php echo htmlspecialchars($ci['item_name']); ?></div>
+                                    <div class="bshop-desc"><?php echo htmlspecialchars($ci['description'] ?? ''); ?></div>
+                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($ci['location'] ?? ''); ?></div>
+                                    <div class="bshop-foot">
+                                        <div class="bshop-price">₱<?php echo number_format($ci['cost'] ?? 0, 2); ?></div>
+                                        <div class="bshop-status-pill <?php echo $isBorrowed ? 'bshop-pill-borrowed' : 'bshop-pill-avail'; ?>">
+                                            <?php if ($isBorrowed && count($retDates) > 0): ?>
+                                                Returns <?php echo $retDates[0]; ?>
+                                            <?php elseif ($isBorrowed): ?>
+                                                Borrowed
+                                            <?php else: ?>
+                                                Available
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <?php endforeach; endforeach; ?>
+                                <!-- Custom item card -->
+                                <div class="bshop-card bshop-card-custom"
+                                     data-value="__custom__" data-item-id="" data-status="available"
+                                     data-category="" data-available="999" data-quantity="999"
+                                     onclick="selectBorrowCard(this)">
+                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
+                                    <div class="bshop-icon bshop-icon-custom"><i class="fas fa-pen"></i></div>
+                                    <div class="bshop-name">Other / Custom</div>
+                                    <div class="bshop-desc">Specify an item not in the list</div>
+                                    <div class="bshop-foot"><div class="bshop-status-pill bshop-pill-custom">Custom</div></div>
+                                </div>
+                                <div id="bshop-empty" class="bshop-empty" style="display:none;">
+                                    <i class="fas fa-search"></i><span>No items match</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -716,23 +1002,75 @@ displayMessage();
 
                     <div class="rq-field">
                         <label>Item Name <span class="rq-req">*</span></label>
-                        <div class="rq-input-wrap">
-                            <i class="fas fa-box rq-input-icon"></i>
-                            <select class="form-select" id="item_description" name="item_description"
-                                    onchange="handleItemCatalogChange(this); updateSummary();">
-                                <option value="">— Select an item —</option>
-                                <?php foreach ($catalog_by_category as $category => $items): ?>
-                                <optgroup label="<?php echo htmlspecialchars($category); ?>">
-                                    <?php foreach ($items as $ci): ?>
-                                    <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
-                                            data-desc="<?php echo htmlspecialchars($ci['description'] ?? ''); ?>">
-                                        <?php echo htmlspecialchars($ci['item_name']); ?>
-                                    </option>
-                                    <?php endforeach; ?>
-                                </optgroup>
+
+                        <!-- Hidden select (drives handleItemCatalogChange) -->
+                        <select id="item_description" name="item_description" style="display:none;">
+                            <option value="">— Select an item —</option>
+                            <?php foreach ($catalog_by_category as $category => $items): ?>
+                            <optgroup label="<?php echo htmlspecialchars($category); ?>">
+                                <?php foreach ($items as $ci): ?>
+                                <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
+                                        data-desc="<?php echo htmlspecialchars($ci['description'] ?? ''); ?>">
+                                    <?php echo htmlspecialchars($ci['item_name']); ?>
+                                </option>
                                 <?php endforeach; ?>
-                                <option value="__custom__">✏️ Other (specify custom item)</option>
-                            </select>
+                            </optgroup>
+                            <?php endforeach; ?>
+                            <option value="__custom__">Other (custom)</option>
+                        </select>
+
+                        <!-- Shop grid -->
+                        <div class="bshop-wrap">
+                            <div class="bshop-controls">
+                                <div class="bshop-search-wrap">
+                                    <i class="fas fa-search bshop-search-icon"></i>
+                                    <input type="text" id="ishop-search" placeholder="Search items…" oninput="filterItemShop()">
+                                </div>
+                            </div>
+                            <div class="bshop-cats" id="ishop-cats">
+                                <button type="button" class="bshop-cat active" data-cat="" onclick="filterItemShop(this)">All</button>
+                                <?php foreach (array_keys($catalog_by_category) as $cat): ?>
+                                <button type="button" class="bshop-cat" data-cat="<?php echo htmlspecialchars($cat); ?>" onclick="filterItemShop(this)"><?php echo htmlspecialchars($cat); ?></button>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="bshop-grid" id="ishop-grid">
+                                <?php foreach ($catalog_by_category as $category => $items):
+                                    foreach ($items as $ci):
+                                        $meta = $catMeta[$category] ?? $defaultMeta;
+                                ?>
+                                <div class="bshop-card"
+                                     data-value="<?php echo htmlspecialchars($ci['item_name']); ?>"
+                                     data-category="<?php echo htmlspecialchars($category); ?>"
+                                     data-desc="<?php echo htmlspecialchars($ci['description'] ?? ''); ?>"
+                                     onclick="selectItemReqCard(this)">
+                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
+                                    <div class="bshop-avail-badge bshop-avail-ok">Available</div>
+                                    <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
+                                        <i class="fas <?php echo $meta['icon']; ?>"></i>
+                                    </div>
+                                    <div class="bshop-name"><?php echo htmlspecialchars($ci['item_name']); ?></div>
+                                    <div class="bshop-desc"><?php echo htmlspecialchars($ci['description'] ?? ''); ?></div>
+                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($ci['location'] ?? ''); ?></div>
+                                    <div class="bshop-foot">
+                                        <div class="bshop-price">₱<?php echo number_format($ci['cost'] ?? 0, 2); ?></div>
+                                        <div class="bshop-status-pill bshop-pill-avail"><?php echo htmlspecialchars($category); ?></div>
+                                    </div>
+                                </div>
+                                <?php endforeach; endforeach; ?>
+                                <!-- Custom card -->
+                                <div class="bshop-card bshop-card-custom"
+                                     data-value="__custom__" data-category="" data-desc=""
+                                     onclick="selectItemReqCard(this)">
+                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
+                                    <div class="bshop-icon bshop-icon-custom"><i class="fas fa-pen"></i></div>
+                                    <div class="bshop-name">Other / Custom</div>
+                                    <div class="bshop-desc">Specify an item not in the list</div>
+                                    <div class="bshop-foot"><div class="bshop-status-pill bshop-pill-custom">Custom</div></div>
+                                </div>
+                                <div id="ishop-empty" class="bshop-empty" style="display:none;">
+                                    <i class="fas fa-search"></i><span>No items match</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -782,17 +1120,75 @@ displayMessage();
 
                     <div class="rq-field">
                         <label>Item Requiring Service <span class="rq-req">*</span></label>
-                        <div class="rq-input-wrap">
-                            <i class="fas fa-cube rq-input-icon"></i>
-                            <select class="form-select" id="item_id" name="item_id"
-                                    onchange="updateSummary()">
-                                <option value="">— Select an item —</option>
-                                <?php foreach ($inventory_items as $item): ?>
-                                <option value="<?php echo $item['id']; ?>">
-                                    <?php echo htmlspecialchars($item['item_name']); ?>
-                                </option>
+
+                        <!-- Hidden select (used by addToCart for item name + id) -->
+                        <select id="item_id" name="item_id" style="display:none;" required>
+                            <option value="">— Select an item —</option>
+                            <?php foreach ($inventory_items as $item): ?>
+                            <option value="<?php echo $item['id']; ?>">
+                                <?php echo htmlspecialchars($item['item_name']); ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+
+                        <!-- Shop grid -->
+                        <?php
+                        $svcStatusMeta = [
+                            'available'   => ['label'=>'Available',   'cls'=>'bshop-pill-avail',    'badge'=>'bshop-avail-ok'],
+                            'borrowed'    => ['label'=>'Borrowed',    'cls'=>'bshop-pill-borrowed',  'badge'=>'bshop-avail-none'],
+                            'maintenance' => ['label'=>'Maintenance', 'cls'=>'bshop-pill-maint',    'badge'=>'bshop-avail-maint'],
+                            'damaged'     => ['label'=>'Damaged',     'cls'=>'bshop-pill-damaged',  'badge'=>'bshop-avail-none'],
+                            'requested'   => ['label'=>'Requested',   'cls'=>'bshop-pill-borrowed', 'badge'=>'bshop-avail-none'],
+                        ];
+                        // Group inventory items by category for filter
+                        $svc_by_cat = [];
+                        foreach ($inventory_items as $item) {
+                            $c = $item['category'] ?? 'Other';
+                            if (!isset($svc_by_cat[$c])) $svc_by_cat[$c] = [];
+                            $svc_by_cat[$c][] = $item;
+                        }
+                        ?>
+                        <div class="bshop-wrap">
+                            <div class="bshop-controls">
+                                <div class="bshop-search-wrap">
+                                    <i class="fas fa-search bshop-search-icon"></i>
+                                    <input type="text" id="sshop-search" placeholder="Search items…" oninput="filterServiceShop()">
+                                </div>
+                            </div>
+                            <div class="bshop-cats" id="sshop-cats">
+                                <button type="button" class="bshop-cat active" data-cat="" onclick="filterServiceShop(this)">All</button>
+                                <?php foreach (array_keys($svc_by_cat) as $cat): ?>
+                                <button type="button" class="bshop-cat" data-cat="<?php echo htmlspecialchars($cat); ?>" onclick="filterServiceShop(this)"><?php echo htmlspecialchars($cat); ?></button>
                                 <?php endforeach; ?>
-                            </select>
+                            </div>
+                            <div class="bshop-grid" id="sshop-grid">
+                                <?php foreach ($inventory_items as $item):
+                                    $category = $item['category'] ?? 'Other';
+                                    $meta = $catMeta[$category] ?? $defaultMeta;
+                                    $sm = $svcStatusMeta[$item['status']] ?? ['label'=>ucfirst($item['status']),'cls'=>'bshop-pill-custom','badge'=>'bshop-avail-none'];
+                                ?>
+                                <div class="bshop-card"
+                                     data-value="<?php echo $item['id']; ?>"
+                                     data-category="<?php echo htmlspecialchars($category); ?>"
+                                     onclick="selectServiceCard(this)">
+                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
+                                    <div class="bshop-avail-badge <?php echo $sm['badge']; ?>"><?php echo $sm['label']; ?></div>
+                                    <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
+                                        <i class="fas <?php echo $meta['icon']; ?>"></i>
+                                    </div>
+                                    <div class="bshop-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                    <div class="bshop-desc"><?php echo htmlspecialchars($item['description'] ?? ''); ?></div>
+                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($item['location'] ?? ''); ?></div>
+                                    <div class="bshop-foot">
+                                        <div class="bshop-price">₱<?php echo number_format($item['cost'] ?? 0, 2); ?></div>
+                                        <div class="bshop-status-pill <?php echo $sm['cls']; ?>"><?php echo $sm['label']; ?></div>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                                <div id="sshop-empty" class="bshop-empty" style="display:none;">
+                                    <i class="fas fa-search"></i><span>No items match</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1018,6 +1414,41 @@ function selectReceivingMethod(method, el) {
 }
 
 /* ── Catalog selects ── */
+/* ── Borrow item shop ── */
+function selectBorrowCard(card) {
+    document.querySelectorAll('.bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
+    card.classList.add('bshop-selected');
+    var select = document.getElementById('borrow_catalog_select');
+    select.value = card.getAttribute('data-value');
+    handleCatalogChange(select);
+    updateSummary();
+}
+
+function filterShopItems(btn) {
+    if (btn) {
+        document.querySelectorAll('.bshop-cat').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+    }
+    var activeCat = '';
+    var activeBtn = document.querySelector('.bshop-cat.active');
+    if (activeBtn) activeCat = activeBtn.getAttribute('data-cat') || '';
+    var search = (document.getElementById('bshop-search').value || '').toLowerCase().trim();
+    var visible = 0;
+    document.querySelectorAll('.bshop-grid .bshop-card').forEach(function(card) {
+        var cat = card.getAttribute('data-category') || '';
+        var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
+        var desc = (card.querySelector('.bshop-desc') ? card.querySelector('.bshop-desc').textContent : '').toLowerCase();
+        var isCustom = card.classList.contains('bshop-card-custom');
+        var catMatch = !activeCat || cat === activeCat || isCustom;
+        var searchMatch = !search || name.indexOf(search) !== -1 || desc.indexOf(search) !== -1;
+        var show = catMatch && searchMatch;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    var emptyEl = document.getElementById('bshop-empty');
+    if (emptyEl) emptyEl.style.display = visible === 0 ? 'flex' : 'none';
+}
+
 function handleCatalogChange(select) {
     var wrap  = document.getElementById('custom_item_wrap');
     var input = document.getElementById('custom_item_name');
@@ -1155,6 +1586,70 @@ window.iacNav = function(dir) {
     iacViewDate = new Date(iacViewDate.getFullYear(), iacViewDate.getMonth() + dir, 1);
     renderIacGrid(iacCurrentId ? (itemAvailData[iacCurrentId] || []) : []);
 };
+function selectItemReqCard(card) {
+    document.querySelectorAll('#ishop-grid .bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
+    card.classList.add('bshop-selected');
+    var select = document.getElementById('item_description');
+    select.value = card.getAttribute('data-value');
+    handleItemCatalogChange(select);
+    updateSummary();
+}
+
+function filterItemShop(btn) {
+    if (btn) {
+        document.querySelectorAll('#ishop-cats .bshop-cat').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+    }
+    var activeCat = '';
+    var activeBtn = document.querySelector('#ishop-cats .bshop-cat.active');
+    if (activeBtn) activeCat = activeBtn.getAttribute('data-cat') || '';
+    var search = (document.getElementById('ishop-search').value || '').toLowerCase().trim();
+    var visible = 0;
+    document.querySelectorAll('#ishop-grid .bshop-card').forEach(function(card) {
+        var cat = card.getAttribute('data-category') || '';
+        var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
+        var isCustom = card.classList.contains('bshop-card-custom');
+        var catMatch = !activeCat || cat === activeCat || isCustom;
+        var searchMatch = !search || name.indexOf(search) !== -1;
+        var show = catMatch && searchMatch;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    var emptyEl = document.getElementById('ishop-empty');
+    if (emptyEl) emptyEl.style.display = visible === 0 ? 'flex' : 'none';
+}
+
+function selectServiceCard(card) {
+    document.querySelectorAll('#sshop-grid .bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
+    card.classList.add('bshop-selected');
+    var select = document.getElementById('item_id');
+    select.value = card.getAttribute('data-value');
+    updateSummary();
+}
+
+function filterServiceShop(btn) {
+    if (btn) {
+        document.querySelectorAll('#sshop-cats .bshop-cat').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+    }
+    var activeCat = '';
+    var activeBtn = document.querySelector('#sshop-cats .bshop-cat.active');
+    if (activeBtn) activeCat = activeBtn.getAttribute('data-cat') || '';
+    var search = (document.getElementById('sshop-search').value || '').toLowerCase().trim();
+    var visible = 0;
+    document.querySelectorAll('#sshop-grid .bshop-card').forEach(function(card) {
+        var cat = card.getAttribute('data-category') || '';
+        var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
+        var catMatch = !activeCat || cat === activeCat;
+        var searchMatch = !search || name.indexOf(search) !== -1;
+        var show = catMatch && searchMatch;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    var emptyEl = document.getElementById('sshop-empty');
+    if (emptyEl) emptyEl.style.display = visible === 0 ? 'flex' : 'none';
+}
+
 function handleItemCatalogChange(select) {
     var customWrap  = document.getElementById('custom_item_req_wrap');
     var customInput = document.getElementById('custom_item_req_name');
@@ -1253,13 +1748,17 @@ function renderCart() {
 function resetStaging(type) {
     if (type === 'borrow') {
         document.getElementById('borrow_catalog_select').value = '';
+        document.querySelectorAll('.bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
         document.getElementById('custom_item_name').value = '';
         document.getElementById('custom_item_wrap').style.display = 'none';
         document.getElementById('expected_return_date').value = '';
         document.getElementById('borrow_quantity').value = 1;
         document.getElementById('reason').value = '';
+        var iacWrap = document.getElementById('iac-wrap');
+        if (iacWrap) iacWrap.style.display = 'none';
     } else if (type === 'item') {
         document.getElementById('item_description').value = '';
+        document.querySelectorAll('#ishop-grid .bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
         document.getElementById('custom_item_req_name').value = '';
         document.getElementById('custom_item_req_wrap').style.display = 'none';
         document.getElementById('item_desc_display_wrap').style.display = 'none';
@@ -1267,6 +1766,7 @@ function resetStaging(type) {
         document.getElementById('item_reason').value = '';
     } else {
         document.getElementById('item_id').value = '';
+        document.querySelectorAll('#sshop-grid .bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
         document.getElementById('service_type').value = '';
         document.getElementById('service_description').value = '';
     }
@@ -1339,31 +1839,38 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
 renderCart();
 updateSummary();
 
-// Pre-select item in dropdown if coming from inventory page
+// Pre-select item from inventory page
 <?php if ($auto_fill_item): ?>
-    const selectElement = document.getElementById('borrow_catalog_select');
-    if (selectElement) {
-        selectElement.value = '<?php echo htmlspecialchars($auto_fill_item); ?>';
-        handleCatalogChange(selectElement);
-        
-        // Set a default return date (7 days from today)
-        const returnDateInput = document.getElementById('expected_return_date');
-        if (!returnDateInput.value) {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 7);
-            const year = tomorrow.getFullYear();
-            const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
-            const day = String(tomorrow.getDate()).padStart(2, '0');
-            returnDateInput.value = `${year}-${month}-${day}`;
+    (function() {
+        var autoVal = '<?php echo htmlspecialchars($auto_fill_item, ENT_QUOTES); ?>';
+        // Select the matching shop card
+        var matchCard = null;
+        document.querySelectorAll('.bshop-card').forEach(function(c) {
+            if (c.getAttribute('data-value') === autoVal) matchCard = c;
+        });
+        if (matchCard) {
+            matchCard.classList.add('bshop-selected');
+            // Scroll card into view inside the grid
+            setTimeout(function() { matchCard.scrollIntoView({ block: 'nearest' }); }, 100);
         }
-        
-        updateSummary();
-        
-        // Scroll to form
-        setTimeout(() => {
-            selectElement.closest('.rq-form-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 150);
-    }
+        // Sync hidden select and trigger logic
+        var selectElement = document.getElementById('borrow_catalog_select');
+        if (selectElement) {
+            selectElement.value = autoVal;
+            handleCatalogChange(selectElement);
+            var returnDateInput = document.getElementById('expected_return_date');
+            if (returnDateInput && !returnDateInput.value) {
+                var d = new Date(); d.setDate(d.getDate() + 7);
+                returnDateInput.value = d.getFullYear() + '-' +
+                    String(d.getMonth()+1).padStart(2,'0') + '-' +
+                    String(d.getDate()).padStart(2,'0');
+            }
+            updateSummary();
+            setTimeout(function() {
+                selectElement.closest('.rq-form-card').scrollIntoView({ behavior:'smooth', block:'center' });
+            }, 150);
+        }
+    })();
 <?php endif; ?>
 </script>
 
