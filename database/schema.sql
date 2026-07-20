@@ -92,15 +92,22 @@ CREATE TABLE IF NOT EXISTS user_owned_items (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Stores campuses/colleges/offices added via the admin UI (extends the hardcoded defaults)
-CREATE TABLE IF NOT EXISTS custom_departments (
+CREATE TABLE IF NOT EXISTS campuses (
+    id          BIGSERIAL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    location    TEXT,
+    description TEXT,
+    is_default  BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS departments (
     id           BIGSERIAL PRIMARY KEY,
-    type         TEXT NOT NULL CHECK (type IN ('campus','college','office')),
-    abbreviation TEXT,
-    name         TEXT,
-    full_name    TEXT,
-    location     TEXT,
-    description  TEXT
+    type         TEXT NOT NULL CHECK (type IN ('college','office')),
+    abbreviation TEXT NOT NULL,
+    full_name    TEXT NOT NULL,
+    is_default   BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ─────────────────────────────────────────────
@@ -108,12 +115,13 @@ CREATE TABLE IF NOT EXISTS custom_departments (
 --    (auth is handled by PHP session; anon key needs full access)
 -- ─────────────────────────────────────────────
 
-ALTER TABLE users              DISABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory          DISABLE ROW LEVEL SECURITY;
-ALTER TABLE requests           DISABLE ROW LEVEL SECURITY;
-ALTER TABLE borrow_records     DISABLE ROW LEVEL SECURITY;
-ALTER TABLE user_owned_items   DISABLE ROW LEVEL SECURITY;
-ALTER TABLE custom_departments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE users          DISABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory      DISABLE ROW LEVEL SECURITY;
+ALTER TABLE requests       DISABLE ROW LEVEL SECURITY;
+ALTER TABLE borrow_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_owned_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE campuses       DISABLE ROW LEVEL SECURITY;
+ALTER TABLE departments    DISABLE ROW LEVEL SECURITY;
 
 -- ─────────────────────────────────────────────
 -- 3. SEED DATA
@@ -207,3 +215,40 @@ INSERT INTO user_owned_items (id, user_id, item_name, category, description, yea
 (4, 4, 'Whiteboard Set',   'Equipment',   'Portable whiteboard with markers',     2022, 3, 2, 'fair',      'Surface has some stains but functional', '2022-09-12', '2024-05-22 11:45:00'),
 (5, 2, 'Printer',          'Electronics', 'Canon Laser Printer',                  2024, 1, 1, 'excellent', 'Department use',                  '2024-02-28', '2024-09-05 16:20:00');
 SELECT setval('user_owned_items_id_seq', (SELECT MAX(id) FROM user_owned_items));
+
+-- Campuses
+INSERT INTO campuses (id, name, location, description, is_default) VALUES
+(1, 'Main Campus',                 'Brgy. Cabambangan, Bacolor, Pampanga', 'Central campus of Pampanga State University hosting 8 colleges and the university administration.', true),
+(2, 'Mexico Campus',               'Mexico, Pampanga',                     'PSU extension campus serving the Mexico municipality and surrounding areas.',                          true),
+(3, 'Porac Campus',                'Porac, Pampanga',                      'PSU extension campus serving the Porac municipality and surrounding areas.',                           true),
+(4, 'Santo Tomas Campus',          'Santo Tomas, Pampanga',                'PSU satellite campus providing quality education in the Santo Tomas area.',                           true),
+(5, 'Lubao Campus',                'Sta. Catalina, Lubao, Pampanga',       'PSU extension campus offering specialized courses in the Lubao area.',                               true),
+(6, 'Candaba Campus',              'Candaba, Pampanga',                    'PSU extension campus serving the educational needs of the Candaba community.',                        true),
+(7, 'Apalit Campus',               'Apalit, Pampanga',                     'PSU dedicated campus serving the Apalit municipality.',                                               true),
+(8, 'City of San Fernando Campus', 'City of San Fernando, Pampanga',       'PSU satellite campus in the provincial capital, City of San Fernando.',                              true);
+SELECT setval('campuses_id_seq', (SELECT MAX(id) FROM campuses));
+
+-- Departments (colleges and offices)
+INSERT INTO departments (type, abbreviation, full_name, is_default) VALUES
+('college', 'CEA',    'College of Engineering and Architecture (CEA)',                true),
+('college', 'COE',    'College of Education (COE)',                                   true),
+('college', 'CCS',    'College of Computing Studies (CCS)',                           true),
+('college', 'CBS',    'College of Business Studies (CBS)',                            true),
+('college', 'CAS',    'College of Arts and Sciences (CAS)',                           true),
+('college', 'CIT',    'College of Industrial Technology (CIT)',                       true),
+('college', 'CHTM',   'College of Hospitality and Tourism Management (CHTM)',         true),
+('college', 'CSSP',   'College of Social Sciences and Philosophy (CSSP)',             true),
+('office',  'OUP',    'Office of the University President (OUP)',                     true),
+('office',  'OVPAA',  'Office of the VP for Academic Affairs (OVPAA)',                true),
+('office',  'OVPAF',  'Office of the VP for Administration & Finance (OVPAF)',        true),
+('office',  'OVPRDE', 'Office of the VP for Research, Development & Extension (OVPRDE)', true),
+('office',  'OUR',    'Office of the University Registrar (OUR)',                     true),
+('office',  'OSAS',   'Office of Student Affairs and Services (OSAS)',                true),
+('office',  'HRMO',   'Human Resource Management Office (HRMO)',                      true),
+('office',  'ICTO',   'Information and Communications Technology Office (ICTO)',      true),
+('office',  'FBO',    'Finance and Budget Office (FBO)',                              true),
+('office',  'PMO',    'Procurement Management Office (PMO)',                          true),
+('office',  'PPMO',   'Physical Plant and Maintenance Office (PPMO)',                 true),
+('office',  'ULib',   'University Library (ULib)',                                    true),
+('office',  'GCC',    'Guidance and Counseling Center (GCC)',                         true),
+('office',  'PDO',    'Planning and Development Office (PDO)',                        true);

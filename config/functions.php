@@ -235,18 +235,35 @@ function dbCreateUserOwnedItem(array $data): ?array {
 }
 
 function dbAddCustomDepartment(string $type, array $data): bool {
-    $payload = array_merge(['type' => $type], $data);
-    $rows = supabase()->insert('custom_departments', $payload);
+    if ($type === 'campus') {
+        $rows = supabase()->insert('campuses', [
+            'name'        => $data['name'],
+            'location'    => $data['location'] ?? null,
+            'description' => $data['description'] ?? null,
+            'is_default'  => false,
+        ]);
+    } else {
+        $rows = supabase()->insert('departments', [
+            'type'         => $type,
+            'abbreviation' => $data['abbreviation'],
+            'full_name'    => $data['full_name'],
+            'is_default'   => false,
+        ]);
+    }
     return !empty($rows);
 }
 
 function dbDeleteCustomDepartment(string $type, string $abbreviation): bool {
-    $rows = supabase()->delete('custom_departments', 'type=eq.' . urlencode($type) . '&abbreviation=eq.' . urlencode($abbreviation));
-    return $rows !== [];
+    $rows = supabase()->select('departments', 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation));
+    if (empty($rows) || $rows[0]['is_default']) return false;
+    supabase()->delete('departments', 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation));
+    return true;
 }
 
 function dbDeleteCustomCampus(int $id): bool {
-    $rows = supabase()->delete('custom_departments', 'id=eq.' . $id . '&type=eq.campus');
-    return $rows !== [];
+    $campus = supabase()->find('campuses', $id);
+    if (!$campus || $campus['is_default']) return false;
+    supabase()->deleteById('campuses', $id);
+    return true;
 }
 ?>

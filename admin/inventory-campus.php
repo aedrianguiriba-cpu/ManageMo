@@ -49,26 +49,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
 
         if ($type === 'campuses') {
             $del_id = (int)($_POST['campus_id'] ?? 0);
-            if (in_array($del_id, [1,2,3,4,5,6,7,8])) {
-                $dept_err = "Default campuses cannot be deleted.";
+            $ok = dbDeleteCustomCampus($del_id);
+            if ($ok) {
+                $dept_msg = "Campus removed successfully.";
             } else {
-                $ok = dbDeleteCustomCampus($del_id);
-                $dept_msg = $ok ? "Campus removed successfully." : '';
-                if (!$ok) $dept_err = 'Failed to remove campus. Please try again.';
+                $dept_err = "This campus cannot be deleted.";
             }
         } else {
-            $abbr = $_POST['dept_abbr'] ?? '';
+            $abbr   = $_POST['dept_abbr'] ?? '';
             $dbtype = rtrim($type, 's');
-            $defaults_colleges = ['CEA','COE','CCS','CBS','CAS','CIT','CHTM','CSSP'];
-            $defaults_offices  = ['OUP','OVPAA','OVPAF','OVPRDE','OUR','OSAS','HRMO','ICTO','FBO','PMO','PPMO','ULib','GCC','PDO'];
-            $is_default = ($type === 'colleges' && in_array($abbr, $defaults_colleges))
-                       || ($type === 'offices'  && in_array($abbr, $defaults_offices));
-            if ($is_default) {
-                $dept_err = "Default entries cannot be deleted.";
+            $ok = dbDeleteCustomDepartment($dbtype, $abbr);
+            if ($ok) {
+                $dept_msg = "\"$abbr\" removed successfully.";
             } else {
-                $ok = dbDeleteCustomDepartment($dbtype, $abbr);
-                $dept_msg = $ok ? "\"$abbr\" removed successfully." : '';
-                if (!$ok) $dept_err = 'Failed to remove entry. Please try again.';
+                $dept_err = "Default entries cannot be deleted.";
             }
         }
     }

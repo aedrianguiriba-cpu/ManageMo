@@ -25,25 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
         $users = getUsers();
         $user = null;
 
-        // ── TEMP DEBUG ──────────────────────────────────────────────────────────
-        if (isset($_POST['debug_login'])) {
-            $matched = null;
-            foreach ($users as $u) { if ($u['email'] === $email) { $matched = $u; break; } }
-            echo '<pre style="background:#111;color:#0f0;padding:20px;font-size:13px;">';
-            echo 'SUPABASE_URL = ' . SUPABASE_URL . "\n";
-            echo 'SUPABASE_KEY = ' . substr(SUPABASE_KEY, 0, 20) . "...\n";
-            echo 'getUsers() count = ' . count($users) . "\n";
-            echo 'email match = ' . ($matched ? 'YES' : 'NO') . "\n";
-            if ($matched) {
-                echo 'is_active = ' . var_export($matched['is_active'], true) . "\n";
-                echo 'password hash = ' . $matched['password'] . "\n";
-                echo 'password_verify = ' . var_export(password_verify($password, $matched['password']), true) . "\n";
-            }
-            echo '</pre>'; exit;
-        }
-        // ── END DEBUG ───────────────────────────────────────────────────────────
-
-        foreach ($users as $u) {
+foreach ($users as $u) {
             if ($u['email'] === $email && $u['is_active'] == 1) {
                 $user = $u;
                 break;
@@ -541,7 +523,6 @@ $campuses = getAllCampuses();
                                 <a href="#">Forgot password?</a>
                             </div>
 
-                            <input type="hidden" name="debug_login" value="1">
                             <button type="submit" name="login_submit" class="btn-auth">
                                 Sign In
                             </button>

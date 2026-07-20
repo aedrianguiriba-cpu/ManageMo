@@ -13,70 +13,26 @@ function _dbCache(string $key, callable $loader): array {
     return $c[$key];
 }
 
-// ── Custom departments (campuses/colleges/offices added via admin UI) ──────────
-
-function _loadCustomDepartments(): array {
-    $rows = _dbCache('custom_departments', fn() => supabase()->select('custom_departments'));
-    $out  = ['colleges' => [], 'offices' => [], 'campuses' => []];
-    foreach ($rows as $r) {
-        if ($r['type'] === 'college') {
-            $out['colleges'][$r['abbreviation']] = $r['full_name'];
-        } elseif ($r['type'] === 'office') {
-            $out['offices'][$r['abbreviation']] = $r['full_name'];
-        } elseif ($r['type'] === 'campus') {
-            $out['campuses'][] = [
-                'id'          => (int)$r['id'],
-                'name'        => $r['name'] ?? '',
-                'location'    => $r['location'] ?? '',
-                'description' => $r['description'] ?? '',
-                'colleges'    => [],
-            ];
-        }
-    }
-    return $out;
-}
-
-/** @deprecated Use dbAddCustomDepartment() / dbDeleteCustomDepartment() instead */
-function saveCustomDepartments(array $data): void {
-    // no-op — direct DB mutations are used in admin/inventory-campus.php
-}
-
 // ── Main Campus Colleges ──────────────────────────────────────────────────────
 
 function getMainCampusColleges(): array {
-    $defaults = [
-        'CEA'  => 'College of Engineering and Architecture (CEA)',
-        'COE'  => 'College of Education (COE)',
-        'CCS'  => 'College of Computing Studies (CCS)',
-        'CBS'  => 'College of Business Studies (CBS)',
-        'CAS'  => 'College of Arts and Sciences (CAS)',
-        'CIT'  => 'College of Industrial Technology (CIT)',
-        'CHTM' => 'College of Hospitality and Tourism Management (CHTM)',
-        'CSSP' => 'College of Social Sciences and Philosophy (CSSP)',
-    ];
-    return array_merge($defaults, _loadCustomDepartments()['colleges'] ?? []);
+    return _dbCache('departments_colleges', function () {
+        $rows = supabase()->select('departments', 'type=eq.college&order=abbreviation.asc');
+        $out = [];
+        foreach ($rows as $r) $out[$r['abbreviation']] = $r['full_name'];
+        return $out;
+    });
 }
 
 // ── Main Campus Offices ───────────────────────────────────────────────────────
 
 function getMainCampusOffices(): array {
-    $defaults = [
-        'OUP'    => 'Office of the University President (OUP)',
-        'OVPAA'  => 'Office of the VP for Academic Affairs (OVPAA)',
-        'OVPAF'  => 'Office of the VP for Administration & Finance (OVPAF)',
-        'OVPRDE' => 'Office of the VP for Research, Development & Extension (OVPRDE)',
-        'OUR'    => 'Office of the University Registrar (OUR)',
-        'OSAS'   => 'Office of Student Affairs and Services (OSAS)',
-        'HRMO'   => 'Human Resource Management Office (HRMO)',
-        'ICTO'   => 'Information and Communications Technology Office (ICTO)',
-        'FBO'    => 'Finance and Budget Office (FBO)',
-        'PMO'    => 'Procurement Management Office (PMO)',
-        'PPMO'   => 'Physical Plant and Maintenance Office (PPMO)',
-        'ULib'   => 'University Library (ULib)',
-        'GCC'    => 'Guidance and Counseling Center (GCC)',
-        'PDO'    => 'Planning and Development Office (PDO)',
-    ];
-    return array_merge($defaults, _loadCustomDepartments()['offices'] ?? []);
+    return _dbCache('departments_offices', function () {
+        $rows = supabase()->select('departments', 'type=eq.office&order=abbreviation.asc');
+        $out = [];
+        foreach ($rows as $r) $out[$r['abbreviation']] = $r['full_name'];
+        return $out;
+    });
 }
 
 // ── Combined departments ──────────────────────────────────────────────────────
@@ -97,20 +53,17 @@ function getUsers(): array {
 // ── Campuses ──────────────────────────────────────────────────────────────────
 
 function getCampuses(): array {
-    $defaults = [
-        ['id'=>1,'name'=>'Main Campus',              'location'=>'Brgy. Cabambangan, Bacolor, Pampanga',  'description'=>'Central campus of Pampanga State University hosting 8 colleges and the university administration.', 'colleges'=>['College of Engineering and Architecture (CEA)','College of Education (COE)','College of Computing Studies (CCS)','College of Business Studies (CBS)','College of Arts and Sciences (CAS)','College of Industrial Technology (CIT)','College of Hospitality and Tourism Management (CHTM)','College of Social Sciences and Philosophy (CSSP)']],
-        ['id'=>2,'name'=>'Mexico Campus',            'location'=>'Mexico, Pampanga',                      'description'=>'PSU extension campus serving the Mexico municipality and surrounding areas.','colleges'=>[]],
-        ['id'=>3,'name'=>'Porac Campus',             'location'=>'Porac, Pampanga',                       'description'=>'PSU extension campus serving the Porac municipality and surrounding areas.','colleges'=>[]],
-        ['id'=>4,'name'=>'Santo Tomas Campus',       'location'=>'Santo Tomas, Pampanga',                 'description'=>'PSU satellite campus providing quality education in the Santo Tomas area.','colleges'=>[]],
-        ['id'=>5,'name'=>'Lubao Campus',             'location'=>'Sta. Catalina, Lubao, Pampanga',        'description'=>'PSU extension campus offering specialized courses in the Lubao area.','colleges'=>[]],
-        ['id'=>6,'name'=>'Candaba Campus',           'location'=>'Candaba, Pampanga',                     'description'=>'PSU extension campus serving the educational needs of the Candaba community.','colleges'=>[]],
-        ['id'=>7,'name'=>'Apalit Campus',            'location'=>'Apalit, Pampanga',                      'description'=>'PSU dedicated campus serving the Apalit municipality.','colleges'=>[]],
-        ['id'=>8,'name'=>'City of San Fernando Campus','location'=>'City of San Fernando, Pampanga',      'description'=>'PSU satellite campus in the provincial capital, City of San Fernando.','colleges'=>[]],
-    ];
-    foreach (_loadCustomDepartments()['campuses'] ?? [] as $c) {
-        $defaults[] = $c;
-    }
-    return $defaults;
+    return _dbCache('campuses', function () {
+        $rows = supabase()->select('campuses', 'order=id.asc');
+        return array_map(fn($r) => [
+            'id'          => (int)$r['id'],
+            'name'        => $r['name'],
+            'location'    => $r['location'] ?? '',
+            'description' => $r['description'] ?? '',
+            'is_default'  => (bool)$r['is_default'],
+            'colleges'    => (int)$r['id'] === 1 ? array_values(getMainCampusColleges()) : [],
+        ], $rows);
+    });
 }
 
 // ── Borrow Catalog (static — not stored in DB) ────────────────────────────────
