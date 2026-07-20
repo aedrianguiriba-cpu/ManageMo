@@ -23,15 +23,42 @@ if (isset($_GET['item_id'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $request_type = sanitizeInput($_POST['request_type']);
-    $urgency = sanitizeInput($_POST['urgency']);
+    $request_type    = sanitizeInput($_POST['request_type']);
+    $urgency         = sanitizeInput($_POST['urgency']);
+    $receiving_method= in_array($_POST['receiving_method'] ?? '', ['delivery','pickup']) ? $_POST['receiving_method'] : null;
+    $request_number  = dbNextRequestNumber();
 
-    // Generate request number
-    $request_number = 'REQ-' . date('YmdHis') . '-' . strtoupper(substr(md5(mt_rand()), 0, 5));
+    $payload = [
+        'request_number'      => $request_number,
+        'user_id'             => $current_user['id'],
+        'request_type'        => in_array($request_type, ['borrow','item','service']) ? $request_type : 'borrow',
+        'urgency'             => in_array($urgency, ['low','medium','high','critical']) ? $urgency : 'medium',
+        'receiving_method'    => $receiving_method,
+        'status'              => 'pending',
+    ];
 
-    // In hardcoded mode, just log and redirect
-    logActivity($current_user['id'], 'CREATE', "Submitted $request_type request", 'requests', rand(100, 999));
-    redirectWithMessage('requests.php', 'Request submitted successfully! Request ID: ' . $request_number, 'success');
+    if ($request_type === 'borrow') {
+        $item_id = (int)($_POST['item_id'] ?? 0);
+        $payload['inventory_id']         = $item_id ?: null;
+        $payload['reason_for_request']   = sanitizeInput($_POST['reason'] ?? '');
+        $payload['expected_return_date'] = sanitizeInput($_POST['expected_return_date'] ?? '') ?: null;
+        $payload['quantity_requested']   = max(1, (int)($_POST['borrow_quantity'] ?? 1));
+    } elseif ($request_type === 'item') {
+        $custom_name = sanitizeInput($_POST['custom_item_req_name'] ?? $_POST['custom_item_name'] ?? '');
+        $qty         = max(1, (int)($_POST['quantity'] ?? 1));
+        $payload['reason_for_request']  = sanitizeInput($_POST['reason'] ?? '');
+        $payload['service_description'] = $custom_name . ($qty > 1 ? ' - Qty: ' . $qty : '');
+        $payload['quantity_requested']  = $qty;
+    } elseif ($request_type === 'service') {
+        $service_type = sanitizeInput($_POST['service_type'] ?? '');
+        $service_desc = sanitizeInput($_POST['service_description'] ?? '');
+        $payload['service_description'] = $service_type ? "[$service_type] $service_desc" : $service_desc;
+        $payload['quantity_requested']  = 1;
+    }
+
+    $new_req = dbCreateRequest($payload);
+    logActivity($current_user['id'], 'CREATE', "Submitted $request_type request", 'requests', $new_req['id'] ?? 0);
+    redirectWithMessage('my-requests.php', 'Request submitted successfully! Request ID: ' . $request_number, 'success');
 }
 
 require_once dirname(__DIR__) . '/includes/header.php';

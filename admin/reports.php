@@ -18,12 +18,7 @@ $per_page    = 15;
 // Data
 $all_inventory = getInventory();
 $all_requests  = getRequests();
-$all_users     = array_merge(getUsers(), $_SESSION['added_users'] ?? []);
-// Apply status overrides
-foreach ($all_users as &$u) {
-    if (isset($_SESSION['user_status_overrides'][$u['id']])) $u['is_active'] = $_SESSION['user_status_overrides'][$u['id']];
-}
-unset($u);
+$all_users = getUsers();
 $campuses  = getCampuses();
 $colleges  = getMainCampusColleges();
 $offices   = getMainCampusOffices();
@@ -45,14 +40,6 @@ if ($campus_id) {
     $campus_user_ids = array_column(filterByColumn($all_users, 'campus_id', $campus_id), 'id');
     $req_data = array_values(array_filter($req_data, fn($r) => in_array($r['user_id'], $campus_user_ids)));
 }
-// Apply session overrides
-foreach ($req_data as &$r) {
-    if (!empty($_SESSION['request_overrides'][$r['id']])) {
-        $r = array_merge($r, $_SESSION['request_overrides'][$r['id']]);
-    }
-}
-unset($r);
-
 // --- Filtered users ---
 $usr_data = $campus_id ? filterByColumn($all_users, 'campus_id', $campus_id) : $all_users;
 if ($status_f === 'active')   $usr_data = array_values(array_filter($usr_data, fn($u) => $u['is_active']));

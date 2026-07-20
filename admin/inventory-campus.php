@@ -11,7 +11,6 @@ $dept_msg = '';
 $dept_err = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
-    $custom = _loadCustomDepartments();
     $action = $_POST['dept_action'];
 
     if ($action === 'add') {
@@ -24,21 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
             if (!$name || !$location) {
                 $dept_err = 'Campus name and location are required.';
             } else {
-                $all_ids = array_column(getCampuses(), 'id');
-                $new_id  = max($all_ids) + 1;
-                $custom['campuses'][] = [
-                    'id'          => $new_id,
-                    'name'        => $name,
-                    'location'    => $location,
-                    'description' => $desc,
-                    'colleges'    => [],
-                ];
-                saveCustomDepartments($custom);
-                $dept_msg = "Campus \"$name\" added successfully.";
+                $ok = dbAddCustomDepartment('campus', ['name' => $name, 'location' => $location, 'description' => $desc]);
+                $dept_msg = $ok ? "Campus \"$name\" added successfully." : '';
+                if (!$ok) $dept_err = 'Failed to add campus. Please try again.';
             }
         } else {
             $abbr = strtoupper(trim($_POST['dept_abbr'] ?? ''));
             $name = trim($_POST['dept_name'] ?? '');
+            $dbtype = rtrim($type, 's'); // 'colleges' -> 'college', 'offices' -> 'office'
             if (!in_array($type, ['colleges', 'offices'])) {
                 $dept_err = 'Invalid department type.';
             } elseif (!$abbr || !$name) {
@@ -46,9 +38,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
             } elseif (isset(getMainCampusColleges()[$abbr]) || isset(getMainCampusOffices()[$abbr])) {
                 $dept_err = "Abbreviation \"$abbr\" already exists.";
             } else {
-                $custom[$type][$abbr] = $name;
-                saveCustomDepartments($custom);
-                $dept_msg = ucfirst(rtrim($type, 's')) . " \"$abbr\" added successfully.";
+                $ok = dbAddCustomDepartment($dbtype, ['abbreviation' => $abbr, 'full_name' => $name]);
+                $dept_msg = $ok ? ucfirst($dbtype) . " \"$abbr\" added successfully." : '';
+                if (!$ok) $dept_err = 'Failed to add entry. Please try again.';
             }
         }
 
@@ -57,26 +49,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
 
         if ($type === 'campuses') {
             $del_id = (int)($_POST['campus_id'] ?? 0);
-            $default_campus_ids = [1,2,3,4,5,6,7,8];
-            if (in_array($del_id, $default_campus_ids)) {
+            if (in_array($del_id, [1,2,3,4,5,6,7,8])) {
                 $dept_err = "Default campuses cannot be deleted.";
             } else {
-                $custom['campuses'] = array_values(array_filter($custom['campuses'], fn($c) => $c['id'] !== $del_id));
-                saveCustomDepartments($custom);
-                $dept_msg = "Campus removed successfully.";
+                $ok = dbDeleteCustomCampus($del_id);
+                $dept_msg = $ok ? "Campus removed successfully." : '';
+                if (!$ok) $dept_err = 'Failed to remove campus. Please try again.';
             }
         } else {
             $abbr = $_POST['dept_abbr'] ?? '';
+            $dbtype = rtrim($type, 's');
             $defaults_colleges = ['CEA','COE','CCS','CBS','CAS','CIT','CHTM','CSSP'];
             $defaults_offices  = ['OUP','OVPAA','OVPAF','OVPRDE','OUR','OSAS','HRMO','ICTO','FBO','PMO','PPMO','ULib','GCC','PDO'];
             $is_default = ($type === 'colleges' && in_array($abbr, $defaults_colleges))
                        || ($type === 'offices'  && in_array($abbr, $defaults_offices));
             if ($is_default) {
                 $dept_err = "Default entries cannot be deleted.";
-            } elseif (isset($custom[$type][$abbr])) {
-                unset($custom[$type][$abbr]);
-                saveCustomDepartments($custom);
-                $dept_msg = "\"$abbr\" removed successfully.";
+            } else {
+                $ok = dbDeleteCustomDepartment($dbtype, $abbr);
+                $dept_msg = $ok ? "\"$abbr\" removed successfully." : '';
+                if (!$ok) $dept_err = 'Failed to remove entry. Please try again.';
             }
         }
     }

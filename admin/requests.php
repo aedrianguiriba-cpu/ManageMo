@@ -12,37 +12,32 @@ $type_filter = $_GET['type'] ?? '';
 
 // Handle request actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $request_id = sanitizeInput($_POST['request_id']);
+    $request_id  = (int)sanitizeInput($_POST['request_id']);
     $action_type = sanitizeInput($_POST['action']);
 
-    startSession();
     if ($action_type === 'approve') {
-        $approval_notes = sanitizeInput($_POST['approval_notes']);
-        $_SESSION['request_overrides'][(int)$request_id]['status'] = 'approved';
-        if ($approval_notes) $_SESSION['request_overrides'][(int)$request_id]['approval_notes'] = $approval_notes;
+        dbUpdateRequest($request_id, ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
         logActivity($current_user['id'], 'APPROVE', "Approved request #$request_id", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request approved successfully!', 'success');
+
     } elseif ($action_type === 'disapprove') {
-        $approval_notes = sanitizeInput($_POST['approval_notes']);
-        $_SESSION['request_overrides'][(int)$request_id]['status'] = 'disapproved';
-        if ($approval_notes) $_SESSION['request_overrides'][(int)$request_id]['approval_notes'] = $approval_notes;
+        dbUpdateRequest($request_id, ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
         logActivity($current_user['id'], 'DISAPPROVE', "Disapproved request #$request_id", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request disapproved.', 'info');
+
     } elseif ($action_type === 'change_receiving_method') {
         $new_method = sanitizeInput($_POST['receiving_method'] ?? '');
         if (in_array($new_method, ['delivery', 'pickup'])) {
-            $_SESSION['request_overrides'][(int)$request_id]['receiving_method'] = $new_method;
+            dbUpdateRequest($request_id, ['receiving_method' => $new_method]);
             logActivity($current_user['id'], 'UPDATE', "Changed receiving method of request #$request_id to $new_method", 'requests', $request_id);
             redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Receiving method updated to ' . ucfirst($new_method) . '.', 'success');
         }
+
     } elseif ($action_type === 'mark_out_for_delivery') {
-        $_SESSION['request_overrides'][(int)$request_id]['delivery_status'] = 'out_for_delivery';
-        // Send email notification
-        $req_data  = findById(getRequests(), (int)$request_id);
-        $req_over  = $_SESSION['request_overrides'][(int)$request_id] ?? [];
-        $req_data  = array_merge($req_data ?? [], $req_over);
-        $notif_user = findById(getUsers(), $req_data['user_id'] ?? 0);
-        $req_num   = $req_data['request_number'] ?? 'REQ-' . str_pad($request_id, 5, '0', STR_PAD_LEFT);
+        dbUpdateRequest($request_id, ['delivery_status' => 'out_for_delivery']);
+        $req_data    = findById(getRequests(), $request_id);
+        $notif_user  = findById(getUsers(), $req_data['user_id'] ?? 0);
+        $req_num     = $req_data['request_number'] ?? 'REQ-' . str_pad($request_id, 5, '0', STR_PAD_LEFT);
         $recv_method = $req_data['receiving_method'] ?? 'delivery';
         if ($notif_user) {
             $stage = ($recv_method === 'pickup') ? 'pickup_ready' : 'out_for_delivery';
@@ -51,9 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as out for delivery", 'requests', $request_id);
         $label = ($recv_method === 'pickup') ? 'Marked as Ready for Pickup. Email notification sent.' : 'Marked as Out for Delivery. Email notification sent.';
         redirectWithMessage('requests.php?action=view&id=' . $request_id, $label, 'success');
+
     } elseif ($action_type === 'mark_delivered') {
-        $_SESSION['request_overrides'][(int)$request_id]['delivery_status'] = 'delivered';
-        $_SESSION['request_overrides'][(int)$request_id]['status'] = 'delivered';
+        dbUpdateRequest($request_id, ['delivery_status' => 'delivered', 'status' => 'delivered']);
         logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as delivered", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request marked as Delivered.', 'success');
     }
@@ -66,21 +61,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 <?php
 displayMessage();
 
-// Get all requests from hardcoded data
-$all_requests = getRequests();
-$users_data = getUsers();
+// Get all requests
+$all_requests   = getRequests();
+$users_data     = getUsers();
 $inventory_data = getInventory();
-
-// Apply session-stored status overrides to the list
-startSession();
-if (!empty($_SESSION['request_overrides'])) {
-    foreach ($all_requests as &$_req) {
-        if (!empty($_SESSION['request_overrides'][(int)$_req['id']])) {
-            $_req = array_merge($_req, $_SESSION['request_overrides'][(int)$_req['id']]);
-        }
-    }
-    unset($_req);
-}
 
 // Apply filters
 $filtered_requests = $all_requests;
@@ -417,12 +401,6 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             'request_number' => $request['request_number'] ?? 'REQ-' . str_pad($request['id'], 5, '0', STR_PAD_LEFT),
         ]);
 
-        // Apply any session-stored overrides (status changes, receiving method changes)
-        startSession();
-        if (!empty($_SESSION['request_overrides'][(int)$request['id']])) {
-            $request = array_merge($request, $_SESSION['request_overrides'][(int)$request['id']]);
-        }
-
         $status_colors = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'success'];
         $urgency_colors = ['low'=>'info','medium'=>'warning','high'=>'danger','critical'=>'danger'];
         $type_labels = ['item'=>'Item Request','borrow'=>'Borrow Request','service'=>'Service Request'];
@@ -630,10 +608,6 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                 <form method="POST" action="">
                     <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
                     <input type="hidden" name="action" value="approve">
-                    <div class="mb-3">
-                        <label class="form-label">Approval Notes <small class="text-muted">(optional)</small></label>
-                        <textarea class="form-control" name="approval_notes" rows="3" placeholder="Notes for the requester"></textarea>
-                    </div>
                     <button type="submit" class="btn ar-btn-success"><i class="fas fa-check me-1"></i> Approve Request</button>
                 </form>
             </div>
@@ -641,20 +615,9 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                 <form method="POST" action="">
                     <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
                     <input type="hidden" name="action" value="disapprove">
-                    <div class="mb-3">
-                        <label class="form-label">Reason for Disapproval *</label>
-                        <textarea class="form-control" name="approval_notes" rows="3" placeholder="Explain why this request is being disapproved" required></textarea>
-                    </div>
                     <button type="submit" class="btn ar-btn-danger"><i class="fas fa-times me-1"></i> Disapprove Request</button>
                 </form>
             </div>
-        </div>
-        <?php elseif (!empty($request['approval_notes'])): ?>
-        <div class="ar-card">
-            <div class="ar-section-label">Admin Notes</div>
-            <div class="ar-desc-box"><?php echo nl2br(htmlspecialchars($request['approval_notes'])); ?></div>
-            <?php $approver = findById(getUsers(), $request['approved_by'] ?? 0); ?>
-            <?php if ($approver): ?><small style="color:rgba(0,0,0,0.40);font-size:0.76rem;">By: <?php echo htmlspecialchars($approver['full_name']); ?></small><?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -796,14 +759,8 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
         $view_mode   = $_GET['view'] ?? 'table';
         $active_tab  = $_GET['tab']  ?? 'all';
         // Count per tab (using all requests, not paginated)
-        $count_all     = count(getRequests());
         $all_reqs_raw  = getRequests();
-        // Apply session overrides for counts
-        foreach ($all_reqs_raw as &$_rc) {
-            if (!empty($_SESSION['request_overrides'][(int)$_rc['id']])) {
-                $_rc = array_merge($_rc, $_SESSION['request_overrides'][(int)$_rc['id']]);
-            }
-        } unset($_rc);
+        $count_all     = count($all_reqs_raw);
         $count_item    = count(array_filter($all_reqs_raw, fn($r) => $r['request_type'] === 'item'));
         $count_borrow  = count(array_filter($all_reqs_raw, fn($r) => $r['request_type'] === 'borrow'));
         $count_service = count(array_filter($all_reqs_raw, fn($r) => $r['request_type'] === 'service'));

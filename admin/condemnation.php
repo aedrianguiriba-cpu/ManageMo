@@ -11,34 +11,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $item_id     = (int)sanitizeInput($_POST['item_id'] ?? 0);
     $action_type = sanitizeInput($_POST['action'] ?? '');
 
-    startSession();
-
     if ($action_type === 'condemn' && $item_id > 0) {
         $condemn_reason = sanitizeInput($_POST['condemn_reason'] ?? '');
-        $_SESSION['condemnation_overrides'][$item_id] = [
-            'status'         => 'condemned',
-            'condemn_reason' => $condemn_reason,
-            'condemned_at'   => date('Y-m-d H:i:s'),
-        ];
+        dbUpdateInventory($item_id, [
+            'status'                => 'condemned',
+            'condemnation_reason'   => $condemn_reason,
+            'condemned_at'          => date('Y-m-d H:i:s'),
+        ]);
         logActivity($current_user['id'], 'CONDEMN', "Condemned inventory item #$item_id", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=condemned', 'Item condemned successfully.', 'success');
 
     } elseif ($action_type === 'dispose' && $item_id > 0) {
         $dispose_notes = sanitizeInput($_POST['dispose_notes'] ?? '');
-        $existing = $_SESSION['condemnation_overrides'][$item_id] ?? [];
-        $_SESSION['condemnation_overrides'][$item_id] = array_merge($existing, [
+        dbUpdateInventory($item_id, [
             'status'        => 'disposed',
-            'dispose_notes' => $dispose_notes,
+            'disposal_notes'=> $dispose_notes,
             'disposed_at'   => date('Y-m-d H:i:s'),
         ]);
         logActivity($current_user['id'], 'DISPOSE', "Disposed inventory item #$item_id", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=disposed', 'Item marked as disposed.', 'success');
 
     } elseif ($action_type === 'restore' && $item_id > 0) {
-        startSession();
-        if (isset($_SESSION['condemnation_overrides'][$item_id])) {
-            unset($_SESSION['condemnation_overrides'][$item_id]);
-        }
+        dbUpdateInventory($item_id, [
+            'status'              => 'damaged',
+            'condemnation_reason' => null,
+            'condemned_at'        => null,
+            'disposal_notes'      => null,
+            'disposed_at'         => null,
+        ]);
         logActivity($current_user['id'], 'RESTORE', "Restored inventory item #$item_id from condemnation", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=evaluate', 'Item restored to evaluation list.', 'info');
     }
@@ -54,17 +54,6 @@ displayMessage();
 // Load data
 $all_inventory = getInventory();
 $all_campuses  = getAllCampuses();
-
-// Apply session condemnation overrides
-startSession();
-if (!empty($_SESSION['condemnation_overrides'])) {
-    foreach ($all_inventory as &$item) {
-        if (isset($_SESSION['condemnation_overrides'][$item['id']])) {
-            $item = array_merge($item, $_SESSION['condemnation_overrides'][$item['id']]);
-        }
-    }
-    unset($item);
-}
 
 // Build tab lists (re-index with array_values for clean iteration)
 $evaluate_items  = array_values(array_filter($all_inventory, fn($i) => in_array($i['status'], ['damaged', 'maintenance'])));

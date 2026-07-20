@@ -176,4 +176,77 @@ function getPendingRequestsCount() {
     $pending = filterByColumn($requests, 'status', REQUEST_STATUS_PENDING);
     return count($pending);
 }
+
+// ── Database mutation helpers ─────────────────────────────────────────────────
+
+function dbNextRequestNumber(): string {
+    $rows = supabase()->select('requests', 'select=request_number&order=id.desc&limit=1');
+    if (empty($rows)) return 'REQ-00001';
+    preg_match('/REQ-(\d+)$/', $rows[0]['request_number'] ?? '', $m);
+    $next = isset($m[1]) ? (int)$m[1] + 1 : 1;
+    return 'REQ-' . str_pad($next, 5, '0', STR_PAD_LEFT);
+}
+
+function dbCreateRequest(array $data): ?array {
+    $rows = supabase()->insert('requests', $data);
+    return $rows[0] ?? null;
+}
+
+function dbUpdateRequest(int $id, array $data): bool {
+    $data['updated_at'] = date('Y-m-d H:i:s');
+    $rows = supabase()->updateById('requests', $id, $data);
+    return !empty($rows);
+}
+
+function dbCreateInventory(array $data): ?array {
+    $rows = supabase()->insert('inventory', $data);
+    return $rows[0] ?? null;
+}
+
+function dbUpdateInventory(int $id, array $data): bool {
+    $rows = supabase()->updateById('inventory', $id, $data);
+    return !empty($rows);
+}
+
+function dbDeleteInventory(int $id): bool {
+    $rows = supabase()->deleteById('inventory', $id);
+    return $rows !== [];
+}
+
+function dbCreateUser(array $data): ?array {
+    $rows = supabase()->insert('users', $data);
+    return $rows[0] ?? null;
+}
+
+function dbUpdateUser(int $id, array $data): bool {
+    $data['updated_at'] = date('Y-m-d H:i:s');
+    $rows = supabase()->updateById('users', $id, $data);
+    return !empty($rows);
+}
+
+function dbCreateBorrowRecord(array $data): ?array {
+    $rows = supabase()->insert('borrow_records', $data);
+    return $rows[0] ?? null;
+}
+
+function dbCreateUserOwnedItem(array $data): ?array {
+    $rows = supabase()->insert('user_owned_items', $data);
+    return $rows[0] ?? null;
+}
+
+function dbAddCustomDepartment(string $type, array $data): bool {
+    $payload = array_merge(['type' => $type], $data);
+    $rows = supabase()->insert('custom_departments', $payload);
+    return !empty($rows);
+}
+
+function dbDeleteCustomDepartment(string $type, string $abbreviation): bool {
+    $rows = supabase()->delete('custom_departments', 'type=eq.' . urlencode($type) . '&abbreviation=eq.' . urlencode($abbreviation));
+    return $rows !== [];
+}
+
+function dbDeleteCustomCampus(int $id): bool {
+    $rows = supabase()->delete('custom_departments', 'id=eq.' . $id . '&type=eq.campus');
+    return $rows !== [];
+}
 ?>

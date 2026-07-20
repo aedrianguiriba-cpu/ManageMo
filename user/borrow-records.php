@@ -320,7 +320,7 @@ displayMessage();
             <table class="table">
                 <thead><tr>
                     <th>Request #</th><th>Item / Description</th><th>Urgency</th>
-                    <th>Reason</th><th>Submitted</th><th>Status</th><th>Admin Notes</th>
+                    <th>Reason</th><th>Submitted</th><th>Status</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($item_requests) > 0):
@@ -349,7 +349,6 @@ displayMessage();
                             <?php echo ucfirst($req['status']); ?>
                         </span>
                     </td>
-                    <td><span class="br-notes"><?php echo $req['approval_notes'] ? htmlspecialchars($req['approval_notes']) : '—'; ?></span></td>
                 </tr>
                 <?php endforeach; else: ?>
                 <tr><td colspan="7">

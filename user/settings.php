@@ -10,15 +10,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = sanitizeInput($_POST['action']);
 
     if ($action === 'update_profile') {
-        $full_name = sanitizeInput($_POST['full_name']);
-        $email = sanitizeInput($_POST['email']);
-        $phone = sanitizeInput($_POST['phone']);
-        
-        // In hardcoded mode, just redirect
+        $full_name  = sanitizeInput($_POST['full_name']);
+        $email      = sanitizeInput($_POST['email']);
+        $phone      = sanitizeInput($_POST['phone']);
+        $college_id = sanitizeInput($_POST['college_id'] ?? '');
+        dbUpdateUser($current_user['id'], [
+            'full_name'  => $full_name,
+            'email'      => $email,
+            'phone'      => $phone,
+            'college_id' => $college_id ?: null,
+        ]);
         redirectWithMessage('settings.php', 'Profile updated successfully!', 'success');
+
     } elseif ($action === 'change_password') {
         $current_password = $_POST['current_password'];
-        $new_password = $_POST['new_password'];
+        $new_password     = $_POST['new_password'];
         $confirm_password = $_POST['confirm_password'];
 
         if ($new_password !== $confirm_password) {
@@ -28,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!verifyPassword($current_password, $current_user['password'])) {
             $password_error = 'Current password is incorrect';
         } else {
-            // In hardcoded mode, just redirect
+            dbUpdateUser($current_user['id'], ['password' => hashPassword($new_password)]);
             redirectWithMessage('settings.php', 'Password changed successfully!', 'success');
         }
     }

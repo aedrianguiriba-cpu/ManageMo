@@ -13,56 +13,62 @@ $page = $_GET['page'] ?? 1;
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'add') {
-        $qr_code_id = generateQRCodeId();
-        $item_name = sanitizeInput($_POST['item_name']);
-        $category = sanitizeInput($_POST['category']);
-        $description = sanitizeInput($_POST['description']);
-        $campus_id = sanitizeInput($_POST['campus_id']);
-        $quantity = sanitizeInput($_POST['quantity']);
-        $location = sanitizeInput($_POST['location']);
-        $purchase_date = sanitizeInput($_POST['purchase_date']);
-        $cost = sanitizeInput($_POST['cost']);
-        $condition = sanitizeInput($_POST['condition']);
-
-        // In hardcoded mode, we just log and redirect
-        logActivity($current_user['id'], 'CREATE', "Added new inventory item: $item_name", 'inventory', rand(100, 999));
+        $item_name    = sanitizeInput($_POST['item_name']);
+        $new_item = dbCreateInventory([
+            'qr_code_id'    => generateQRCodeId(),
+            'item_name'     => $item_name,
+            'category'      => sanitizeInput($_POST['category']),
+            'description'   => sanitizeInput($_POST['description']),
+            'campus_id'     => (int)$_POST['campus_id'],
+            'quantity'      => max(0, (int)$_POST['quantity']),
+            'location'      => sanitizeInput($_POST['location']),
+            'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
+            'cost'          => is_numeric($_POST['cost'] ?? '') ? (float)$_POST['cost'] : null,
+            'condition'     => sanitizeInput($_POST['condition']),
+            'status'        => 'available',
+        ]);
+        logActivity($current_user['id'], 'CREATE', "Added new inventory item: $item_name", 'inventory', $new_item['id'] ?? 0);
         redirectWithMessage('inventory.php', 'Item added successfully!', 'success');
+
     } elseif ($action === 'add_owned') {
-        $user_id = sanitizeInput($_POST['user_id']);
         $item_name = sanitizeInput($_POST['item_name']);
-        $category = sanitizeInput($_POST['category']);
-        $description = sanitizeInput($_POST['description']);
-        $campus_id = sanitizeInput($_POST['campus_id']);
-        $year_owned = sanitizeInput($_POST['year_owned']);
-        $quantity = sanitizeInput($_POST['quantity']);
-        $condition = sanitizeInput($_POST['condition']);
-        $notes = sanitizeInput($_POST['notes']);
-        $purchase_date = sanitizeInput($_POST['purchase_date']);
-
-        logActivity($current_user['id'], 'CREATE', "Added user owned item: $item_name (Qty: $quantity) for user_id: $user_id", 'inventory', rand(100, 999));
+        $user_id   = (int)$_POST['user_id'];
+        $qty       = max(1, (int)($_POST['quantity'] ?? 1));
+        dbCreateUserOwnedItem([
+            'user_id'       => $user_id,
+            'item_name'     => $item_name,
+            'category'      => sanitizeInput($_POST['category']),
+            'description'   => sanitizeInput($_POST['description']),
+            'campus_id'     => (int)$_POST['campus_id'],
+            'year_owned'    => (int)$_POST['year_owned'] ?: null,
+            'quantity'      => $qty,
+            'condition'     => sanitizeInput($_POST['condition']),
+            'notes'         => sanitizeInput($_POST['notes']),
+            'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
+        ]);
+        logActivity($current_user['id'], 'CREATE', "Added user owned item: $item_name (Qty: $qty) for user_id: $user_id", 'user_owned_items', $user_id);
         redirectWithMessage('inventory.php?tab=owned', 'User-owned item added successfully!', 'success');
+
     } elseif ($action === 'edit') {
-        $inventory_id = sanitizeInput($_GET['id']);
-        $item_name = sanitizeInput($_POST['item_name']);
-        $category = sanitizeInput($_POST['category']);
-        $description = sanitizeInput($_POST['description']);
-        $campus_id = sanitizeInput($_POST['campus_id']);
-        $quantity = sanitizeInput($_POST['quantity']);
-        $location = sanitizeInput($_POST['location']);
-        $condition = sanitizeInput($_POST['condition']);
-        $status = sanitizeInput($_POST['status']);
-
-        $query = "UPDATE inventory SET item_name = '$item_name', category = '$category', description = '$description', 
-                  campus_id = '$campus_id', quantity = '$quantity', location = '$location', condition = '$condition', status = '$status'
-                  WHERE id = '$inventory_id'";
-
-        // In hardcoded mode, just redirect
+        $inventory_id = (int)$_GET['id'];
+        $item_name    = sanitizeInput($_POST['item_name']);
+        dbUpdateInventory($inventory_id, [
+            'item_name'   => $item_name,
+            'category'    => sanitizeInput($_POST['category']),
+            'description' => sanitizeInput($_POST['description']),
+            'campus_id'   => (int)$_POST['campus_id'],
+            'quantity'    => max(0, (int)$_POST['quantity']),
+            'location'    => sanitizeInput($_POST['location']),
+            'condition'   => sanitizeInput($_POST['condition']),
+            'status'      => sanitizeInput($_POST['status']),
+        ]);
         logActivity($current_user['id'], 'UPDATE', "Updated inventory item: $item_name", 'inventory', $inventory_id);
         redirectWithMessage('inventory.php', 'Item updated successfully!', 'success');
+
     } elseif ($action === 'delete') {
-        $inventory_id = sanitizeInput($_GET['id']);
-        // In hardcoded mode, just redirect
-        logActivity($current_user['id'], 'DELETE', "Deleted inventory item", 'inventory', $inventory_id);
+        $inventory_id = (int)$_GET['id'];
+        dbDeleteInventory($inventory_id);
+        logActivity($current_user['id'], 'DELETE', "Deleted inventory item #$inventory_id", 'inventory', $inventory_id);
         redirectWithMessage('inventory.php', 'Item deleted successfully!', 'success');
     }
 }

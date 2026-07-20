@@ -542,21 +542,6 @@ displayMessage();
             <?php endif; ?>
         </div>
 
-        <!-- Admin Notes -->
-        <?php if ($req['approval_notes']): ?>
-        <?php
-            $notes_class = 'mrt-notes-pending';
-            $notes_icon  = 'fa-info-circle';
-            if ($status === 'approved')    { $notes_class = 'mrt-notes-approved';    $notes_icon = 'fa-check-circle'; }
-            if ($status === 'disapproved') { $notes_class = 'mrt-notes-disapproved'; $notes_icon = 'fa-times-circle'; }
-        ?>
-        <div class="mrt-notes <?php echo $notes_class; ?>">
-            <i class="fas <?php echo $notes_icon; ?>" style="margin-top:2px;flex-shrink:0;"></i>
-            <div>
-                <strong>Admin Notes:</strong> <?php echo htmlspecialchars($req['approval_notes']); ?>
-            </div>
-        </div>
-        <?php endif; ?>
 
         <!-- Delivery Banner -->
         <?php if ($status === 'approved'): ?>

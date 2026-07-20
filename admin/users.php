@@ -28,15 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (strlen($password) < 6) $errors[] = 'Password must be at least 6 characters.';
         if ($password !== $confirm) $errors[] = 'Passwords do not match.';
 
-        // Check duplicate email in mock data
         foreach (getUsers() as $u) {
-            if (strtolower($u['email']) === strtolower($email)) {
-                $errors[] = 'Email already exists.';
-                break;
-            }
-        }
-        // Also check session-added users
-        foreach ($_SESSION['added_users'] ?? [] as $u) {
             if (strtolower($u['email']) === strtolower($email)) {
                 $errors[] = 'Email already exists.';
                 break;
@@ -44,10 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
-            $all_existing = array_merge(getUsers(), $_SESSION['added_users'] ?? []);
-            $new_id = max(array_column($all_existing, 'id')) + 1;
-            $_SESSION['added_users'][] = [
-                'id'         => $new_id,
+            $new_user = dbCreateUser([
                 'email'      => $email,
                 'password'   => hashPassword($password),
                 'full_name'  => $full_name,
@@ -56,44 +45,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'college_id' => $college_id ?: null,
                 'phone'      => $phone,
                 'is_active'  => 1,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ];
+            ]);
+            $new_id = $new_user['id'] ?? 0;
             logActivity($current_user['id'], 'CREATE', "Added new user: $email", 'users', $new_id);
             redirectWithMessage('users.php', 'User added successfully!', 'success');
         } else {
+            startSession();
             $_SESSION['user_form_errors'] = $errors;
             $_SESSION['user_form_data']   = $_POST;
             redirectWithMessage('users.php?action=add', implode(' ', $errors), 'danger');
         }
 
     } elseif ($post_action === 'toggle_status') {
-        $uid = (int)($_POST['user_id'] ?? 0);
-        if (!isset($_SESSION['user_status_overrides'])) $_SESSION['user_status_overrides'] = [];
-        $all_users = array_merge(getUsers(), $_SESSION['added_users'] ?? []);
-        $target = null;
-        foreach ($all_users as $u) { if ($u['id'] === $uid) { $target = $u; break; } }
+        $uid    = (int)($_POST['user_id'] ?? 0);
+        $target = findById(getUsers(), $uid);
         if ($target) {
-            $current_active = $_SESSION['user_status_overrides'][$uid] ?? $target['is_active'];
-            $_SESSION['user_status_overrides'][$uid] = $current_active ? 0 : 1;
-            $label = $current_active ? 'deactivated' : 'activated';
+            $new_active = $target['is_active'] ? 0 : 1;
+            dbUpdateUser($uid, ['is_active' => $new_active]);
+            $label = $new_active ? 'activated' : 'deactivated';
             logActivity($current_user['id'], 'UPDATE', "User #$uid $label", 'users', $uid);
             redirectWithMessage('users.php', 'User ' . $label . '.', 'success');
         }
     }
 }
 
-// Merge mock users + session-added users
-startSession();
-$all_users = array_merge(getUsers(), $_SESSION['added_users'] ?? []);
-// Apply status overrides
-foreach ($all_users as &$u) {
-    if (isset($_SESSION['user_status_overrides'][$u['id']])) {
-        $u['is_active'] = $_SESSION['user_status_overrides'][$u['id']];
-    }
-}
-unset($u);
-
+$all_users = getUsers();
 $campuses    = getCampuses();
 $colleges    = getMainCampusColleges();
 $offices     = getMainCampusOffices();
