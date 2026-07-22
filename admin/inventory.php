@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Load shared data needed by multiple form views
 $campuses = getAllCampuses();
-$users    = getUsers();
+$users    = filterByColumn(getUsers(), 'role', ROLE_USER);
 
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
@@ -398,11 +398,19 @@ displayMessage();
         <div class="ai-card-title">Add User-Owned Item</div>
         <div class="ai-card-sub">Record items owned by users from past years for tracking purposes</div>
         <hr class="ai-divider mt-0">
+        <!-- User-to-campus map for auto-fill -->
+        <script>
+        var userCampusMap = <?php
+            $map = [];
+            foreach ($users as $u) $map[$u['id']] = $u['campus_id'];
+            echo json_encode($map);
+        ?>;
+        </script>
         <form method="POST" action="?action=add_owned">
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">User *</label>
-                    <select class="form-select" name="user_id" required>
+                    <select class="form-select" name="user_id" id="ownedUserId" required onchange="fillUserCampus(this.value)">
                         <option value="">Select User</option>
                         <?php foreach ($users as $user): ?>
                             <option value="<?php echo $user['id']; ?>"><?php echo htmlspecialchars($user['full_name']); ?> (<?php echo htmlspecialchars($user['email']); ?>)</option>
@@ -433,7 +441,7 @@ displayMessage();
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Campus *</label>
-                    <select class="form-select" name="campus_id" required>
+                    <select class="form-select" name="campus_id" id="ownedCampusId" required>
                         <option value="">Select Campus</option>
                         <?php foreach ($campuses as $campus): ?>
                             <option value="<?php echo $campus['id']; ?>"><?php echo htmlspecialchars($campus['name']); ?></option>
@@ -474,6 +482,16 @@ displayMessage();
             </div>
         </form>
     </div>
+    <script>
+    function fillUserCampus(userId) {
+        var campusId = userCampusMap[userId];
+        if (campusId) {
+            document.getElementById('ownedCampusId').value = campusId;
+        } else {
+            document.getElementById('ownedCampusId').value = '';
+        }
+    }
+    </script>
 
     <?php else: ?>
 
