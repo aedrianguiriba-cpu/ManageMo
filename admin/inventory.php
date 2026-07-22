@@ -92,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'description'   => sanitizeInput($_POST['description']),
             'campus_id'     => (int)$_POST['campus_id'],
             'year_owned'    => (int)$_POST['year_owned'] ?: null,
+            'quantity'      => max(1, (int)$_POST['quantity']),
             'condition'     => sanitizeInput($_POST['condition']),
             'notes'         => sanitizeInput($_POST['notes']),
             'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
@@ -445,11 +446,15 @@ displayMessage();
                 </div>
             </div>
             <div class="row g-3 mb-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <label class="form-label">Year Owned *</label>
                     <input type="number" class="form-control" name="year_owned" min="2000" max="<?php echo date('Y'); ?>" value="<?php echo $owned_item['year_owned']; ?>" required>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <label class="form-label">Quantity *</label>
+                    <input type="number" class="form-control" name="quantity" min="1" value="<?php echo (int)$owned_item['quantity']; ?>" required>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Condition *</label>
                     <select class="form-select" name="condition" required>
                         <?php foreach (['excellent','good','fair','poor'] as $c): ?>
