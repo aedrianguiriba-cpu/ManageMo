@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS inventory (
     condemned_at         TIMESTAMPTZ,
     disposal_notes       TEXT,
     disposed_at          TIMESTAMPTZ,
+    group_id             TEXT,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS user_owned_items (
     condition     TEXT,
     notes         TEXT,
     purchase_date DATE,
+    group_id      TEXT,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

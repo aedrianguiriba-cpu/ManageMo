@@ -103,16 +103,25 @@ usort($filtered_items, function($a, $b) {
     return strcmp($a['item_name'], $b['item_name']);
 });
 
-// Calculate pagination
-$total = count($filtered_items);
-$total_pages = ceil($total / ITEMS_PER_PAGE);
+// Group into display groups, then paginate over groups
+$grouped_inventory = groupInventoryItems($filtered_items);
+$grouped_owned     = groupOwnedItems($user_owned_items);
 
-// Get items for current page
-$offset = ($page - 1) * ITEMS_PER_PAGE;
-$items = array_slice($filtered_items, $offset, ITEMS_PER_PAGE);
+$total       = count($grouped_inventory);
+$total_pages = ceil($total / ITEMS_PER_PAGE);
+$offset      = ($page - 1) * ITEMS_PER_PAGE;
+$items       = array_slice($grouped_inventory, $offset, ITEMS_PER_PAGE);
 
 // Pre-load borrow records once
 $all_borrows = getBorrowRecords();
+
+// Current user's active borrow inventory_ids — for quick group-level lookup
+$user_borrowed_item_ids = [];
+foreach ($all_borrows as $br) {
+    if ((int)$br['user_id'] === (int)$current_user['id'] && $br['status'] === 'active') {
+        $user_borrowed_item_ids[] = (int)$br['inventory_id'];
+    }
+}
 ?>
 
 <style>
@@ -532,7 +541,7 @@ $all_borrows = getBorrowRecords();
         </form>
         <?php if ($total > 0): ?>
         <div class="inv-results-count">
-            Showing <?php echo count($items); ?> of <?php echo $total; ?> item<?php echo $total !== 1 ? 's' : ''; ?>
+            Showing <?php echo count($items); ?> of <?php echo $total; ?> group<?php echo $total !== 1 ? 's' : ''; ?>
             <?php if ($search || $category_filter || $status_filter): ?>
                 — filtered results
             <?php endif; ?>
@@ -542,48 +551,37 @@ $all_borrows = getBorrowRecords();
 
     <!-- AVAILABLE/BORROWED ITEMS TAB -->
     <div id="tab-campus-inventory" style="display: <?php echo in_array($current_tab, ['available', 'borrowed']) ? 'block' : 'none'; ?>;">
-    <!-- Inventory Grid -->
+    <!-- Inventory Grid (grouped) -->
     <?php if (count($items) > 0): ?>
     <div class="row g-3">
-        <?php foreach ($items as $item):
-            // Check if user has an active borrow for this item
-            $borrowed = null;
-            foreach ($all_borrows as $borrow) {
-                if ($borrow['inventory_id'] == $item['id'] && $borrow['user_id'] == $current_user['id'] && $borrow['status'] == 'active') {
-                    $borrowed = $borrow;
-                    break;
-                }
-            }
-
-            $status_class_map = [
-                'available'   => 'inv-status-available',
-                'borrowed'    => 'inv-status-borrowed',
-                'maintenance' => 'inv-status-maintenance',
-                'damaged'     => 'inv-status-damaged',
-                'retired'     => 'inv-status-retired',
-            ];
-            $status_icon_map = [
-                'available'   => 'fa-check-circle',
-                'borrowed'    => 'fa-hand-holding',
-                'maintenance' => 'fa-tools',
-                'damaged'     => 'fa-exclamation-triangle',
-                'retired'     => 'fa-archive',
-            ];
-            $cat_icon_map = [
-                'Electronics'  => 'fa-laptop',
-                'Furniture'    => 'fa-chair',
-                'Tools'        => 'fa-tools',
-                'Sports'       => 'fa-futbol',
-                'Books'        => 'fa-book',
-                'Audio/Visual' => 'fa-video',
-                'Stationery'   => 'fa-pen',
-            ];
-            $sclass = $status_class_map[$item['status']] ?? 'inv-status-retired';
-            $sicon  = $status_icon_map[$item['status']] ?? 'fa-circle';
-            $cicon  = $cat_icon_map[$item['category']] ?? 'fa-box';
-
-            $condition_colors = ['good' => '#15803d', 'fair' => '#b45309', 'poor' => '#b91c1c', 'new' => '#1d4ed8'];
-            $cond_color = $condition_colors[strtolower($item['condition'])] ?? '#6b7280';
+        <?php
+        $cat_icon_map = [
+            'Electronics'       => 'fa-laptop',
+            'Furniture'         => 'fa-chair',
+            'Tools & Hardware'  => 'fa-tools',
+            'Sports & Recreation'=> 'fa-futbol',
+            'Books & Publications'=> 'fa-book',
+            'Audio/Visual'      => 'fa-video',
+            'Office Supplies'   => 'fa-pen',
+            'Equipment'         => 'fa-cogs',
+            'Cleaning Supplies' => 'fa-broom',
+            'Medical & Safety'  => 'fa-first-aid',
+            'Laboratory Supplies'=> 'fa-flask',
+            'Electrical Supplies'=> 'fa-bolt',
+        ];
+        foreach ($items as $group):
+            $unit_count       = count($group['units']);
+            $available_units  = array_values(array_filter($group['units'], fn($u) => $u['status'] === 'available'));
+            $available_count  = count($available_units);
+            $first_available  = $available_units[0] ?? null;
+            $unit_ids         = array_column($group['units'], 'id');
+            $user_has_borrow  = !empty(array_intersect($unit_ids, $user_borrowed_item_ids));
+            $conditions       = array_unique(array_filter(array_column($group['units'], 'condition')));
+            $cond_label       = count($conditions) === 1 ? ucfirst(reset($conditions)) : 'Mixed';
+            $cond_color_map   = ['excellent' => '#15803d', 'good' => '#15803d', 'fair' => '#b45309', 'poor' => '#b91c1c'];
+            $cond_color       = count($conditions) === 1 ? ($cond_color_map[strtolower(reset($conditions))] ?? '#6b7280') : '#6b7280';
+            $location         = $group['units'][0]['location'] ?? 'N/A';
+            $cicon            = $cat_icon_map[$group['category']] ?? 'fa-box';
         ?>
         <div class="col-md-6 col-lg-4">
             <div class="inv-card">
@@ -593,92 +591,56 @@ $all_borrows = getBorrowRecords();
                         <i class="fas <?php echo $cicon; ?>"></i>
                     </div>
                     <div style="flex:1; min-width:0;">
-                        <div class="inv-card-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                        <span class="inv-card-category"><?php echo htmlspecialchars($item['category']); ?></span>
-                        <div>
-                            <span class="inv-status-badge <?php echo $sclass; ?>">
-                                <i class="fas <?php echo $sicon; ?>" style="font-size:0.65rem;"></i>
-                                <?php echo ucfirst($item['status']); ?>
-                            </span>
-                        </div>
+                        <div class="inv-card-name"><?php echo htmlspecialchars($group['item_name']); ?></div>
+                        <span class="inv-card-category"><?php echo htmlspecialchars($group['category']); ?></span>
                     </div>
+                    <span style="background:rgba(59,130,246,0.12);color:#1d4ed8;font-weight:700;font-size:0.74rem;padding:3px 10px;border-radius:10px;white-space:nowrap;flex-shrink:0;">
+                        <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                    </span>
                 </div>
 
                 <!-- Info Rows -->
                 <div class="inv-card-body">
                     <div class="inv-info-row">
+                        <span class="inv-info-icon"><i class="fas fa-check-circle"></i></span>
+                        <span class="inv-info-label">Available</span>
+                        <span class="inv-info-val" style="color:<?php echo $available_count > 0 ? '#15803d' : '#b91c1c'; ?>;font-weight:700;">
+                            <?php echo $available_count; ?> of <?php echo $unit_count; ?>
+                        </span>
+                    </div>
+                    <div class="inv-info-row">
                         <span class="inv-info-icon"><i class="fas fa-star"></i></span>
                         <span class="inv-info-label">Condition</span>
                         <span class="inv-info-val" style="color:<?php echo $cond_color; ?>;font-weight:600;">
-                            <?php echo ucfirst($item['condition']); ?>
+                            <?php echo $cond_label; ?>
                         </span>
                     </div>
                     <div class="inv-info-row">
                         <span class="inv-info-icon"><i class="fas fa-map-marker-alt"></i></span>
                         <span class="inv-info-label">Location</span>
-                        <span class="inv-info-val"><?php echo htmlspecialchars($item['location'] ?? 'N/A'); ?></span>
+                        <span class="inv-info-val"><?php echo htmlspecialchars($location); ?></span>
                     </div>
-                    <?php if (!empty($item['description'])): ?>
-                    <p class="inv-description"><?php echo htmlspecialchars(mb_strimwidth($item['description'], 0, 80, '…')); ?></p>
+                    <?php if (!empty($group['description'])): ?>
+                    <p class="inv-description"><?php echo htmlspecialchars(mb_strimwidth($group['description'], 0, 80, '…')); ?></p>
                     <?php endif; ?>
-                </div>
-
-                <!-- QR Codes -->
-                <?php
-                $unit_qrs = getItemUnitQRCodes($item);
-                $show_max = 3; // how many unit codes to show before collapsing
-                ?>
-                <div class="inv-card-qr">
-                    <img src="<?php echo htmlspecialchars(QRCodeGenerator::generateQRCodeImage($unit_qrs[0], 100)); ?>"
-                         alt="QR Unit 1" class="inv-qr-img">
-                    <div style="flex:1; min-width:0;">
-                        <?php if (count($unit_qrs) === 1): ?>
-                            <div class="inv-qr-code"><?php echo htmlspecialchars($unit_qrs[0]); ?></div>
-                        <?php else: ?>
-                            <div style="font-size:0.68rem;font-weight:700;color:rgba(0,0,0,0.45);margin-bottom:4px;">
-                                <i class="fas fa-qrcode me-1"></i><?php echo count($unit_qrs); ?> unique QR codes
-                            </div>
-                            <div class="inv-unit-qr-list" id="uqr-<?php echo $item['id']; ?>">
-                                <?php foreach (array_slice($unit_qrs, 0, $show_max) as $idx => $uqr): ?>
-                                <div class="inv-qr-code" style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-                                    <span style="font-size:0.63rem;background:rgba(139,0,0,0.08);color:#8B0000;border-radius:4px;padding:1px 5px;flex-shrink:0;">U<?php echo str_pad($idx+1,2,'0',STR_PAD_LEFT); ?></span>
-                                    <span style="word-break:break-all;"><?php echo htmlspecialchars($uqr); ?></span>
-                                </div>
-                                <?php endforeach; ?>
-                                <?php if (count($unit_qrs) > $show_max): ?>
-                                <div class="inv-unit-qr-extra" id="uqr-extra-<?php echo $item['id']; ?>" style="display:none;">
-                                    <?php foreach (array_slice($unit_qrs, $show_max) as $idx => $uqr): ?>
-                                    <div class="inv-qr-code" style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
-                                        <span style="font-size:0.63rem;background:rgba(139,0,0,0.08);color:#8B0000;border-radius:4px;padding:1px 5px;flex-shrink:0;">U<?php echo str_pad($idx+$show_max+1,2,'0',STR_PAD_LEFT); ?></span>
-                                        <span style="word-break:break-all;"><?php echo htmlspecialchars($uqr); ?></span>
-                                    </div>
-                                    <?php endforeach; ?>
-                                </div>
-                                <button type="button" class="inv-qr-toggle-btn" onclick="toggleUnitQRs(<?php echo $item['id']; ?>)" id="uqr-btn-<?php echo $item['id']; ?>">
-                                    +<?php echo count($unit_qrs) - $show_max; ?> more units
-                                </button>
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-                    </div>
                 </div>
 
                 <!-- Action -->
                 <div class="inv-card-footer">
-                    <?php if ($borrowed): ?>
+                    <?php if ($user_has_borrow): ?>
                         <div class="inv-already-badge">
-                            <i class="fas fa-info-circle"></i> You have this item borrowed
+                            <i class="fas fa-info-circle"></i> You have a unit of this item borrowed
                         </div>
                         <div class="inv-disabled-btn">
                             <i class="fas fa-check"></i> Already Borrowed
                         </div>
-                    <?php elseif ($item['status'] === 'available'): ?>
-                        <a href="requests.php?item_id=<?php echo $item['id']; ?>&type=borrow" class="inv-borrow-btn">
+                    <?php elseif ($first_available): ?>
+                        <a href="requests.php?item_id=<?php echo $first_available['id']; ?>&type=borrow" class="inv-borrow-btn">
                             <i class="fas fa-hand-paper"></i> Borrow Item
                         </a>
                     <?php else: ?>
                         <div class="inv-disabled-btn">
-                            <i class="fas fa-ban"></i> <?php echo ucfirst($item['status']); ?>
+                            <i class="fas fa-ban"></i> Not Available
                         </div>
                     <?php endif; ?>
                 </div>
@@ -720,10 +682,14 @@ $all_borrows = getBorrowRecords();
 
     <!-- USER-OWNED ITEMS TAB -->
     <div id="tab-owned-items" style="display: <?php echo $current_tab === 'owned' ? 'block' : 'none'; ?>;">
-        <?php if (count($user_owned_items) > 0): ?>
+        <?php if (count($grouped_owned) > 0): ?>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
-            <?php foreach ($user_owned_items as $item):
-                $campus_info = getCampus($item['campus_id']);
+            <?php foreach ($grouped_owned as $group):
+                $unit_count    = count($group['units']);
+                $conditions    = array_unique(array_filter(array_column($group['units'], 'condition')));
+                $cond_label    = count($conditions) === 1 ? ucfirst(reset($conditions)) : 'Mixed';
+                $years         = array_unique(array_filter(array_column($group['units'], 'year_owned')));
+                $year_label    = count($years) === 1 ? reset($years) : (count($years) === 0 ? '—' : 'Various');
             ?>
             <div class="inv-card" style="border-color: rgba(139,0,0,0.15);">
                 <!-- Top -->
@@ -732,49 +698,36 @@ $all_borrows = getBorrowRecords();
                         <i class="fas fa-box"></i>
                     </div>
                     <div style="flex:1; min-width:0;">
-                        <div class="inv-card-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                        <span class="inv-card-category"><?php echo htmlspecialchars($item['category']); ?></span>
-                        <div>
-                            <span style="font-size: 0.7rem; font-weight: 600; color: #8B0000; background: rgba(139,0,0,0.10); border-radius: 4px; padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-calendar"></i> Year: <?php echo $item['year_owned']; ?>
-                            </span>
-                        </div>
+                        <div class="inv-card-name"><?php echo htmlspecialchars($group['item_name']); ?></div>
+                        <span class="inv-card-category"><?php echo htmlspecialchars($group['category']); ?></span>
                     </div>
+                    <span style="background:rgba(139,0,0,0.10);color:#8B0000;font-weight:700;font-size:0.74rem;padding:3px 10px;border-radius:10px;white-space:nowrap;flex-shrink:0;">
+                        <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                    </span>
                 </div>
 
                 <!-- Info Rows -->
                 <div class="inv-card-body">
                     <div class="inv-info-row">
-                        <span class="inv-info-icon"><i class="fas fa-cubes"></i></span>
-                        <span class="inv-info-label">Quantity</span>
-                        <span class="inv-info-val"><?php echo $item['quantity']; ?> unit<?php echo $item['quantity'] > 1 ? 's' : ''; ?></span>
+                        <span class="inv-info-icon"><i class="fas fa-calendar"></i></span>
+                        <span class="inv-info-label">Year</span>
+                        <span class="inv-info-val"><?php echo htmlspecialchars($year_label); ?></span>
                     </div>
                     <div class="inv-info-row">
                         <span class="inv-info-icon"><i class="fas fa-star"></i></span>
                         <span class="inv-info-label">Condition</span>
-                        <span class="inv-info-val" style="color: #8B0000; font-weight: 600;"><?php echo ucfirst($item['condition']); ?></span>
+                        <span class="inv-info-val" style="color:#8B0000;font-weight:600;"><?php echo $cond_label; ?></span>
                     </div>
-                    <div class="inv-info-row">
-                        <span class="inv-info-icon"><i class="fas fa-map-marker-alt"></i></span>
-                        <span class="inv-info-label">Campus</span>
-                        <span class="inv-info-val"><?php echo htmlspecialchars($campus_info['name']); ?></span>
-                    </div>
-                    <?php if (!empty($item['description'])): ?>
-                    <p class="inv-description"><?php echo htmlspecialchars(mb_strimwidth($item['description'], 0, 80, '…')); ?></p>
+                    <?php if (!empty($group['description'])): ?>
+                    <p class="inv-description"><?php echo htmlspecialchars(mb_strimwidth($group['description'], 0, 80, '…')); ?></p>
                     <?php endif; ?>
                 </div>
 
-                <!-- Notes Section -->
-                <?php if (!empty($item['notes'])): ?>
-                <div style="background: rgba(34,197,94,0.08); border-left: 3px solid #22c55e; padding: 12px; margin: 12px 16px 0; border-radius: 6px; font-size: 0.85rem; color: #374151;">
-                    <div style="font-weight: 600; color: #15803d; margin-bottom: 4px; font-size: 0.75rem; text-transform: uppercase;">Notes</div>
-                    <?php echo htmlspecialchars($item['notes']); ?>
-                </div>
-                <?php endif; ?>
-
                 <!-- Action -->
                 <div class="inv-card-footer">
-                    <button type="button" class="btn" style="width: 100%; background: rgba(139,0,0,0.10); color: #8B0000; border: none; border-radius: 10px; font-weight: 600; font-size: 0.85rem;" data-bs-toggle="modal" data-bs-target="#ownedItemDetailModal" onclick="showOwnedDetail(<?php echo htmlspecialchars(json_encode($item)); ?>, <?php echo htmlspecialchars(json_encode($campus_info)); ?>)">
+                    <button type="button" class="btn" style="width:100%;background:rgba(139,0,0,0.10);color:#8B0000;border:none;border-radius:10px;font-weight:600;font-size:0.85rem;"
+                        data-bs-toggle="modal" data-bs-target="#ownedItemDetailModal"
+                        onclick="showOwnedGroup(<?php echo htmlspecialchars(json_encode($group)); ?>)">
                         <i class="fas fa-info-circle"></i> View Details
                     </button>
                 </div>
@@ -806,44 +759,16 @@ $all_borrows = getBorrowRecords();
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <!-- Item Information -->
-                <div style="background: rgba(139,0,0,0.08); border-left: 4px solid #8B0000; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div>
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Year Owned</div>
-                            <div id="ownedModalYear" style="font-weight: 600; color: #1a1d23; font-size: 1rem;"></div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Quantity</div>
-                            <div id="ownedModalQty" style="font-weight: 600; color: #1a1d23; font-size: 1rem;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Details Grid -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-                    <div style="background: rgba(0,0,0,0.03); border-radius: 8px; padding: 12px;">
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Condition</div>
-                        <div id="ownedModalCondition" style="font-weight: 600; color: #1a1d23;"></div>
-                    </div>
-                    <div style="background: rgba(0,0,0,0.03); border-radius: 8px; padding: 12px;">
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Campus</div>
-                        <div id="ownedModalCampus" style="font-weight: 600; color: #1a1d23; font-size: 0.95rem;"></div>
-                    </div>
-                </div>
-
                 <!-- Description -->
                 <div id="ownedModalDescSection" style="margin-bottom: 20px; display: none;">
                     <div style="font-size: 0.8rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 600; margin-bottom: 8px;">Description</div>
                     <div id="ownedModalDesc" style="background: rgba(0,0,0,0.03); border-radius: 8px; padding: 12px; line-height: 1.5; color: #374151; font-size: 0.95rem;"></div>
                 </div>
 
-                <!-- Notes -->
-                <div id="ownedModalNotesSection" style="display: none;">
-                    <div style="background: rgba(34,197,94,0.08); border-left: 4px solid #22c55e; border-radius: 8px; padding: 12px;">
-                        <div style="font-size: 0.7rem; color: #15803d; text-transform: uppercase; font-weight: 600; margin-bottom: 8px;">Notes</div>
-                        <div id="ownedModalNotes" style="color: #374151; font-size: 0.95rem; line-height: 1.5;"></div>
-                    </div>
+                <!-- Individual Units -->
+                <div>
+                    <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.50);margin-bottom:10px;">Units</div>
+                    <div id="ownedModalUnitsGrid" style="display:flex;flex-direction:column;gap:6px;"></div>
                 </div>
             </div>
         </div>
@@ -851,54 +776,44 @@ $all_borrows = getBorrowRecords();
 </div>
 
 <script>
-function toggleUnitQRs(itemId) {
-    var extra = document.getElementById('uqr-extra-' + itemId);
-    var btn   = document.getElementById('uqr-btn-' + itemId);
-    if (extra.style.display === 'none') {
-        extra.style.display = 'block';
-        btn.textContent = 'Show less';
-    } else {
-        extra.style.display = 'none';
-        // Restore original label
-        var count = extra.querySelectorAll('.inv-qr-code').length;
-        btn.textContent = '+' + count + ' more units';
-    }
-}
-
 function setInvTab(tabName) {
     document.getElementById('tab-campus-inventory').style.display = tabName !== 'owned' ? 'block' : 'none';
     document.getElementById('tab-owned-items').style.display = tabName === 'owned' ? 'block' : 'none';
     document.getElementById('inv-filter-section').style.display = tabName !== 'owned' ? 'block' : 'none';
-    
-    var tabs = document.querySelectorAll('.inv-tab-link');
-    tabs.forEach(function(tab) {
+    document.querySelectorAll('.inv-tab-link').forEach(function(tab) {
         tab.classList.remove('inv-tab-active');
     });
     event.target.closest('a').classList.add('inv-tab-active');
 }
 
-function showOwnedDetail(item, campusInfo) {
-    document.getElementById('ownedModalTitle').textContent = item.item_name;
-    document.getElementById('ownedModalCategory').textContent = item.category;
-    document.getElementById('ownedModalYear').textContent = item.year_owned;
-    document.getElementById('ownedModalQty').textContent = item.quantity + ' unit' + (item.quantity > 1 ? 's' : '');
-    document.getElementById('ownedModalCondition').textContent = item.condition.charAt(0).toUpperCase() + item.condition.slice(1);
-    document.getElementById('ownedModalCampus').textContent = campusInfo.name;
-    
-    if (item.description) {
-        document.getElementById('ownedModalDescSection').style.display = 'block';
-        document.getElementById('ownedModalDesc').textContent = item.description;
+function showOwnedGroup(group) {
+    document.getElementById('ownedModalTitle').textContent = group.item_name;
+    document.getElementById('ownedModalCategory').textContent = group.category + ' · ' + group.units.length + ' unit(s)';
+
+    var descEl = document.getElementById('ownedModalDescSection');
+    if (group.description) {
+        descEl.style.display = 'block';
+        document.getElementById('ownedModalDesc').textContent = group.description;
     } else {
-        document.getElementById('ownedModalDescSection').style.display = 'none';
+        descEl.style.display = 'none';
     }
-    
-    if (item.notes) {
-        document.getElementById('ownedModalNotesSection').style.display = 'block';
-        document.getElementById('ownedModalNotes').textContent = item.notes;
-    } else {
-        document.getElementById('ownedModalNotesSection').style.display = 'none';
-    }
-    
+
+    var grid = document.getElementById('ownedModalUnitsGrid');
+    grid.innerHTML = '';
+    group.units.forEach(function(unit, idx) {
+        var cond = unit.condition ? unit.condition.charAt(0).toUpperCase() + unit.condition.slice(1) : '—';
+        var year = unit.year_owned || '—';
+        var row  = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f7f7f7;border-radius:6px;font-size:0.88rem;';
+        row.innerHTML =
+            '<div style="display:flex;flex-direction:column;gap:2px;">'
+            + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1)
+            +   ' <span style="font-weight:400;color:rgba(0,0,0,0.50);font-size:0.78rem;">· ' + cond + '</span></span>'
+            + '<span style="color:rgba(0,0,0,0.55);font-size:0.78rem;"><i class="fas fa-calendar" style="margin-right:4px;"></i>Year: ' + year + '</span>'
+            + '</div>';
+        grid.appendChild(row);
+    });
+
     var modal = document.getElementById('ownedItemDetailModal');
     modal.addEventListener('hidden.bs.modal', function() {
         var backdrop = document.querySelector('.modal-backdrop');
