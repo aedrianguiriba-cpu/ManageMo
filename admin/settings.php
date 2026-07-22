@@ -446,22 +446,14 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <div class="as-card">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                     <div class="as-card-title mb-0"><i class="fas fa-list-ul me-2" style="opacity:0.8;"></i>Available Items for Borrowing</div>
-                    <span class="as-badge as-badge-primary"><i class="fas fa-box me-1"></i><?php $available_items = filterByColumn(getInventory(), 'status', 'available'); echo count($available_items); ?> available</span>
+                    <span class="as-badge as-badge-primary"><i class="fas fa-box me-1"></i><?php echo count(filterByColumn(getInventory(), 'status', 'available')); ?> available</span>
                 </div>
                 <div class="as-card-sub">Inventory items available for user borrow requests</div>
                 <?php
-                // Get all available inventory items
                 $available_items = filterByColumn(getInventory(), 'status', 'available');
-                $borrow_catalog = getBorrowCatalog();
-                $catalog_ids = array_column($borrow_catalog, 'id');
-                
-                // Group by category
                 $items_by_category = [];
                 foreach ($available_items as $item) {
-                    $cat = $item['category'];
-                    if (!isset($items_by_category[$cat])) {
-                        $items_by_category[$cat] = [];
-                    }
+                    $cat = $item['category'] ?? 'Other';
                     $items_by_category[$cat][] = $item;
                 }
                 ksort($items_by_category);
@@ -479,17 +471,15 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <span class="as-catalog-item-id">#<?php echo $item['id']; ?></span>
                     <div style="flex:1;">
                         <div class="as-catalog-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                        <div class="as-catalog-item-desc"><?php echo htmlspecialchars($item['description']); ?></div>
+                        <div class="as-catalog-item-desc"><?php echo htmlspecialchars($item['description'] ?? ''); ?></div>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="font-size:0.72rem; font-weight:700; background:rgba(34,197,94,0.10); color:#15803d; padding:3px 10px; border-radius:4px; border:1px solid rgba(34,197,94,0.22);">
                             <i class="fas fa-check-circle me-1"></i>Available
                         </span>
-                        <?php if (in_array($item['id'], $catalog_ids)): ?>
                         <span style="font-size:0.72rem; font-weight:700; background:rgba(139,0,0,0.08); color:#8B0000; padding:3px 10px; border-radius:4px; border:1px solid rgba(139,0,0,0.18);">
-                            <i class="fas fa-star me-1"></i>Borrowable
+                            <i class="fas fa-cubes me-1"></i>Qty: <?php echo (int)$item['quantity']; ?>
                         </span>
-                        <?php endif; ?>
                     </div>
                 </div>
                 <?php endforeach; ?>

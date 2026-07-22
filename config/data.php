@@ -102,32 +102,6 @@ function getCampuses(): array {
     });
 }
 
-// ── Borrow Catalog (static — not stored in DB) ────────────────────────────────
-
-function getBorrowCatalog(): array {
-    return [
-        ['id'=>1, 'name'=>'Laptop Computer',        'category'=>'Electronics', 'description'=>'Portable laptop for academic or office use'],
-        ['id'=>2, 'name'=>'Desktop Computer',        'category'=>'Electronics', 'description'=>'Desktop PC unit'],
-        ['id'=>3, 'name'=>'Projector',               'category'=>'Electronics', 'description'=>'Multimedia projector for presentations'],
-        ['id'=>4, 'name'=>'Monitor',                 'category'=>'Electronics', 'description'=>'External display monitor'],
-        ['id'=>5, 'name'=>'Printer',                 'category'=>'Electronics', 'description'=>'Laser or inkjet printer'],
-        ['id'=>6, 'name'=>'Extension Cord',          'category'=>'Electronics', 'description'=>'Multi-outlet power extension'],
-        ['id'=>7, 'name'=>'Monobloc Chair',          'category'=>'Furniture',   'description'=>'Plastic stackable chair'],
-        ['id'=>8, 'name'=>'Folding Table',           'category'=>'Furniture',   'description'=>'Portable folding table'],
-        ['id'=>9, 'name'=>'Office Chair',            'category'=>'Furniture',   'description'=>'Ergonomic swivel office chair'],
-        ['id'=>10,'name'=>'Podium/Lectern',          'category'=>'Furniture',   'description'=>'Standing podium for presentations'],
-        ['id'=>11,'name'=>'Scientific Calculator',   'category'=>'Equipment',   'description'=>'Advanced scientific calculator'],
-        ['id'=>12,'name'=>'Whiteboard',              'category'=>'Equipment',   'description'=>'Portable whiteboard'],
-        ['id'=>13,'name'=>'Megaphone / Bullhorn',    'category'=>'Equipment',   'description'=>'Battery-powered megaphone for announcements'],
-        ['id'=>14,'name'=>'Microphone & Speaker Set','category'=>'Equipment',   'description'=>'Wireless microphone with portable speaker'],
-        ['id'=>15,'name'=>'HDMI / VGA Cable',        'category'=>'Equipment',   'description'=>'Display cable for projector or monitor connection'],
-        ['id'=>17,'name'=>'Tarpaulin Stand',         'category'=>'Supplies',    'description'=>'Adjustable stand for tarpaulin display'],
-        ['id'=>18,'name'=>'Electric Fan',            'category'=>'Appliances',  'description'=>'Portable electric stand fan'],
-        ['id'=>19,'name'=>'Water Dispenser',         'category'=>'Appliances',  'description'=>'Hot and cold water dispenser'],
-        ['id'=>20,'name'=>'First Aid Kit',           'category'=>'Safety',      'description'=>'Standard first aid kit for events'],
-    ];
-}
-
 // ── Inventory ─────────────────────────────────────────────────────────────────
 
 function getInventory(): array {
