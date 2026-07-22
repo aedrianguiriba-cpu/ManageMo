@@ -23,48 +23,61 @@ if (isset($_GET['item_id'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $request_type    = sanitizeInput($_POST['request_type']);
-    $urgency         = sanitizeInput($_POST['urgency']);
-    $receiving_method= in_array($_POST['receiving_method'] ?? '', ['delivery','pickup']) ? $_POST['receiving_method'] : null;
-    $request_number  = dbNextRequestNumber();
+    $request_type     = sanitizeInput($_POST['request_type']);
+    $urgency          = in_array($_POST['urgency'] ?? '', ['low','medium','high','critical']) ? $_POST['urgency'] : 'medium';
+    $receiving_method = in_array($_POST['receiving_method'] ?? '', ['delivery','pickup']) ? $_POST['receiving_method'] : null;
+    $safe_type        = in_array($request_type, ['borrow','item','service']) ? $request_type : 'borrow';
 
-    $payload = [
-        'request_number'      => $request_number,
-        'user_id'             => $current_user['id'],
-        'request_type'        => in_array($request_type, ['borrow','item','service']) ? $request_type : 'borrow',
-        'urgency'             => in_array($urgency, ['low','medium','high','critical']) ? $urgency : 'medium',
-        'receiving_method'    => $receiving_method,
-        'status'              => 'pending',
-    ];
-
-    if ($request_type === 'borrow') {
-        $item_id = (int)($_POST['item_id'] ?? 0);
-        $payload['inventory_id']         = $item_id ?: null;
-        $payload['reason_for_request']   = sanitizeInput($_POST['reason'] ?? '');
-        $payload['expected_return_date'] = sanitizeInput($_POST['expected_return_date'] ?? '') ?: null;
-        $payload['quantity_requested']   = max(1, (int)($_POST['borrow_quantity'] ?? 1));
-    } elseif ($request_type === 'item') {
-        $selected    = sanitizeInput($_POST['item_description'] ?? '');
-        $custom_name = ($selected && $selected !== '__custom__')
-            ? $selected
-            : sanitizeInput($_POST['custom_item_req_name'] ?? $_POST['custom_item_name'] ?? '');
-        $qty         = max(1, (int)($_POST['quantity'] ?? 1));
-        $payload['reason_for_request']  = sanitizeInput($_POST['reason'] ?? '');
-        $payload['service_description'] = $custom_name . ($qty > 1 ? ' - Qty: ' . $qty : '');
-        $payload['quantity_requested']  = $qty;
-    } elseif ($request_type === 'service') {
-        $service_type = sanitizeInput($_POST['service_type'] ?? '');
-        $service_desc = sanitizeInput($_POST['service_description'] ?? '');
-        $payload['service_description'] = $service_type ? "[$service_type] $service_desc" : $service_desc;
-        $payload['quantity_requested']  = 1;
-    }
-
-    $result = dbCreateRequest($payload);
-    if (!$result['success']) {
-        $submit_error = 'Failed to submit request: ' . $result['error'];
+    $cart_items = json_decode($_POST['items_json'] ?? '[]', true);
+    if (!is_array($cart_items) || empty($cart_items)) {
+        $submit_error = 'No items in your request. Please add at least one item.';
     } else {
-        logActivity($current_user['id'], 'CREATE', "Submitted $request_type request", 'requests', $result['row']['id'] ?? 0);
-        redirectWithMessage('my-requests.php', 'Request submitted successfully! Request ID: ' . $request_number, 'success');
+        $errors = [];
+        foreach ($cart_items as $entry) {
+            $request_number = dbNextRequestNumber();
+            $payload = [
+                'request_number'   => $request_number,
+                'user_id'          => $current_user['id'],
+                'request_type'     => $safe_type,
+                'urgency'          => $urgency,
+                'receiving_method' => $receiving_method,
+                'status'           => 'pending',
+            ];
+
+            if ($safe_type === 'borrow') {
+                $inv_id = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                $payload['inventory_id']         = $inv_id;
+                $payload['reason_for_request']   = sanitizeInput($entry['reason'] ?? '');
+                $payload['expected_return_date']  = !empty($entry['return_date']) ? $entry['return_date'] : null;
+                $payload['quantity_requested']   = max(1, (int)($entry['qty'] ?? 1));
+            } elseif ($safe_type === 'item') {
+                $name = sanitizeInput($entry['name'] ?? '');
+                $qty  = max(1, (int)($entry['qty'] ?? 1));
+                $payload['reason_for_request']  = sanitizeInput($entry['reason'] ?? '');
+                $payload['service_description'] = $name . ($qty > 1 ? ' - Qty: ' . $qty : '');
+                $payload['quantity_requested']  = $qty;
+            } elseif ($safe_type === 'service') {
+                $svc_type = sanitizeInput($entry['service_type'] ?? '');
+                $svc_desc = sanitizeInput($entry['description'] ?? '');
+                $payload['inventory_id']        = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
+                $payload['service_description'] = $svc_type ? "[$svc_type] $svc_desc" : $svc_desc;
+                $payload['quantity_requested']  = 1;
+            }
+
+            $result = dbCreateRequest($payload);
+            if (!$result['success']) {
+                $errors[] = $result['error'];
+            } else {
+                logActivity($current_user['id'], 'CREATE', "Submitted $safe_type request", 'requests', $result['row']['id'] ?? 0);
+            }
+        }
+
+        if (empty($errors)) {
+            $count = count($cart_items);
+            redirectWithMessage('my-requests.php', ($count > 1 ? $count . ' requests' : 'Request') . ' submitted successfully!', 'success');
+        } else {
+            $submit_error = 'Some requests failed to save: ' . implode('; ', $errors);
+        }
     }
 }
 
@@ -77,19 +90,13 @@ $all_inventory  = getInventory();
 $inventory_items = filterByColumn($all_inventory, 'campus_id', $campus_id);
 usort($inventory_items, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
 
-// Get available items for dropdown (from actual inventory)
-$available_items = array_filter($all_inventory, function($item) {
-    return $item['status'] === 'available';
-});
-usort($available_items, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
+// Item request catalog — all inventory items regardless of status
+$all_sorted = $all_inventory;
+usort($all_sorted, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
 
-// Group available items by category
 $catalog_by_category = [];
-foreach ($available_items as $item) {
+foreach ($all_sorted as $item) {
     $category = $item['category'] ?? 'Other';
-    if (!isset($catalog_by_category[$category])) {
-        $catalog_by_category[$category] = [];
-    }
     $catalog_by_category[$category][] = $item;
 }
 
@@ -1726,7 +1733,9 @@ function addToCart() {
         if (!rd) { showCartError('Please enter the expected return date.'); return; }
         var qty = parseInt(document.getElementById('borrow_quantity').value) || 1;
         var reason = document.getElementById('reason').value.trim();
-        entry = { type:'borrow', name:name, qty:qty, return_date:rd, reason:reason };
+        var borrowCard = document.querySelector('#bshop-grid .bshop-card.bshop-selected');
+        var inventoryId = borrowCard ? (borrowCard.getAttribute('data-item-id') || '') : '';
+        entry = { type:'borrow', name:name, inventory_id:inventoryId, qty:qty, return_date:rd, reason:reason };
     } else if (type === 'item') {
         var sel2 = document.getElementById('item_description');
         var name2 = (sel2.value && sel2.value !== '__custom__') ? sel2.value : document.getElementById('custom_item_req_name').value.trim();
