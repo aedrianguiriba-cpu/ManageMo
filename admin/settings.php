@@ -495,7 +495,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <?php endforeach; ?>
                 <?php endforeach; ?>
                 <?php endif; ?>
-                <div class="as-note mt-4"><i class="fas fa-lightbulb me-2"></i><strong>Info:</strong> This shows all available inventory items. Items marked "Borrowable" are in the borrow catalog. Update the <code style="background:rgba(0,0,0,0.10); padding:2px 6px; border-radius:4px; font-weight:600;">getBorrowCatalog()</code> function in <code style="background:rgba(0,0,0,0.10); padding:2px 6px; border-radius:4px; font-weight:600;">config/data.php</code> to control which items can be borrowed.</div>
             </div>
         </div>
 
