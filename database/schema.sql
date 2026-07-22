@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS requests (
     expected_return_date DATE,
     quantity_requested   INT  NOT NULL DEFAULT 1,
     status               TEXT NOT NULL DEFAULT 'pending'
-                             CHECK (status IN ('pending','approved','disapproved','delivered')),
+                             CHECK (status IN ('pending','approved','disapproved','delivered','completed')),
     delivery_status      TEXT CHECK (delivery_status IN ('out_for_delivery','delivered')),
     approved_by          INT,
     approved_at          TIMESTAMPTZ,

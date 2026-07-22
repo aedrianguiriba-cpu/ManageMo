@@ -16,12 +16,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action_type = sanitizeInput($_POST['action']);
 
     if ($action_type === 'approve') {
+        $req = findById(getRequests(), $request_id);
         dbUpdateRequest($request_id, ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+        if ($req && $req['request_type'] === 'borrow' && !empty($req['inventory_id'])) {
+            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'requested']);
+        } elseif ($req && $req['request_type'] === 'service' && !empty($req['inventory_id'])) {
+            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'maintenance']);
+        }
         logActivity($current_user['id'], 'APPROVE', "Approved request #$request_id", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request approved successfully!', 'success');
 
     } elseif ($action_type === 'disapprove') {
+        $req = findById(getRequests(), $request_id);
         dbUpdateRequest($request_id, ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+        if ($req && in_array($req['request_type'], ['borrow', 'service']) && !empty($req['inventory_id'])) {
+            $inv = findById(getInventory(), (int)$req['inventory_id']);
+            if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
+                dbUpdateInventory((int)$req['inventory_id'], ['status' => 'available']);
+            }
+        }
         logActivity($current_user['id'], 'DISAPPROVE', "Disapproved request #$request_id", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request disapproved.', 'info');
 
@@ -48,9 +61,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWithMessage('requests.php?action=view&id=' . $request_id, $label, 'success');
 
     } elseif ($action_type === 'mark_delivered') {
+        $req = findById(getRequests(), $request_id);
         dbUpdateRequest($request_id, ['delivery_status' => 'delivered', 'status' => 'delivered']);
+        if ($req && $req['request_type'] === 'borrow' && !empty($req['inventory_id'])) {
+            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'borrowed']);
+            dbCreateBorrowRecord([
+                'user_id'              => (int)$req['user_id'],
+                'inventory_id'         => (int)$req['inventory_id'],
+                'request_id'           => $request_id,
+                'borrow_date'          => date('Y-m-d'),
+                'expected_return_date' => $req['expected_return_date'] ?? null,
+                'status'               => 'active',
+                'notes'                => $req['reason_for_request'] ?? null,
+            ]);
+        }
         logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as delivered", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request marked as Delivered.', 'success');
+
+    } elseif ($action_type === 'mark_returned') {
+        $req = findById(getRequests(), $request_id);
+        if ($req && $req['request_type'] === 'borrow' && !empty($req['inventory_id'])) {
+            // Mark borrow record returned
+            $borrow_records = getBorrowRecords();
+            foreach ($borrow_records as $br) {
+                if ((int)$br['request_id'] === $request_id && $br['status'] === 'active') {
+                    dbUpdateRequest($br['id'], []); // placeholder — use supabase directly
+                    supabase()->updateById('borrow_records', (int)$br['id'], [
+                        'status'             => 'returned',
+                        'actual_return_date' => date('Y-m-d'),
+                    ]);
+                    clearDataCache('borrow_records');
+                    break;
+                }
+            }
+            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'available']);
+        }
+        dbUpdateRequest($request_id, ['status' => 'completed']);
+        logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as returned/completed", 'requests', $request_id);
+        redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Item returned and request completed.', 'success');
+
+    } elseif ($action_type === 'mark_completed') {
+        $req = findById(getRequests(), $request_id);
+        if ($req && $req['request_type'] === 'service' && !empty($req['inventory_id'])) {
+            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'available']);
+        }
+        dbUpdateRequest($request_id, ['status' => 'completed']);
+        logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as completed", 'requests', $request_id);
+        redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request marked as completed.', 'success');
     }
 }
 
@@ -422,7 +479,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             }
         }
 
-        $status_colors = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'success'];
+        $status_colors = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'secondary'];
         $urgency_colors = ['low'=>'info','medium'=>'warning','high'=>'danger','critical'=>'danger'];
         $type_labels = ['item'=>'Item Request','borrow'=>'Borrow Request','service'=>'Service Request'];
         ?>
@@ -666,6 +723,44 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             <div style="margin-top:10px;font-size:0.76rem;color:rgba(0,0,0,0.40);">
                 <i class="fas fa-envelope me-1"></i>An email notification will be automatically sent to <strong><?php echo htmlspecialchars($request['email']); ?></strong> when you proceed.
             </div>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        // Mark Returned — borrow requests that have been delivered
+        if ($request['request_type'] === 'borrow' && $request['status'] === 'delivered'):
+        ?>
+        <div class="ar-card mb-3">
+            <div class="ar-section-label">Return</div>
+            <form method="POST" action="requests.php?action=view&id=<?php echo $request['id']; ?>">
+                <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
+                <input type="hidden" name="action" value="mark_returned">
+                <button type="submit" class="btn ar-btn-success" onclick="return confirm('Confirm item has been returned?');">
+                    <i class="fas fa-undo me-1"></i> Mark as Returned
+                </button>
+            </form>
+            <div style="margin-top:8px;font-size:0.76rem;color:rgba(0,0,0,0.40);">This will mark the borrow record as returned and set the item back to available.</div>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        // Mark Completed — service requests after approved, item requests after delivered
+        $show_complete = ($request['request_type'] === 'service' && $request['status'] === 'approved')
+                      || ($request['request_type'] === 'item'    && $request['status'] === 'delivered');
+        if ($show_complete):
+        ?>
+        <div class="ar-card mb-3">
+            <div class="ar-section-label">Complete</div>
+            <form method="POST" action="requests.php?action=view&id=<?php echo $request['id']; ?>">
+                <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
+                <input type="hidden" name="action" value="mark_completed">
+                <button type="submit" class="btn ar-btn-success" onclick="return confirm('Mark this request as completed?');">
+                    <i class="fas fa-check-double me-1"></i> Mark as Completed
+                </button>
+            </form>
+            <?php if ($request['request_type'] === 'service'): ?>
+            <div style="margin-top:8px;font-size:0.76rem;color:rgba(0,0,0,0.40);">This will restore the item status to available.</div>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
 
