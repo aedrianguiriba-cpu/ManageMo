@@ -83,6 +83,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'CREATE', "Added $qty unit(s) of user owned item: $item_name for user_id: $user_id", 'user_owned_items', $user_id);
         redirectWithMessage('inventory.php?tab=owned', "$qty unit(s) of '$item_name' recorded successfully!", 'success');
 
+    } elseif ($action === 'edit_owned') {
+        $owned_id  = (int)$_GET['id'];
+        $item_name = sanitizeInput($_POST['item_name']);
+        dbUpdateUserOwnedItem($owned_id, [
+            'item_name'     => $item_name,
+            'category'      => sanitizeInput($_POST['category']),
+            'description'   => sanitizeInput($_POST['description']),
+            'campus_id'     => (int)$_POST['campus_id'],
+            'year_owned'    => (int)$_POST['year_owned'] ?: null,
+            'condition'     => sanitizeInput($_POST['condition']),
+            'notes'         => sanitizeInput($_POST['notes']),
+            'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
+        ]);
+        logActivity($current_user['id'], 'UPDATE', "Updated user-owned item: $item_name", 'user_owned_items', $owned_id);
+        redirectWithMessage('inventory.php?tab=owned', 'Item updated successfully!', 'success');
+
     } elseif ($action === 'edit') {
         $inventory_id = (int)$_GET['id'];
         $item_name    = sanitizeInput($_POST['item_name']);
@@ -391,6 +407,82 @@ displayMessage();
             <div class="d-flex justify-content-end gap-2">
                 <a href="inventory.php" class="btn ai-btn-secondary">Cancel</a>
                 <button type="submit" class="btn ai-btn-primary"><i class="fas fa-save"></i> Update Item</button>
+            </div>
+        </form>
+    </div>
+
+    <?php elseif ($action === 'edit_owned'): ?>
+    <!-- Edit User-Owned Item Form -->
+    <?php
+        $owned_id   = (int)sanitizeInput($_GET['id']);
+        $owned_item = findById(getUserOwnedItems(), $owned_id);
+        if (!$owned_item) { die('<div class="alert alert-danger">Item not found.</div>'); }
+        $owned_owner = findById($users, $owned_item['user_id']);
+    ?>
+    <div class="ai-card">
+        <div class="ai-card-title">Edit User-Owned Item</div>
+        <div class="ai-card-sub">
+            Unit owned by <strong><?php echo htmlspecialchars($owned_owner['full_name'] ?? 'Unknown'); ?></strong>
+        </div>
+        <hr class="ai-divider mt-0">
+        <form method="POST" action="?action=edit_owned&id=<?php echo $owned_id; ?>">
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Item Name *</label>
+                    <input type="text" class="form-control" name="item_name" value="<?php echo htmlspecialchars($owned_item['item_name']); ?>" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Category *</label>
+                    <select class="form-select" name="category" required>
+                        <option value="">Select Category</option>
+                        <?php
+                        $cats = ['Office Supplies','Furniture','Electronics','Equipment','Cleaning Supplies','Medical & Safety','Sports & Recreation','Tools & Hardware','Books & Publications','Laboratory Supplies','Electrical Supplies','Other'];
+                        foreach ($cats as $cat):
+                        ?>
+                        <option value="<?php echo htmlspecialchars($cat); ?>" <?php echo $owned_item['category'] === $cat ? 'selected' : ''; ?>><?php echo htmlspecialchars($cat); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Year Owned *</label>
+                    <input type="number" class="form-control" name="year_owned" min="2000" max="<?php echo date('Y'); ?>" value="<?php echo $owned_item['year_owned']; ?>" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Condition *</label>
+                    <select class="form-select" name="condition" required>
+                        <?php foreach (['excellent','good','fair','poor'] as $c): ?>
+                        <option value="<?php echo $c; ?>" <?php echo $owned_item['condition'] === $c ? 'selected' : ''; ?>><?php echo ucfirst($c); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Campus *</label>
+                    <select class="form-select" name="campus_id" required>
+                        <?php foreach ($campuses as $campus): ?>
+                        <option value="<?php echo $campus['id']; ?>" <?php echo $campus['id'] == $owned_item['campus_id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($campus['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Purchase Date</label>
+                    <input type="date" class="form-control" name="purchase_date" value="<?php echo htmlspecialchars($owned_item['purchase_date'] ?? ''); ?>">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea class="form-control" name="description" rows="2"><?php echo htmlspecialchars($owned_item['description'] ?? ''); ?></textarea>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Notes / Return Condition</label>
+                <textarea class="form-control" name="notes" rows="3"><?php echo htmlspecialchars($owned_item['notes'] ?? ''); ?></textarea>
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+                <a href="inventory.php?tab=owned" class="btn ai-btn-secondary">Cancel</a>
+                <button type="submit" class="btn ai-btn-primary"><i class="fas fa-save"></i> Save Changes</button>
             </div>
         </form>
     </div>
@@ -1202,7 +1294,7 @@ function openOwnedGroupModal(group, ownerName, campus) {
             + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1) + '</span>'
             + '<span style="color:rgba(0,0,0,0.45);font-size:0.78rem;margin-left:8px;">' + cond + '</span>'
             + '</div>'
-            + '<a href="inventory.php?action=delete&id=' + unit.id + '" class="ai-btn-sm ai-btn-delete delete-btn" title="Remove unit"><i class="fas fa-trash"></i></a>';
+            + '<a href="inventory.php?action=edit_owned&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit unit"><i class="fas fa-edit"></i> Edit</a>';
         grid.appendChild(row);
     });
 

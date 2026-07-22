@@ -298,6 +298,12 @@ function dbCreateUserOwnedItem(array $data): ?array {
     return $rows[0] ?? null;
 }
 
+function dbUpdateUserOwnedItem(int $id, array $data): bool {
+    $rows = supabase()->updateById('user_owned_items', $id, $data);
+    clearDataCache('user_owned_items');
+    return !empty($rows);
+}
+
 function dbAddCustomDepartment(string $type, array $data): bool {
     if ($type === 'campus') {
         $rows = supabase()->insert('campuses', [
