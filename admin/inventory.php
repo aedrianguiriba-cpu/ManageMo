@@ -515,6 +515,11 @@ displayMessage();
             foreach ($users as $u) $map[$u['id']] = $u['campus_id'];
             echo json_encode($map);
         ?>;
+        var userNameMap = <?php
+            $map = [];
+            foreach ($users as $u) $map[$u['id']] = $u['full_name'];
+            echo json_encode($map);
+        ?>;
         </script>
         <form method="POST" action="?action=add_owned">
             <div class="row g-3 mb-3">
@@ -1001,12 +1006,11 @@ displayMessage();
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($owned_items_page) > 0):
                 foreach ($owned_items_page as $group):
-                    $owner_user  = findById($users, $group['user_id']);
-                    $owner_name  = $owner_user ? htmlspecialchars($owner_user['full_name']) : 'Unknown User';
-                    $campus_info = getCampus($group['campus_id']);
-                    $unit_count  = count($group['units']);
-                    $conditions  = array_unique(array_column($group['units'], 'condition'));
-                    $cond_label  = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
+                    $unit_count   = count($group['units']);
+                    $owner_ids    = array_unique(array_column($group['units'], 'user_id'));
+                    $owner_count  = count($owner_ids);
+                    $conditions   = array_unique(array_column($group['units'], 'condition'));
+                    $cond_label   = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
         <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
@@ -1023,20 +1027,10 @@ displayMessage();
                 </span>
             </div>
             <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
-                    <div>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Owner</div>
-                        <div style="font-weight:600;color:#1a1d23;font-size:0.88rem;"><i class="fas fa-user-circle me-1" style="color:#3b82f6;"></i><?php echo $owner_name; ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Year Owned</div>
-                        <div style="font-weight:600;color:#1a1d23;"><?php echo $group['year_owned'] ?? '—'; ?></div>
-                    </div>
-                </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Campus</div>
-                        <div style="font-weight:600;color:#1a1d23;font-size:0.88rem;"><?php echo htmlspecialchars($campus_info['name']); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Owners</div>
+                        <div style="font-weight:600;color:#1a1d23;font-size:0.88rem;"><i class="fas fa-users me-1" style="color:#3b82f6;"></i><?php echo $owner_count; ?> user<?php echo $owner_count > 1 ? 's' : ''; ?></div>
                     </div>
                     <div>
                         <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Condition</div>
@@ -1046,7 +1040,7 @@ displayMessage();
             </div>
             <div style="display:flex;gap:8px;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;cursor:pointer;"
-                    onclick="openOwnedGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, '<?php echo $owner_name; ?>', <?php echo htmlspecialchars(json_encode($campus_info)); ?>)">
+                    onclick="openOwnedGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
                     <i class="fas fa-info-circle"></i> View Units
                 </button>
             </div>
@@ -1278,23 +1272,24 @@ function setTab(tabName) {
     window.history.pushState({tab: tabName}, '', 'inventory.php?tab=' + tabName);
 }
 
-function openOwnedGroupModal(group, ownerName, campus) {
+function openOwnedGroupModal(group) {
     document.getElementById('ownedItemModalTitle').textContent = group.item_name;
     document.getElementById('ownedItemModalCategory').textContent =
-        group.category + ' · ' + ownerName + ' · ' + group.units.length + ' unit(s)';
+        group.category + ' · ' + group.units.length + ' unit(s)';
 
-    document.getElementById('ownedItemOwner').textContent = ownerName;
-    document.getElementById('ownedItemYear').textContent = group.year_owned || '—';
-    document.getElementById('ownedItemCampus').textContent = campus ? campus.name : 'Unknown';
+    var ownerIds = [...new Set(group.units.map(function(u){ return u.user_id; }))];
+    var ownerNames = ownerIds.map(function(id){ return userNameMap[id] || 'User #' + id; });
+    document.getElementById('ownedItemOwner').textContent = ownerNames.join(', ');
 
     var condSet = [...new Set(group.units.map(function(u){ return u.condition; }).filter(Boolean))];
     document.getElementById('ownedItemCondition').textContent =
         condSet.length === 1 ? condSet[0].charAt(0).toUpperCase() + condSet[0].slice(1) : 'Mixed';
 
-    document.getElementById('ownedItemDescription').textContent = group.description || 'No description provided';
+    document.getElementById('ownedItemDescription').textContent = group.description || (group.units[0] && group.units[0].description) || 'No description provided';
+    var firstNotes = group.units[0] && group.units[0].notes ? group.units[0].notes : '';
     var notesEl = document.getElementById('ownedItemNotes');
-    notesEl.parentElement.style.display = group.notes ? 'block' : 'none';
-    notesEl.textContent = group.notes || '';
+    notesEl.parentElement.style.display = firstNotes ? 'block' : 'none';
+    notesEl.textContent = firstNotes;
 
     var grid = document.getElementById('ownedUnitsGrid');
     grid.innerHTML = '';
@@ -1302,12 +1297,14 @@ function openOwnedGroupModal(group, ownerName, campus) {
         var cond = unit.condition
             ? unit.condition.charAt(0).toUpperCase() + unit.condition.slice(1)
             : '—';
+        var ownerName = userNameMap[unit.user_id] || 'User #' + unit.user_id;
+        var year = unit.year_owned || '—';
         var row = document.createElement('div');
         row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f7f7f7;border-radius:6px;font-size:0.88rem;';
         row.innerHTML =
-            '<div>'
-            + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1) + '</span>'
-            + '<span style="color:rgba(0,0,0,0.45);font-size:0.78rem;margin-left:8px;">' + cond + '</span>'
+            '<div style="display:flex;flex-direction:column;gap:2px;">'
+            + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1) + ' <span style="font-weight:400;color:rgba(0,0,0,0.50);font-size:0.78rem;">· ' + cond + '</span></span>'
+            + '<span style="color:rgba(0,0,0,0.60);font-size:0.78rem;">' + ownerName + ' · ' + year + '</span>'
             + '</div>'
             + '<a href="inventory.php?action=edit_owned&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit unit"><i class="fas fa-edit"></i> Edit</a>';
         grid.appendChild(row);
@@ -1329,29 +1326,17 @@ function openOwnedGroupModal(group, ownerName, campus) {
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" style="padding:24px;">
-                <!-- Owner Info -->
+                <!-- Owners & Condition summary -->
                 <div style="background:#f0f5ff;border-left:3px solid #3b82f6;padding:14px 16px;border-radius:6px;margin-bottom:20px;">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                         <div>
-                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;font-weight:700;margin-bottom:5px;letter-spacing:0.5px;">Owner</div>
-                            <div id="ownedItemOwner" style="font-weight:700;font-size:0.95rem;color:#1a1d23;"></div>
+                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;font-weight:700;margin-bottom:5px;letter-spacing:0.5px;">Owners</div>
+                            <div id="ownedItemOwner" style="font-weight:700;font-size:0.88rem;color:#1a1d23;"></div>
                         </div>
                         <div>
-                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;font-weight:700;margin-bottom:5px;letter-spacing:0.5px;">Year Owned</div>
-                            <div id="ownedItemYear" style="font-weight:700;font-size:0.95rem;color:#1a1d23;"></div>
+                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;font-weight:700;margin-bottom:5px;letter-spacing:0.5px;">Condition</div>
+                            <div id="ownedItemCondition" style="font-weight:700;font-size:0.95rem;color:#1a1d23;"></div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Item Details -->
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
-                    <div>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;margin-bottom:4px;">Campus</div>
-                        <div id="ownedItemCampus" style="font-weight:600;color:#1a1d23;font-size:0.9rem;"></div>
-                    </div>
-                    <div>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;margin-bottom:4px;">Condition</div>
-                        <div id="ownedItemCondition" style="font-weight:600;color:#1a1d23;font-size:0.9rem;"></div>
                     </div>
                 </div>
 
