@@ -94,6 +94,31 @@ function getItemUnitQRCodes($item) {
     return $units;
 }
 
+// Groups user-owned items by user_id + item_name + category.
+function groupOwnedItems(array $items): array {
+    $groups = [];
+    foreach ($items as $item) {
+        $key = (int)$item['user_id']
+             . '||' . strtolower(trim($item['item_name']))
+             . '||' . strtolower(trim($item['category'] ?? ''));
+        if (!isset($groups[$key])) {
+            $groups[$key] = [
+                'user_id'     => (int)$item['user_id'],
+                'item_name'   => $item['item_name'],
+                'category'    => $item['category'] ?? '',
+                'campus_id'   => (int)$item['campus_id'],
+                'year_owned'  => $item['year_owned'],
+                'description' => $item['description'] ?? '',
+                'notes'       => $item['notes'] ?? '',
+                'created_at'  => $item['created_at'] ?? '',
+                'units'       => [],
+            ];
+        }
+        $groups[$key]['units'][] = $item;
+    }
+    return array_values($groups);
+}
+
 // Groups a flat array of inventory items by item_name + category + campus_id.
 // Each group has a 'units' key containing the individual item rows.
 function groupInventoryItems(array $items): array {

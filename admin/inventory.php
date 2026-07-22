@@ -65,20 +65,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $item_name = sanitizeInput($_POST['item_name']);
         $user_id   = (int)$_POST['user_id'];
         $qty       = max(1, (int)($_POST['quantity'] ?? 1));
-        dbCreateUserOwnedItem([
+        $base_owned = [
             'user_id'       => $user_id,
             'item_name'     => $item_name,
             'category'      => sanitizeInput($_POST['category']),
             'description'   => sanitizeInput($_POST['description']),
             'campus_id'     => (int)$_POST['campus_id'],
             'year_owned'    => (int)$_POST['year_owned'] ?: null,
-            'quantity'      => $qty,
+            'quantity'      => 1,
             'condition'     => sanitizeInput($_POST['condition']),
             'notes'         => sanitizeInput($_POST['notes']),
             'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
-        ]);
-        logActivity($current_user['id'], 'CREATE', "Added user owned item: $item_name (Qty: $qty) for user_id: $user_id", 'user_owned_items', $user_id);
-        redirectWithMessage('inventory.php?tab=owned', 'User-owned item added successfully!', 'success');
+        ];
+        for ($u = 0; $u < $qty; $u++) {
+            dbCreateUserOwnedItem($base_owned);
+        }
+        logActivity($current_user['id'], 'CREATE', "Added $qty unit(s) of user owned item: $item_name for user_id: $user_id", 'user_owned_items', $user_id);
+        redirectWithMessage('inventory.php?tab=owned', "$qty unit(s) of '$item_name' recorded successfully!", 'success');
 
     } elseif ($action === 'edit') {
         $inventory_id = (int)$_GET['id'];
@@ -534,6 +537,7 @@ displayMessage();
     $grouped_requested   = groupInventoryItems($requested_items);
     $grouped_maintenance = groupInventoryItems($maintenance_items);
     $grouped_borrowed    = groupInventoryItems($borrowed_items);
+    $grouped_owned       = groupOwnedItems($owned_items);
 
     // Pagination settings
     $items_per_page = 6;
@@ -555,7 +559,7 @@ displayMessage();
     $pages_requested = ceil(count($grouped_requested) / $items_per_page);
     $pages_maintenance = ceil(count($grouped_maintenance) / $items_per_page);
     $pages_borrowed = ceil(count($grouped_borrowed) / $items_per_page);
-    $pages_owned = ceil($total_owned / $items_per_page);
+    $pages_owned = ceil(count($grouped_owned) / $items_per_page);
 
     $offset_available = ($current_page_available - 1) * $items_per_page;
     $offset_requested = ($current_page_requested - 1) * $items_per_page;
@@ -567,7 +571,7 @@ displayMessage();
     $requested_items_page   = array_slice($grouped_requested, $offset_requested, $items_per_page);
     $maintenance_items_page = array_slice($grouped_maintenance, $offset_maintenance, $items_per_page);
     $borrowed_items_page    = array_slice($grouped_borrowed, $offset_borrowed, $items_per_page);
-    $owned_items_page       = array_slice($owned_items, $offset_owned, $items_per_page);
+    $owned_items_page       = array_slice($grouped_owned, $offset_owned, $items_per_page);
     ?>
 
     <!-- TAB NAVIGATION -->
@@ -889,65 +893,62 @@ displayMessage();
     <div id="tab-owned" style="display: <?php echo $current_tab === 'owned' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($owned_items_page) > 0):
-                foreach ($owned_items_page as $item):
-                    $owner_user = findById($users, $item['user_id']);
-                    $owner_name = $owner_user ? htmlspecialchars($owner_user['full_name']) : 'Unknown User';
-                    $campus_info = getCampus($item['campus_id']);
+                foreach ($owned_items_page as $group):
+                    $owner_user  = findById($users, $group['user_id']);
+                    $owner_name  = $owner_user ? htmlspecialchars($owner_user['full_name']) : 'Unknown User';
+                    $campus_info = getCampus($group['campus_id']);
+                    $unit_count  = count($group['units']);
+                    $conditions  = array_unique(array_column($group['units'], 'condition'));
+                    $cond_label  = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
-                    <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
-                        <?php echo htmlspecialchars($item['item_name']); ?>
+                    <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
+                        <?php echo htmlspecialchars($group['item_name']); ?>
                     </div>
-                    <div style="font-size: 0.75rem; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 0.5px;">
-                        <?php echo htmlspecialchars($item['category']); ?>
-                    </div>
-                </div>
-                <span class="ai-badge" style="background: rgba(59,130,246,0.15); color: #1d4ed8; font-size: 0.7rem; padding: 4px 8px;"><i class="fas fa-user-check me-1"></i><?php echo $item['year_owned']; ?></span>
-            </div>
-            
-            <div style="border-top: 1px solid rgba(0,0,0,0.07); border-bottom: 1px solid rgba(0,0,0,0.07); padding: 12px 0; margin: 12px 0; font-size: 0.9rem;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Owner</div>
-                        <div style="font-weight: 600; color: #1a1d23; font-size: 0.9rem;"><i class="fas fa-user-circle me-1" style="color: #3b82f6;"></i><?php echo $owner_name; ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Quantity</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo $item['quantity']; ?> unit<?php echo $item['quantity'] > 1 ? 's' : ''; ?></div>
+                    <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
+                        <?php echo htmlspecialchars($group['category']); ?>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <span style="background:rgba(59,130,246,0.12);color:#1d4ed8;font-weight:700;font-size:0.76rem;padding:3px 10px;border-radius:10px;">
+                    <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                </span>
+            </div>
+            <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;">
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Campus</div>
-                        <div style="font-weight: 600; color: #1a1d23; font-size: 0.9rem;"><?php echo htmlspecialchars($campus_info['name']); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Owner</div>
+                        <div style="font-weight:600;color:#1a1d23;font-size:0.88rem;"><i class="fas fa-user-circle me-1" style="color:#3b82f6;"></i><?php echo $owner_name; ?></div>
                     </div>
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Condition</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo ucfirst($item['condition']); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Year Owned</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo $group['year_owned'] ?? '—'; ?></div>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Campus</div>
+                        <div style="font-weight:600;color:#1a1d23;font-size:0.88rem;"><?php echo htmlspecialchars($campus_info['name']); ?></div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Condition</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo $cond_label; ?></div>
                     </div>
                 </div>
             </div>
-
-            <?php if (!empty($item['notes'])): ?>
-            <div style="background: rgba(34,197,94,0.08); border-left: 3px solid #22c55e; padding: 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.85rem; color: #374151;">
-                <div style="font-weight: 600; color: #15803d; margin-bottom: 4px; font-size: 0.75rem; text-transform: uppercase;">Notes</div>
-                <?php echo htmlspecialchars($item['notes']); ?>
-            </div>
-            <?php endif; ?>
-
-            <div style="display: flex; gap: 8px;">
-                <button type="button" class="ai-btn-sm" style="background: rgba(59,130,246,0.10); color: #1d4ed8; flex: 1; border: none; border-radius: 8px; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#ownedItemModal" onclick="showOwnedItemDetails(<?php echo htmlspecialchars(json_encode($item)); ?>, <?php echo htmlspecialchars(json_encode($owner_name)); ?>)">
-                    <i class="fas fa-info-circle"></i> Details
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;cursor:pointer;"
+                    onclick="openOwnedGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, '<?php echo $owner_name; ?>', <?php echo htmlspecialchars(json_encode($campus_info)); ?>)">
+                    <i class="fas fa-info-circle"></i> View Units
                 </button>
             </div>
         </div>
         <?php endforeach; else: ?>
-        <div class="ai-empty" style="grid-column: 1 / -1;">
+        <div class="ai-empty" style="grid-column:1/-1;">
             <i class="fas fa-user-circle"></i>
             <p>No user-owned items recorded yet</p>
-            <small style="color: rgba(0,0,0,0.40);">Start tracking user-owned items from past years</small>
+            <small style="color:rgba(0,0,0,0.40);">Start tracking user-owned items from past years</small>
         </div>
         <?php endif; ?>
         </div>
@@ -1170,48 +1171,42 @@ function setTab(tabName) {
     window.history.pushState({tab: tabName}, '', 'inventory.php?tab=' + tabName);
 }
 
-function showOwnedItemDetails(item, ownerName) {
-    var modalElement = document.getElementById('ownedItemModal');
-    var modal = new bootstrap.Modal(modalElement);
-    
-    // Populate modal
-    document.getElementById('ownedItemModalTitle').textContent = item.item_name;
-    document.getElementById('ownedItemModalCategory').textContent = item.category + ' • Owned in ' + item.year_owned;
-    
+function openOwnedGroupModal(group, ownerName, campus) {
+    document.getElementById('ownedItemModalTitle').textContent = group.item_name;
+    document.getElementById('ownedItemModalCategory').textContent =
+        group.category + ' · ' + ownerName + ' · ' + group.units.length + ' unit(s)';
+
     document.getElementById('ownedItemOwner').textContent = ownerName;
-    document.getElementById('ownedItemYear').textContent = item.year_owned;
-    document.getElementById('ownedItemQuantity').textContent = item.quantity + ' unit' + (item.quantity > 1 ? 's' : '');
-    document.getElementById('ownedItemCondition').textContent = item.condition.charAt(0).toUpperCase() + item.condition.slice(1);
-    
-    var campuses = <?php echo json_encode(getAllCampuses()); ?>;
-    var campus = campuses.find(c => c.id == item.campus_id);
-    document.getElementById('ownedItemCampus').textContent = campus ? campus.name : 'Unknown Campus';
-    
-    document.getElementById('ownedItemDescription').textContent = item.description || 'No description provided';
-    document.getElementById('ownedItemNotes').parentElement.style.display = item.notes ? 'block' : 'none';
-    document.getElementById('ownedItemNotes').textContent = item.notes || '';
-    
-    if (item.purchase_date) {
-        document.getElementById('ownedItemPurchaseDate').textContent = new Date(item.purchase_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-        document.getElementById('ownedItemPurchaseDateRow').style.display = 'block';
-    } else {
-        document.getElementById('ownedItemPurchaseDateRow').style.display = 'none';
-    }
-    
-    // Handle proper modal cleanup on close
-    modalElement.addEventListener('hidden.bs.modal', function() {
-        // Remove modal backdrop if it exists
-        var backdrop = document.querySelector('.modal-backdrop');
-        if (backdrop) {
-            backdrop.remove();
-        }
-        // Remove modal-open class from body
-        document.body.classList.remove('modal-open');
-        document.body.style.overflow = '';
-        document.body.style.paddingRight = '';
-    }, { once: true });
-    
-    modal.show();
+    document.getElementById('ownedItemYear').textContent = group.year_owned || '—';
+    document.getElementById('ownedItemCampus').textContent = campus ? campus.name : 'Unknown';
+
+    var condSet = [...new Set(group.units.map(function(u){ return u.condition; }).filter(Boolean))];
+    document.getElementById('ownedItemCondition').textContent =
+        condSet.length === 1 ? condSet[0].charAt(0).toUpperCase() + condSet[0].slice(1) : 'Mixed';
+
+    document.getElementById('ownedItemDescription').textContent = group.description || 'No description provided';
+    var notesEl = document.getElementById('ownedItemNotes');
+    notesEl.parentElement.style.display = group.notes ? 'block' : 'none';
+    notesEl.textContent = group.notes || '';
+
+    var grid = document.getElementById('ownedUnitsGrid');
+    grid.innerHTML = '';
+    group.units.forEach(function(unit, idx) {
+        var cond = unit.condition
+            ? unit.condition.charAt(0).toUpperCase() + unit.condition.slice(1)
+            : '—';
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f7f7f7;border-radius:6px;font-size:0.88rem;';
+        row.innerHTML =
+            '<div>'
+            + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1) + '</span>'
+            + '<span style="color:rgba(0,0,0,0.45);font-size:0.78rem;margin-left:8px;">' + cond + '</span>'
+            + '</div>'
+            + '<a href="inventory.php?action=delete&id=' + unit.id + '" class="ai-btn-sm ai-btn-delete delete-btn" title="Remove unit"><i class="fas fa-trash"></i></a>';
+        grid.appendChild(row);
+    });
+
+    new bootstrap.Modal(document.getElementById('ownedItemModal')).show();
 }
 </script>
 
@@ -1226,56 +1221,49 @@ function showOwnedItemDetails(item, ownerName) {
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" style="padding: 28px;">
+            <div class="modal-body" style="padding:24px;">
                 <!-- Owner Info -->
-                <div style="background: #f0f5ff; border-left: 3px solid #3b82f6; padding: 16px; border-radius: 6px; margin-bottom: 24px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div style="background:#f0f5ff;border-left:3px solid #3b82f6;padding:14px 16px;border-radius:6px;margin-bottom:20px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
                         <div>
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Owner</div>
-                            <div id="ownedItemOwner" style="font-weight: 700; font-size: 1rem; color: #1a1d23;"></div>
+                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;font-weight:700;margin-bottom:5px;letter-spacing:0.5px;">Owner</div>
+                            <div id="ownedItemOwner" style="font-weight:700;font-size:0.95rem;color:#1a1d23;"></div>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;">Year Owned</div>
-                            <div id="ownedItemYear" style="font-weight: 700; font-size: 1rem; color: #1a1d23;"></div>
+                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;font-weight:700;margin-bottom:5px;letter-spacing:0.5px;">Year Owned</div>
+                            <div id="ownedItemYear" style="font-weight:700;font-size:0.95rem;color:#1a1d23;"></div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Item Details Section -->
-                <div style="margin-bottom: 24px;">
-                    <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(0,0,0,0.50); margin-bottom: 12px;">Item Details</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
-                        <div>
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; margin-bottom: 4px;">Quantity</div>
-                            <div id="ownedItemQuantity" style="font-weight: 600; color: #1a1d23;"></div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; margin-bottom: 4px;">Condition</div>
-                            <div id="ownedItemCondition" style="font-weight: 600; color: #1a1d23;"></div>
-                        </div>
+
+                <!-- Item Details -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                    <div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;margin-bottom:4px;">Campus</div>
+                        <div id="ownedItemCampus" style="font-weight:600;color:#1a1d23;font-size:0.9rem;"></div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                        <div>
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; margin-bottom: 4px;">Campus</div>
-                            <div id="ownedItemCampus" style="font-weight: 600; color: #1a1d23;"></div>
-                        </div>
-                        <div id="ownedItemPurchaseDateRow">
-                            <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase; margin-bottom: 4px;">Purchase Date</div>
-                            <div id="ownedItemPurchaseDate" style="font-weight: 600; color: #1a1d23;"></div>
-                        </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;margin-bottom:4px;">Condition</div>
+                        <div id="ownedItemCondition" style="font-weight:600;color:#1a1d23;font-size:0.9rem;"></div>
                     </div>
                 </div>
-                
+
                 <!-- Description -->
-                <div style="margin-bottom: 20px;">
-                    <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(0,0,0,0.50); margin-bottom: 8px;">Description</div>
-                    <div id="ownedItemDescription" style="font-size: 0.9rem; color: #374151; line-height: 1.6; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px;"></div>
+                <div style="margin-bottom:20px;">
+                    <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.50);margin-bottom:8px;">Description</div>
+                    <div id="ownedItemDescription" style="font-size:0.88rem;color:#374151;line-height:1.6;background:rgba(0,0,0,0.03);padding:10px;border-radius:6px;"></div>
                 </div>
-                
-                <!-- Notes Section -->
-                <div style="background: rgba(34,197,94,0.08); border-left: 4px solid #22c55e; padding: 14px; border-radius: 8px;">
-                    <div style="font-size: 0.7rem; color: #15803d; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px;"><i class="fas fa-sticky-note me-2"></i>Notes</div>
-                    <div id="ownedItemNotes" style="font-size: 0.9rem; color: #374151; line-height: 1.6;"></div>
+
+                <!-- Notes -->
+                <div style="background:rgba(34,197,94,0.08);border-left:3px solid #22c55e;padding:12px 14px;border-radius:6px;margin-bottom:20px;">
+                    <div style="font-size:0.7rem;color:#15803d;text-transform:uppercase;font-weight:700;margin-bottom:5px;letter-spacing:0.5px;"><i class="fas fa-sticky-note me-1"></i>Notes</div>
+                    <div id="ownedItemNotes" style="font-size:0.88rem;color:#374151;line-height:1.6;"></div>
+                </div>
+
+                <!-- Units list -->
+                <div>
+                    <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.50);margin-bottom:10px;">Individual Units</div>
+                    <div id="ownedUnitsGrid" style="display:flex;flex-direction:column;gap:6px;"></div>
                 </div>
             </div>
         </div>
