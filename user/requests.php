@@ -56,9 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $payload['quantity_requested']  = 1;
     }
 
-    $new_req = dbCreateRequest($payload);
-    logActivity($current_user['id'], 'CREATE', "Submitted $request_type request", 'requests', $new_req['id'] ?? 0);
-    redirectWithMessage('my-requests.php', 'Request submitted successfully! Request ID: ' . $request_number, 'success');
+    $result = dbCreateRequest($payload);
+    if (!$result['success']) {
+        $submit_error = 'Failed to submit request: ' . $result['error'];
+    } else {
+        logActivity($current_user['id'], 'CREATE', "Submitted $request_type request", 'requests', $result['row']['id'] ?? 0);
+        redirectWithMessage('my-requests.php', 'Request submitted successfully! Request ID: ' . $request_number, 'success');
+    }
 }
 
 require_once dirname(__DIR__) . '/includes/header.php';
@@ -113,6 +117,12 @@ foreach ($borrowable as $item) {
 }
 
 displayMessage();
+if (!empty($submit_error)): ?>
+<div style="background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.30);border-radius:8px;padding:14px 18px;margin-bottom:18px;color:#dc2626;font-size:0.88rem;font-weight:600;display:flex;align-items:center;gap:10px;">
+    <i class="fas fa-exclamation-circle"></i>
+    <span><?php echo htmlspecialchars($submit_error); ?></span>
+</div>
+<?php endif;
 ?>
 
 <style>

@@ -187,10 +187,14 @@ function dbNextRequestNumber(): string {
     return 'REQ-' . str_pad($next, 5, '0', STR_PAD_LEFT);
 }
 
-function dbCreateRequest(array $data): ?array {
-    $rows = supabase()->insert('requests', $data);
+function dbCreateRequest(array $data): array {
+    $db   = supabase();
+    $rows = $db->insert('requests', $data);
+    if (empty($rows)) {
+        return ['success' => false, 'error' => $db->lastError ?: 'Insert returned no data'];
+    }
     clearDataCache('requests');
-    return $rows[0] ?? null;
+    return ['success' => true, 'row' => $rows[0]];
 }
 
 function dbUpdateRequest(int $id, array $data): bool {

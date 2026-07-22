@@ -34,7 +34,10 @@ class SupabaseClient {
 
     // ── low-level HTTP ────────────────────────────────────────────────────────
 
+    public string $lastError = '';
+
     private function req(string $method, string $table, string $qs = '', mixed $body = null, array $extra = []): array {
+        $this->lastError = '';
         $url = $this->base . '/' . $table . ($qs !== '' ? '?' . $qs : '');
         $ch  = curl_init($url);
 
@@ -64,10 +67,14 @@ class SupabaseClient {
         curl_close($ch);
 
         if ($err) {
+            $this->lastError = "Connection error: $err";
             error_log("Supabase cURL error [$method $url]: $err");
             return [];
         }
         if ($code >= 400) {
+            $decoded = json_decode($resp, true);
+            $msg = $decoded['message'] ?? $decoded['hint'] ?? $resp;
+            $this->lastError = "HTTP $code: $msg";
             error_log("Supabase HTTP $code [$method $url]: $resp");
             return [];
         }
