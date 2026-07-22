@@ -500,20 +500,25 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
         <!-- System Settings Tab -->
         <div class="as-tab-pane" id="system-tab">
+            <?php
+            $sys_campuses  = getAllCampuses();
+            $sys_users     = getUsers();
+            $sys_inventory = getInventory();
+            $sys_requests  = getRequests();
+            $default_campus = null;
+            foreach ($sys_campuses as $c) { if (!empty($c['is_default'])) { $default_campus = $c; break; } }
+            $institution_name = $default_campus ? $default_campus['name'] : ($sys_campuses[0]['name'] ?? 'N/A');
+            ?>
             <div class="as-card">
                 <div class="as-card-title"><i class="fas fa-server me-2" style="opacity:0.8;"></i>System Information</div>
-                <div class="as-card-sub">Pampanga State University — PSU Asset Management</div>
+                <div class="as-card-sub"><?php echo htmlspecialchars($institution_name); ?> — Asset Management</div>
                 <div class="as-info-row">
                     <span class="as-info-label"><i class="fas fa-university me-2"></i>Institution</span>
-                    <span class="as-info-value">Pampanga State University (PSU)</span>
+                    <span class="as-info-value"><?php echo htmlspecialchars($institution_name); ?></span>
                 </div>
                 <div class="as-info-row">
-                    <span class="as-info-label"><i class="fas fa-code-branch me-2"></i>Application Version</span>
-                    <span class="as-info-value">1.0.0</span>
-                </div>
-                <div class="as-info-row">
-                    <span class="as-info-label"><i class="fas fa-database me-2"></i>Data Mode</span>
-                    <span class="as-info-value"><i class="fas fa-check me-1" style="color:#15803d;"></i>Hardcoded (no database)</span>
+                    <span class="as-info-label"><i class="fas fa-database me-2"></i>Data Source</span>
+                    <span class="as-info-value"><i class="fas fa-circle me-1" style="color:#15803d;font-size:0.55rem;vertical-align:middle;"></i>Live (Supabase)</span>
                 </div>
                 <div class="as-info-row">
                     <span class="as-info-label"><i class="fas fa-clock me-2"></i>Current Date &amp; Time</span>
@@ -521,13 +526,32 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
             </div>
             <div class="as-card">
+                <div class="as-card-title"><i class="fas fa-chart-bar me-2" style="opacity:0.8;"></i>Live System Stats</div>
+                <div class="as-card-sub">Real-time counts from the database</div>
+                <div class="as-info-row">
+                    <span class="as-info-label"><i class="fas fa-map-marker-alt me-2"></i>Campuses</span>
+                    <span class="as-info-value"><?php echo count($sys_campuses); ?></span>
+                </div>
+                <div class="as-info-row">
+                    <span class="as-info-label"><i class="fas fa-users me-2"></i>Registered Users</span>
+                    <span class="as-info-value"><?php echo count($sys_users); ?></span>
+                </div>
+                <div class="as-info-row">
+                    <span class="as-info-label"><i class="fas fa-boxes me-2"></i>Inventory Items</span>
+                    <span class="as-info-value"><?php echo count($sys_inventory); ?></span>
+                </div>
+                <div class="as-info-row">
+                    <span class="as-info-label"><i class="fas fa-file-alt me-2"></i>Total Requests</span>
+                    <span class="as-info-value"><?php echo count($sys_requests); ?></span>
+                </div>
+            </div>
+            <div class="as-card">
                 <div class="as-card-title"><i class="fas fa-map-marker-alt me-2" style="opacity:0.8;"></i>Registered Campuses</div>
                 <div class="as-card-sub">All institution campuses in the system</div>
-                <?php $campuses = getAllCampuses(); ?>
                 <table class="as-table">
                     <thead><tr><th><i class="fas fa-building me-1"></i>Campus Name</th><th><i class="fas fa-map-pin me-1"></i>Location</th><th style="text-align:right;"><i class="fas fa-boxes me-1"></i>Items</th></tr></thead>
                     <tbody>
-                    <?php foreach ($campuses as $campus): $item_count = getInventoryCount($campus['id']); ?>
+                    <?php foreach ($sys_campuses as $campus): $item_count = getInventoryCount($campus['id']); ?>
                     <tr>
                         <td style="font-weight:700; color:#1a1d23;"><?php echo htmlspecialchars($campus['name']); ?></td>
                         <td style="color:rgba(0,0,0,0.50);"><?php echo htmlspecialchars($campus['location']); ?></td>

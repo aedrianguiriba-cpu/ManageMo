@@ -47,6 +47,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 <?php
 $campus = getCampus($current_user['campus_id']);
 $user_id = $current_user['id'];
+$departments = getMainCampusDepartments();
+$dept_name = !empty($current_user['college_id']) ? ($departments[$current_user['college_id']] ?? $current_user['college_id']) : '';
 
 $all_requests        = getRequests();
 $user_requests       = filterByColumn($all_requests, 'user_id', $user_id);
@@ -239,9 +241,9 @@ displayMessage();
                 <span class="st-profile-role-pill">
                     <i class="fas fa-user-tag"></i> <?php echo ucfirst($current_user['role']); ?>
                 </span>
-                <?php if (!empty($current_user['college_id'])): ?>
+                <?php if ($dept_name): ?>
                 <span class="st-profile-role-pill" style="margin-top:6px;background:rgba(59,130,246,0.13);color:#1d4ed8;border-color:rgba(59,130,246,0.18);">
-                    <i class="fas fa-graduation-cap"></i> <?php echo htmlspecialchars($current_user['college_id']); ?>
+                    <i class="fas fa-graduation-cap"></i> <?php echo htmlspecialchars($dept_name); ?>
                 </span>
                 <?php endif; ?>
             </div>
