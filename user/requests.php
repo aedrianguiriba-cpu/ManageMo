@@ -37,8 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // One request per cart submission; all cart items become request_items rows
         $request_number = dbNextRequestNumber();
+        $request_group_id = generateGroupId(); // links all items in this submission
         $payload = [
             'request_number'   => $request_number,
+            'group_id'         => $request_group_id,
             'user_id'          => $current_user['id'],
             'request_type'     => $safe_type,
             'urgency'          => $urgency,
@@ -87,16 +89,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $total_qty++;
                         }
                     } else {
-                        // Custom/no-unit borrow
+                        // No unit IDs provided — create one request_item per quantity unit
                         $single_item = $inv_id ? findById($all_inv, $inv_id) : null;
                         $qty = max(1, (int)($entry['qty'] ?? 1));
-                        dbCreateRequestItem([
-                            'request_id'   => $req_id,
-                            'inventory_id' => $inv_id,
-                            'qr_code_id'   => $single_item['qr_code_id'] ?? generateQRCodeId(),
-                            'item_name'    => $single_item['item_name'] ?? $entry['name'] ?? 'Unknown',
-                            'quantity'     => $qty,
-                        ]);
+                        for ($q = 0; $q < $qty; $q++) {
+                            dbCreateRequestItem([
+                                'request_id'   => $req_id,
+                                'inventory_id' => $inv_id,
+                                'qr_code_id'   => $single_item['qr_code_id'] ?? generateQRCodeId(),
+                                'item_name'    => $single_item['item_name'] ?? $entry['name'] ?? 'Unknown',
+                                'quantity'     => 1,
+                            ]);
+                        }
                         $total_qty += $qty;
                     }
                 } elseif ($safe_type === 'item') {
@@ -1814,7 +1818,14 @@ function addToCart() {
         var qty = parseInt(document.getElementById('borrow_quantity').value) || 1;
         var reason = document.getElementById('reason').value.trim();
         var borrowCard = document.querySelector('#bshop-grid .bshop-card.bshop-selected');
-        var unitIdsRaw = borrowCard ? (borrowCard.getAttribute('data-unit-ids') || '[]') : '[]';
+        var unitIdsRaw;
+        if (borrowCard) {
+            unitIdsRaw = borrowCard.getAttribute('data-unit-ids') || '[]';
+        } else {
+            // Fall back to the selected option's data-unit-ids
+            var selOpt = (sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex] : null;
+            unitIdsRaw = (selOpt && selOpt.getAttribute('data-unit-ids')) || '[]';
+        }
         var unitIds = [];
         try { unitIds = JSON.parse(unitIdsRaw); } catch(e) { unitIds = []; }
         var inventoryId = unitIds.length > 0 ? unitIds[0] : (borrowCard ? (borrowCard.getAttribute('data-item-id') || '') : '');

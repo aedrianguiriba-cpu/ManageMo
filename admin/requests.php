@@ -621,6 +621,9 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                         <p><strong>Type:</strong><?php echo $type_labels[$request['request_type']] ?? ucfirst($request['request_type']); ?></p>
                         <p><strong>Urgency:</strong><span class="ar-badge ar-badge-<?php echo $urgency_colors[$request['urgency']] ?? 'secondary'; ?>" style="margin-left:4px;"><?php echo ucfirst($request['urgency']); ?></span></p>
                         <p><strong>Date:</strong><?php echo formatDate($request['created_at'], 'M d, Y'); ?></p>
+                        <?php if (!empty($request['group_id'])): ?>
+                        <p><strong>Group ID:</strong><span style="font-family:monospace;background:rgba(107,114,128,0.10);color:#374151;border-radius:5px;padding:1px 7px;font-size:0.77rem;"><?php echo htmlspecialchars($request['group_id']); ?></span></p>
+                        <?php endif; ?>
                         <?php if (!empty($request['receiving_method'])): ?>
                         <?php $rm = $request['receiving_method']; ?>
                         <p style="align-items:flex-start;flex-direction:column;gap:6px;">
