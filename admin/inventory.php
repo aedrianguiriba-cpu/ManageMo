@@ -435,7 +435,21 @@ displayMessage();
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Category *</label>
-                    <input type="text" class="form-control" name="category" placeholder="e.g., Electronics, Furniture" required>
+                    <select class="form-select" name="category" required>
+                        <option value="">Select Category</option>
+                        <option value="Office Supplies">Office Supplies</option>
+                        <option value="Furniture">Furniture</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Equipment">Equipment</option>
+                        <option value="Cleaning Supplies">Cleaning Supplies</option>
+                        <option value="Medical &amp; Safety">Medical &amp; Safety</option>
+                        <option value="Sports &amp; Recreation">Sports &amp; Recreation</option>
+                        <option value="Tools &amp; Hardware">Tools &amp; Hardware</option>
+                        <option value="Books &amp; Publications">Books &amp; Publications</option>
+                        <option value="Laboratory Supplies">Laboratory Supplies</option>
+                        <option value="Electrical Supplies">Electrical Supplies</option>
+                        <option value="Other">Other</option>
+                    </select>
                 </div>
             </div>
             <div class="row g-3 mb-3">
