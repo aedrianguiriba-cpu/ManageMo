@@ -189,48 +189,57 @@ function dbNextRequestNumber(): string {
 
 function dbCreateRequest(array $data): ?array {
     $rows = supabase()->insert('requests', $data);
+    clearDataCache('requests');
     return $rows[0] ?? null;
 }
 
 function dbUpdateRequest(int $id, array $data): bool {
     $data['updated_at'] = date('Y-m-d H:i:s');
     $rows = supabase()->updateById('requests', $id, $data);
+    clearDataCache('requests');
     return !empty($rows);
 }
 
 function dbCreateInventory(array $data): ?array {
     $rows = supabase()->insert('inventory', $data);
+    clearDataCache('inventory');
     return $rows[0] ?? null;
 }
 
 function dbUpdateInventory(int $id, array $data): bool {
     $rows = supabase()->updateById('inventory', $id, $data);
+    clearDataCache('inventory');
     return !empty($rows);
 }
 
 function dbDeleteInventory(int $id): bool {
     $rows = supabase()->deleteById('inventory', $id);
+    clearDataCache('inventory');
     return $rows !== [];
 }
 
 function dbCreateUser(array $data): ?array {
     $rows = supabase()->insert('users', $data);
+    clearDataCache('users');
     return $rows[0] ?? null;
 }
 
 function dbUpdateUser(int $id, array $data): bool {
     $data['updated_at'] = date('Y-m-d H:i:s');
     $rows = supabase()->updateById('users', $id, $data);
+    clearDataCache('users');
     return !empty($rows);
 }
 
 function dbCreateBorrowRecord(array $data): ?array {
     $rows = supabase()->insert('borrow_records', $data);
+    clearDataCache('borrow_records');
     return $rows[0] ?? null;
 }
 
 function dbCreateUserOwnedItem(array $data): ?array {
     $rows = supabase()->insert('user_owned_items', $data);
+    clearDataCache('user_owned_items');
     return $rows[0] ?? null;
 }
 
@@ -242,6 +251,7 @@ function dbAddCustomDepartment(string $type, array $data): bool {
             'description' => $data['description'] ?? null,
             'is_default'  => false,
         ]);
+        clearDataCache('campuses');
     } else {
         $rows = supabase()->insert('departments', [
             'type'         => $type,
@@ -249,6 +259,7 @@ function dbAddCustomDepartment(string $type, array $data): bool {
             'full_name'    => $data['full_name'],
             'is_default'   => false,
         ]);
+        clearDataCache('departments_colleges', 'departments_offices');
     }
     return !empty($rows);
 }
@@ -257,6 +268,7 @@ function dbDeleteCustomDepartment(string $type, string $abbreviation): bool {
     $rows = supabase()->select('departments', 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation));
     if (empty($rows) || $rows[0]['is_default']) return false;
     supabase()->delete('departments', 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation));
+    clearDataCache('departments_colleges', 'departments_offices');
     return true;
 }
 
@@ -264,6 +276,7 @@ function dbDeleteCustomCampus(int $id): bool {
     $campus = supabase()->find('campuses', $id);
     if (!$campus || $campus['is_default']) return false;
     supabase()->deleteById('campuses', $id);
+    clearDataCache('campuses');
     return true;
 }
 ?>

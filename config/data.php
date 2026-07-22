@@ -6,11 +6,47 @@
 
 require_once __DIR__ . '/supabase.php';
 
-// ── In-request cache ──────────────────────────────────────────────────────────
+// ── Cache TTL in seconds (60s balances freshness vs. API call reduction) ──────
+const DB_CACHE_TTL = 60;
+
+// ── In-request + session cache ────────────────────────────────────────────────
 function _dbCache(string $key, callable $loader): array {
     static $c = [];
-    if (!array_key_exists($key, $c)) $c[$key] = $loader();
-    return $c[$key];
+
+    // Layer 1: in-request memory (free)
+    if (array_key_exists($key, $c)) return $c[$key];
+
+    // Layer 2: session cache with TTL
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $entry = $_SESSION['_db_cache'][$key] ?? null;
+        if ($entry && (time() - $entry['ts']) < DB_CACHE_TTL) {
+            $c[$key] = $entry['data'];
+            return $c[$key];
+        }
+    }
+
+    // Layer 3: live Supabase API call
+    $data = $loader();
+    $c[$key] = $data;
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION['_db_cache'][$key] = ['data' => $data, 'ts' => time()];
+    }
+
+    return $data;
+}
+
+// Call this after any write/update/delete so the next request re-fetches fresh data.
+function clearDataCache(string ...$keys): void {
+    static $c;
+    // Clear in-request static cache via a fresh include trick isn't possible,
+    // so we just nuke the session entries; the static array lives until request ends.
+    if (session_status() !== PHP_SESSION_ACTIVE) return;
+    if (empty($keys)) {
+        unset($_SESSION['_db_cache']);
+    } else {
+        foreach ($keys as $k) unset($_SESSION['_db_cache'][$k]);
+    }
 }
 
 // ── Main Campus Colleges ──────────────────────────────────────────────────────
