@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'cost'          => is_numeric($_POST['cost'] ?? '') ? (float)$_POST['cost'] : null,
             'condition'     => sanitizeInput($_POST['condition']),
             'status'        => 'available',
+            'group_id'      => generateGroupId(),
         ];
         $first_id = null;
         for ($u = 0; $u < $qty; $u++) {
@@ -53,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'cost'          => $ref_item['cost'],
             'condition'     => sanitizeInput($_POST['condition']),
             'status'        => 'available',
+            'group_id'      => !empty($ref_item['group_id']) ? $ref_item['group_id'] : generateGroupId(),
         ];
         for ($u = 0; $u < $qty; $u++) {
             dbCreateInventory(array_merge($base_data, ['qr_code_id' => generateQRCodeId()]));
@@ -76,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'condition'     => sanitizeInput($_POST['condition']),
             'notes'         => sanitizeInput($_POST['notes']),
             'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
+            'group_id'      => generateGroupId(),
         ];
         for ($u = 0; $u < $qty; $u++) {
             dbCreateUserOwnedItem($base_owned);
@@ -84,10 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWithMessage('inventory.php?tab=owned', "$qty unit(s) of '$item_name' recorded successfully!", 'success');
 
     } elseif ($action === 'edit_owned') {
-        $owned_id  = (int)$_GET['id'];
-        $item_name = sanitizeInput($_POST['item_name']);
-        $qty       = max(1, (int)$_POST['quantity']);
-        $unit_data = [
+        $owned_id      = (int)$_GET['id'];
+        $item_name     = sanitizeInput($_POST['item_name']);
+        $qty           = max(1, (int)$_POST['quantity']);
+        $existing_item = findById(getUserOwnedItems(), $owned_id);
+        $user_id       = $existing_item['user_id'] ?? 0;
+        $group_id      = !empty($existing_item['group_id']) ? $existing_item['group_id'] : generateGroupId();
+        $unit_data     = [
             'item_name'     => $item_name,
             'category'      => sanitizeInput($_POST['category']),
             'description'   => sanitizeInput($_POST['description']),
@@ -97,12 +103,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'condition'     => sanitizeInput($_POST['condition']),
             'notes'         => sanitizeInput($_POST['notes']),
             'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
+            'group_id'      => $group_id,
         ];
-        // Update the existing unit row
+        // Update the existing unit row (also stamps group_id if it was missing)
         dbUpdateUserOwnedItem($owned_id, $unit_data);
-        // Create additional rows for extra units
-        $existing_item = findById(getUserOwnedItems(), $owned_id);
-        $user_id = $existing_item['user_id'] ?? 0;
+        // Create additional rows for extra units, all sharing the same group_id
         for ($u = 1; $u < $qty; $u++) {
             dbCreateUserOwnedItem(array_merge($unit_data, ['user_id' => $user_id]));
         }

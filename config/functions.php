@@ -80,6 +80,11 @@ function generateQRCodeId() {
     return 'QR-' . strtoupper(uniqid(sprintf("%08x", mt_rand())));
 }
 
+// Generate a group ID shared by all units added in the same batch
+function generateGroupId() {
+    return 'GRP-' . strtoupper(uniqid(sprintf("%06x", mt_rand())));
+}
+
 // Returns QR code(s) for an inventory item.
 // Items with quantity=1 (the new per-unit model) return their own QR code directly.
 // Legacy items with quantity>1 still get derived per-unit suffixes for backward compat.
@@ -94,23 +99,19 @@ function getItemUnitQRCodes($item) {
     return $units;
 }
 
-// Groups user-owned items by user_id + item_name + category.
+// Groups user-owned items. Uses group_id when present; falls back to item_name+category.
 function groupOwnedItems(array $items): array {
     $groups = [];
     foreach ($items as $item) {
-        $key = (int)$item['user_id']
-             . '||' . strtolower(trim($item['item_name']))
-             . '||' . strtolower(trim($item['category'] ?? ''));
+        $key = !empty($item['group_id'])
+            ? 'gid:' . $item['group_id']
+            : strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? ''));
         if (!isset($groups[$key])) {
             $groups[$key] = [
-                'user_id'     => (int)$item['user_id'],
+                'group_id'    => $item['group_id'] ?? null,
                 'item_name'   => $item['item_name'],
                 'category'    => $item['category'] ?? '',
-                'campus_id'   => (int)$item['campus_id'],
-                'year_owned'  => $item['year_owned'],
                 'description' => $item['description'] ?? '',
-                'notes'       => $item['notes'] ?? '',
-                'created_at'  => $item['created_at'] ?? '',
                 'units'       => [],
             ];
         }
@@ -119,16 +120,16 @@ function groupOwnedItems(array $items): array {
     return array_values($groups);
 }
 
-// Groups a flat array of inventory items by item_name + category + campus_id.
-// Each group has a 'units' key containing the individual item rows.
+// Groups inventory items. Uses group_id when present; falls back to item_name+category+campus_id.
 function groupInventoryItems(array $items): array {
     $groups = [];
     foreach ($items as $item) {
-        $key = strtolower(trim($item['item_name']))
-             . '||' . strtolower(trim($item['category'] ?? ''))
-             . '||' . (int)$item['campus_id'];
+        $key = !empty($item['group_id'])
+            ? 'gid:' . $item['group_id']
+            : strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? '')) . '||' . (int)$item['campus_id'];
         if (!isset($groups[$key])) {
             $groups[$key] = [
+                'group_id'    => $item['group_id'] ?? null,
                 'item_name'   => $item['item_name'],
                 'category'    => $item['category'] ?? '',
                 'campus_id'   => (int)$item['campus_id'],
