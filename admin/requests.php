@@ -459,23 +459,60 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
         ]);
 
         // Build per-unit QR data for sticker sheet
+        // New model: qr_code_id is stored on each request row at submission time.
+        // For multi-unit batches (qty > 1 → multiple request rows), find siblings
+        // submitted within 60 s by the same user for the same item group.
         $sticker_units = [];
-        if ($item) {
-            $group_id = $item['group_id'] ?? null;
-            $qty_req  = (int)($request['quantity_requested'] ?? 1);
-            if ($group_id) {
-                $group_items = array_values(array_filter(getInventory(), fn($i) => ($i['group_id'] ?? null) === $group_id));
-            } else {
-                $group_items = [$item];
+        $req_qr        = $request['qr_code_id'] ?? ($item['qr_code_id'] ?? null);
+        $group_id      = $item['group_id'] ?? null;
+        $qty_req       = (int)($request['quantity_requested'] ?? 1);
+
+        if ($request['request_type'] === 'borrow' && $group_id) {
+            // Gather all sibling borrow requests for the same item group submitted within 60 s
+            $req_ts  = strtotime($request['created_at']);
+            $seen_qr = [];
+            foreach (getRequests() as $sib) {
+                if ((int)$sib['user_id']    !== (int)$request['user_id']) continue;
+                if ($sib['request_type']    !== 'borrow') continue;
+                if (abs(strtotime($sib['created_at']) - $req_ts) > 60) continue;
+                // QR stored on the request row (new model) or fall back to inventory lookup
+                $sib_qr = $sib['qr_code_id'] ?? null;
+                if (!$sib_qr && !empty($sib['inventory_id'])) {
+                    $sib_inv = findById(getInventory(), (int)$sib['inventory_id']);
+                    if (!$sib_inv || ($sib_inv['group_id'] ?? null) !== $group_id) continue;
+                    $sib_qr = $sib_inv['qr_code_id'] ?? null;
+                    $sib_cond = $sib_inv['condition'] ?? 'N/A';
+                    $sib_loc  = $sib_inv['location']  ?? 'N/A';
+                } else {
+                    $sib_inv = !empty($sib['inventory_id']) ? findById(getInventory(), (int)$sib['inventory_id']) : null;
+                    if ($sib_inv && ($sib_inv['group_id'] ?? null) !== $group_id) continue;
+                    $sib_cond = $sib_inv['condition'] ?? ($item['condition'] ?? 'N/A');
+                    $sib_loc  = $sib_inv['location']  ?? ($item['location']  ?? 'N/A');
+                }
+                if (!$sib_qr || in_array($sib_qr, $seen_qr)) continue;
+                $seen_qr[]     = $sib_qr;
+                $sticker_units[] = ['qr' => $sib_qr, 'condition' => $sib_cond, 'location' => $sib_loc];
             }
-            // For qty > 1 (old model), cap to requested count; for qty=1 show just this unit
-            $units_to_show = $qty_req > 1 ? array_slice($group_items, 0, $qty_req) : [$item];
-            foreach ($units_to_show as $u) {
+        }
+
+        // Fall back: use the QR stored on this request (single-unit or non-borrow)
+        if (empty($sticker_units)) {
+            if ($req_qr) {
                 $sticker_units[] = [
-                    'qr'        => $u['qr_code_id'] ?? 'N/A',
-                    'condition' => $u['condition'] ?? 'N/A',
-                    'location'  => $u['location'] ?? 'N/A',
+                    'qr'        => $req_qr,
+                    'condition' => $item['condition'] ?? 'N/A',
+                    'location'  => $item['location']  ?? 'N/A',
                 ];
+                // Old single-row model: qty > 1 but only 1 QR → look up group for distinct QRs
+                if ($qty_req > 1 && $group_id) {
+                    $grp_items = array_values(array_filter(getInventory(), fn($i) => ($i['group_id'] ?? null) === $group_id));
+                    foreach (array_slice($grp_items, 0, $qty_req) as $gi) {
+                        $giqr = $gi['qr_code_id'] ?? null;
+                        if ($giqr && !in_array($giqr, array_column($sticker_units, 'qr'))) {
+                            $sticker_units[] = ['qr' => $giqr, 'condition' => $gi['condition'] ?? 'N/A', 'location' => $gi['location'] ?? 'N/A'];
+                        }
+                    }
+                }
             }
         }
 

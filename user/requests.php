@@ -45,31 +45,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
 
             if ($safe_type === 'borrow') {
-                $unit_ids  = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
-                $inv_id    = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
-                $ret_date  = !empty($entry['return_date']) ? $entry['return_date'] : null;
-                $reason    = sanitizeInput($entry['reason'] ?? '');
+                $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                $ret_date = !empty($entry['return_date']) ? $entry['return_date'] : null;
+                $reason   = sanitizeInput($entry['reason'] ?? '');
                 if (count($unit_ids) > 1) {
-                    // Create one request row per reserved unit
+                    // One request row per unit — each gets the unit's own QR code
+                    $all_inv = getInventory();
                     foreach ($unit_ids as $uid) {
+                        $unit_item      = findById($all_inv, (int)$uid);
+                        $unit_qr        = $unit_item['qr_code_id'] ?? generateQRCodeId();
                         $request_number = dbNextRequestNumber();
-                        $unit_payload = array_merge($payload, [
-                            'request_number'      => $request_number,
-                            'inventory_id'        => (int)$uid,
-                            'reason_for_request'  => $reason,
+                        $result = dbCreateRequest(array_merge($payload, [
+                            'request_number'       => $request_number,
+                            'inventory_id'         => (int)$uid,
+                            'qr_code_id'           => $unit_qr,
+                            'reason_for_request'   => $reason,
                             'expected_return_date' => $ret_date,
-                            'quantity_requested'  => 1,
-                        ]);
-                        $result = dbCreateRequest($unit_payload);
-                        if (!$result['success']) {
-                            $errors[] = $result['error'];
-                        } else {
-                            logActivity($current_user['id'], 'CREATE', "Submitted borrow request for unit #$uid", 'requests', $result['row']['id'] ?? 0);
-                        }
+                            'quantity_requested'   => 1,
+                        ]));
+                        if (!$result['success']) $errors[] = $result['error'];
+                        else logActivity($current_user['id'], 'CREATE', "Submitted borrow request for unit #$uid", 'requests', $result['row']['id'] ?? 0);
                     }
                     continue;
                 }
+                // Single-unit path: copy QR from the inventory unit
+                $single_item = $inv_id ? findById(getInventory(), $inv_id) : null;
                 $payload['inventory_id']         = $inv_id;
+                $payload['qr_code_id']           = $single_item['qr_code_id'] ?? generateQRCodeId();
                 $payload['reason_for_request']   = $reason;
                 $payload['expected_return_date']  = $ret_date;
                 $payload['quantity_requested']   = max(1, (int)($entry['qty'] ?? 1));
@@ -79,10 +82,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $payload['reason_for_request']  = sanitizeInput($entry['reason'] ?? '');
                 $payload['service_description'] = $name . ($qty > 1 ? ' - Qty: ' . $qty : '');
                 $payload['quantity_requested']  = $qty;
+                // Generate a unique QR for this item request
+                $payload['qr_code_id'] = generateQRCodeId();
             } elseif ($safe_type === 'service') {
                 $svc_type = sanitizeInput($entry['service_type'] ?? '');
                 $svc_desc = sanitizeInput($entry['description'] ?? '');
-                $payload['inventory_id']        = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
+                $svc_inv_id = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
+                $svc_item   = $svc_inv_id ? findById(getInventory(), $svc_inv_id) : null;
+                $payload['inventory_id']        = $svc_inv_id;
+                $payload['qr_code_id']          = $svc_item['qr_code_id'] ?? generateQRCodeId();
                 $payload['service_description'] = $svc_type ? "[$svc_type] $svc_desc" : $svc_desc;
                 $payload['quantity_requested']  = 1;
             }

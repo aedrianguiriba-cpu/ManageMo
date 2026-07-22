@@ -47,7 +47,10 @@ CREATE TABLE IF NOT EXISTS requests (
     request_number       TEXT UNIQUE NOT NULL,
     user_id              INT  NOT NULL,
     inventory_id         INT,
+    qr_code_id           TEXT,
     request_type         TEXT NOT NULL CHECK (request_type IN ('borrow','item','service')),
+-- Run in Supabase SQL Editor if table already exists:
+-- ALTER TABLE requests ADD COLUMN IF NOT EXISTS qr_code_id TEXT;
     urgency              TEXT NOT NULL DEFAULT 'medium'
                              CHECK (urgency IN ('low','medium','high','critical')),
     receiving_method     TEXT CHECK (receiving_method IN ('delivery','pickup')),
