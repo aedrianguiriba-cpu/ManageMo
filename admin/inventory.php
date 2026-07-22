@@ -104,8 +104,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get campuses for dropdown
+// Load shared data needed by multiple form views
 $campuses = getAllCampuses();
+$users    = getUsers();
 
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
@@ -487,7 +488,6 @@ displayMessage();
     
     // Get user owned items
     $owned_items = getUserOwnedItems();
-    $users = getUsers();
     
     usort($available_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($requested_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
