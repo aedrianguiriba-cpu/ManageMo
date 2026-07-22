@@ -86,19 +86,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'edit_owned') {
         $owned_id  = (int)$_GET['id'];
         $item_name = sanitizeInput($_POST['item_name']);
-        dbUpdateUserOwnedItem($owned_id, [
+        $qty       = max(1, (int)$_POST['quantity']);
+        $unit_data = [
             'item_name'     => $item_name,
             'category'      => sanitizeInput($_POST['category']),
             'description'   => sanitizeInput($_POST['description']),
             'campus_id'     => (int)$_POST['campus_id'],
             'year_owned'    => (int)$_POST['year_owned'] ?: null,
-            'quantity'      => max(1, (int)$_POST['quantity']),
+            'quantity'      => 1,
             'condition'     => sanitizeInput($_POST['condition']),
             'notes'         => sanitizeInput($_POST['notes']),
             'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
-        ]);
-        logActivity($current_user['id'], 'UPDATE', "Updated user-owned item: $item_name", 'user_owned_items', $owned_id);
-        redirectWithMessage('inventory.php?tab=owned', 'Item updated successfully!', 'success');
+        ];
+        // Update the existing unit row
+        dbUpdateUserOwnedItem($owned_id, $unit_data);
+        // Create additional rows for extra units
+        $existing_item = findById(getUserOwnedItems(), $owned_id);
+        $user_id = $existing_item['user_id'] ?? 0;
+        for ($u = 1; $u < $qty; $u++) {
+            dbCreateUserOwnedItem(array_merge($unit_data, ['user_id' => $user_id]));
+        }
+        $msg = $qty > 1 ? "Unit updated and " . ($qty - 1) . " new unit(s) added for '$item_name'." : "Item updated successfully!";
+        logActivity($current_user['id'], 'UPDATE', "Updated user-owned item: $item_name (qty: $qty)", 'user_owned_items', $owned_id);
+        redirectWithMessage('inventory.php?tab=owned', $msg, 'success');
 
     } elseif ($action === 'edit') {
         $inventory_id = (int)$_GET['id'];
