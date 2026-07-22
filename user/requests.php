@@ -73,14 +73,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($safe_type === 'borrow') {
                     $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
                     $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                    $qty      = max(1, (int)($entry['qty'] ?? 1));
+
                     if (count($unit_ids) >= 1) {
-                        // One request_item per reserved unit, each with its own QR
-                        foreach ($unit_ids as $uid) {
-                            $unit_item = findById($all_inv, (int)$uid);
-                            $unit_qr   = $unit_item['qr_code_id'] ?? generateQRCodeId();
+                        // Create one request_item per quantity; use specific unit IDs where available,
+                        // then fall back to the first inventory_id with a new QR (old single-row model)
+                        $fallback_item = findById($all_inv, (int)$unit_ids[0]);
+                        for ($q = 0; $q < $qty; $q++) {
+                            $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : (int)$unit_ids[0];
+                            $unit_item = findById($all_inv, $uid) ?? $fallback_item;
+                            // Only reuse the stored QR for the first occurrence of this uid
+                            $use_stored_qr = isset($unit_ids[$q]);
+                            $unit_qr   = ($use_stored_qr && $unit_item && $unit_item['qr_code_id'])
+                                         ? $unit_item['qr_code_id']
+                                         : generateQRCodeId();
                             $ri = dbCreateRequestItem([
                                 'request_id'   => $req_id,
-                                'inventory_id' => (int)$uid,
+                                'inventory_id' => $uid,
                                 'qr_code_id'   => $unit_qr,
                                 'item_name'    => $unit_item['item_name'] ?? $entry['name'] ?? 'Unknown',
                                 'quantity'     => 1,
@@ -89,14 +98,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $total_qty++;
                         }
                     } else {
-                        // No unit IDs provided — create one request_item per quantity unit
+                        // No unit IDs — create one request_item per quantity unit
                         $single_item = $inv_id ? findById($all_inv, $inv_id) : null;
-                        $qty = max(1, (int)($entry['qty'] ?? 1));
                         for ($q = 0; $q < $qty; $q++) {
                             dbCreateRequestItem([
                                 'request_id'   => $req_id,
                                 'inventory_id' => $inv_id,
-                                'qr_code_id'   => $single_item['qr_code_id'] ?? generateQRCodeId(),
+                                'qr_code_id'   => ($q === 0 && $single_item && $single_item['qr_code_id'])
+                                                  ? $single_item['qr_code_id']
+                                                  : generateQRCodeId(),
                                 'item_name'    => $single_item['item_name'] ?? $entry['name'] ?? 'Unknown',
                                 'quantity'     => 1,
                             ]);
@@ -104,15 +114,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $total_qty += $qty;
                     }
                 } elseif ($safe_type === 'item') {
-                    $name = sanitizeInput($entry['name'] ?? '');
-                    $qty  = max(1, (int)($entry['qty'] ?? 1));
-                    // Each requested item gets its own QR code for tracking
+                    $name     = sanitizeInput($entry['name'] ?? '');
+                    $qty      = max(1, (int)($entry['qty'] ?? 1));
+                    $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                    $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                    // Each unit gets its own QR; link to the matching inventory unit when available
                     for ($q = 0; $q < $qty; $q++) {
+                        $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
+                        $unit_item = $uid ? findById($all_inv, $uid) : null;
                         dbCreateRequestItem([
                             'request_id'   => $req_id,
-                            'inventory_id' => null,
+                            'inventory_id' => $uid,
                             'qr_code_id'   => generateQRCodeId(),
-                            'item_name'    => $name,
+                            'item_name'    => $unit_item['item_name'] ?? $name,
                             'quantity'     => 1,
                         ]);
                     }
@@ -1159,6 +1173,9 @@ if (!empty($submit_error)): ?>
                                      data-category="<?php echo htmlspecialchars($category); ?>"
                                      data-desc="<?php echo htmlspecialchars($desc); ?>"
                                      data-total="<?php echo $totalUnits; ?>"
+                                     data-first-unit-id="<?php echo $firstUnit['id']; ?>"
+                                     data-group-id="<?php echo htmlspecialchars($ci['group_id'] ?? ''); ?>"
+                                     data-unit-ids="<?php echo htmlspecialchars(json_encode(array_column($ci['units'], 'id'))); ?>"
                                      onclick="selectItemReqCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
                                     <div class="bshop-avail-badge bshop-avail-ok"><?php echo $totalUnits; ?> unit<?php echo $totalUnits > 1 ? 's' : ''; ?></div>
@@ -1837,7 +1854,12 @@ function addToCart() {
         if (!name2) { showCartError('Please select or enter an item name.'); return; }
         var qty2 = parseInt(document.getElementById('quantity').value) || 1;
         var reason2 = document.getElementById('item_reason').value.trim();
-        entry = { type:'item', name:name2, qty:qty2, reason:reason2 };
+        var itemCard = document.querySelector('#ishop-grid .bshop-card.bshop-selected');
+        var itemUnitIdsRaw = itemCard ? (itemCard.getAttribute('data-unit-ids') || '[]') : '[]';
+        var itemUnitIds = [];
+        try { itemUnitIds = JSON.parse(itemUnitIdsRaw); } catch(e) { itemUnitIds = []; }
+        var itemFirstUnitId = itemCard ? (itemCard.getAttribute('data-first-unit-id') || '') : '';
+        entry = { type:'item', name:name2, qty:qty2, reason:reason2, inventory_id:itemFirstUnitId, unit_ids:itemUnitIds };
     } else {
         var itemSel = document.getElementById('item_id');
         if (!itemSel.value) { showCartError('Please select an item requiring service.'); return; }
