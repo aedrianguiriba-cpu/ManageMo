@@ -16,23 +16,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action_type = sanitizeInput($_POST['action']);
 
     if ($action_type === 'approve') {
-        $req = findById(getRequests(), $request_id);
+        $req   = findById(getRequests(), $request_id);
+        $items = getRequestItems($request_id);
         dbUpdateRequest($request_id, ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
-        if ($req && $req['request_type'] === 'borrow' && !empty($req['inventory_id'])) {
-            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'requested']);
-        } elseif ($req && $req['request_type'] === 'service' && !empty($req['inventory_id'])) {
-            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'maintenance']);
+        foreach ($items as $ri) {
+            if (empty($ri['inventory_id'])) continue;
+            if ($req['request_type'] === 'borrow')  dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'requested']);
+            if ($req['request_type'] === 'service') dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'maintenance']);
         }
         logActivity($current_user['id'], 'APPROVE', "Approved request #$request_id", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request approved successfully!', 'success');
 
     } elseif ($action_type === 'disapprove') {
-        $req = findById(getRequests(), $request_id);
+        $req   = findById(getRequests(), $request_id);
+        $items = getRequestItems($request_id);
         dbUpdateRequest($request_id, ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
-        if ($req && in_array($req['request_type'], ['borrow', 'service']) && !empty($req['inventory_id'])) {
-            $inv = findById(getInventory(), (int)$req['inventory_id']);
-            if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
-                dbUpdateInventory((int)$req['inventory_id'], ['status' => 'available']);
+        if (in_array($req['request_type'], ['borrow', 'service'])) {
+            foreach ($items as $ri) {
+                if (empty($ri['inventory_id'])) continue;
+                $inv = findById(getInventory(), (int)$ri['inventory_id']);
+                if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
+                    dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'available']);
+                }
             }
         }
         logActivity($current_user['id'], 'DISAPPROVE', "Disapproved request #$request_id", 'requests', $request_id);
@@ -61,49 +66,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWithMessage('requests.php?action=view&id=' . $request_id, $label, 'success');
 
     } elseif ($action_type === 'mark_delivered') {
-        $req = findById(getRequests(), $request_id);
+        $req   = findById(getRequests(), $request_id);
+        $items = getRequestItems($request_id);
         dbUpdateRequest($request_id, ['delivery_status' => 'delivered', 'status' => 'delivered']);
-        if ($req && $req['request_type'] === 'borrow' && !empty($req['inventory_id'])) {
-            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'borrowed']);
-            dbCreateBorrowRecord([
-                'user_id'              => (int)$req['user_id'],
-                'inventory_id'         => (int)$req['inventory_id'],
-                'request_id'           => $request_id,
-                'borrow_date'          => date('Y-m-d'),
-                'expected_return_date' => $req['expected_return_date'] ?? null,
-                'status'               => 'active',
-                'notes'                => $req['reason_for_request'] ?? null,
-            ]);
+        if ($req && $req['request_type'] === 'borrow') {
+            foreach ($items as $ri) {
+                if (empty($ri['inventory_id'])) continue;
+                dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'borrowed']);
+                dbCreateBorrowRecord([
+                    'user_id'              => (int)$req['user_id'],
+                    'inventory_id'         => (int)$ri['inventory_id'],
+                    'request_id'           => $request_id,
+                    'borrow_date'          => date('Y-m-d'),
+                    'expected_return_date' => $req['expected_return_date'] ?? null,
+                    'status'               => 'active',
+                    'notes'                => $req['reason_for_request'] ?? null,
+                ]);
+            }
         }
         logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as delivered", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request marked as Delivered.', 'success');
 
     } elseif ($action_type === 'mark_returned') {
-        $req = findById(getRequests(), $request_id);
-        if ($req && $req['request_type'] === 'borrow' && !empty($req['inventory_id'])) {
-            // Mark borrow record returned
+        $req   = findById(getRequests(), $request_id);
+        $items = getRequestItems($request_id);
+        if ($req && $req['request_type'] === 'borrow') {
             $borrow_records = getBorrowRecords();
             foreach ($borrow_records as $br) {
                 if ((int)$br['request_id'] === $request_id && $br['status'] === 'active') {
-                    dbUpdateRequest($br['id'], []); // placeholder — use supabase directly
                     supabase()->updateById('borrow_records', (int)$br['id'], [
                         'status'             => 'returned',
                         'actual_return_date' => date('Y-m-d'),
                     ]);
                     clearDataCache('borrow_records');
-                    break;
                 }
             }
-            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'available']);
+            foreach ($items as $ri) {
+                if (empty($ri['inventory_id'])) continue;
+                dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'available']);
+            }
         }
         dbUpdateRequest($request_id, ['status' => 'completed']);
         logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as returned/completed", 'requests', $request_id);
         redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Item returned and request completed.', 'success');
 
     } elseif ($action_type === 'mark_completed') {
-        $req = findById(getRequests(), $request_id);
-        if ($req && $req['request_type'] === 'service' && !empty($req['inventory_id'])) {
-            dbUpdateInventory((int)$req['inventory_id'], ['status' => 'available']);
+        $req   = findById(getRequests(), $request_id);
+        $items = getRequestItems($request_id);
+        if ($req && in_array($req['request_type'], ['service', 'item'])) {
+            foreach ($items as $ri) {
+                if (empty($ri['inventory_id'])) continue;
+                dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'available']);
+            }
         }
         dbUpdateRequest($request_id, ['status' => 'completed']);
         logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as completed", 'requests', $request_id);
@@ -458,61 +472,29 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             'request_number' => $request['request_number'] ?? 'REQ-' . str_pad($request['id'], 5, '0', STR_PAD_LEFT),
         ]);
 
-        // Build per-unit QR data for sticker sheet
-        // New model: qr_code_id is stored on each request row at submission time.
-        // For multi-unit batches (qty > 1 → multiple request rows), find siblings
-        // submitted within 60 s by the same user for the same item group.
+        // Build per-unit QR sticker data from request_items (one entry per physical unit)
         $sticker_units = [];
-        $req_qr        = $request['qr_code_id'] ?? ($item['qr_code_id'] ?? null);
-        $group_id      = $item['group_id'] ?? null;
-        $qty_req       = (int)($request['quantity_requested'] ?? 1);
-
-        if ($request['request_type'] === 'borrow' && $group_id) {
-            // Gather all sibling borrow requests for the same item group submitted within 60 s
-            $req_ts  = strtotime($request['created_at']);
-            $seen_qr = [];
-            foreach (getRequests() as $sib) {
-                if ((int)$sib['user_id']    !== (int)$request['user_id']) continue;
-                if ($sib['request_type']    !== 'borrow') continue;
-                if (abs(strtotime($sib['created_at']) - $req_ts) > 60) continue;
-                // QR stored on the request row (new model) or fall back to inventory lookup
-                $sib_qr = $sib['qr_code_id'] ?? null;
-                if (!$sib_qr && !empty($sib['inventory_id'])) {
-                    $sib_inv = findById(getInventory(), (int)$sib['inventory_id']);
-                    if (!$sib_inv || ($sib_inv['group_id'] ?? null) !== $group_id) continue;
-                    $sib_qr = $sib_inv['qr_code_id'] ?? null;
-                    $sib_cond = $sib_inv['condition'] ?? 'N/A';
-                    $sib_loc  = $sib_inv['location']  ?? 'N/A';
-                } else {
-                    $sib_inv = !empty($sib['inventory_id']) ? findById(getInventory(), (int)$sib['inventory_id']) : null;
-                    if ($sib_inv && ($sib_inv['group_id'] ?? null) !== $group_id) continue;
-                    $sib_cond = $sib_inv['condition'] ?? ($item['condition'] ?? 'N/A');
-                    $sib_loc  = $sib_inv['location']  ?? ($item['location']  ?? 'N/A');
-                }
-                if (!$sib_qr || in_array($sib_qr, $seen_qr)) continue;
-                $seen_qr[]     = $sib_qr;
-                $sticker_units[] = ['qr' => $sib_qr, 'condition' => $sib_cond, 'location' => $sib_loc];
-            }
+        foreach (getRequestItems($request['id']) as $ri) {
+            $ri_qr  = $ri['qr_code_id'] ?? null;
+            if (!$ri_qr) continue;
+            $ri_inv = !empty($ri['inventory_id']) ? findById(getInventory(), (int)$ri['inventory_id']) : null;
+            $sticker_units[] = [
+                'qr'        => $ri_qr,
+                'item_name' => $ri['item_name'] ?? ($ri_inv['item_name'] ?? ($item['item_name'] ?? 'N/A')),
+                'condition' => $ri_inv['condition'] ?? ($item['condition'] ?? 'N/A'),
+                'location'  => $ri_inv['location']  ?? ($item['location']  ?? 'N/A'),
+            ];
         }
-
-        // Fall back: use the QR stored on this request (single-unit or non-borrow)
+        // Fallback for legacy requests with no request_items rows
         if (empty($sticker_units)) {
-            if ($req_qr) {
+            $fb_qr = $request['qr_code_id'] ?? ($item['qr_code_id'] ?? null);
+            if ($fb_qr) {
                 $sticker_units[] = [
-                    'qr'        => $req_qr,
+                    'qr'        => $fb_qr,
+                    'item_name' => $item['item_name'] ?? 'N/A',
                     'condition' => $item['condition'] ?? 'N/A',
                     'location'  => $item['location']  ?? 'N/A',
                 ];
-                // Old single-row model: qty > 1 but only 1 QR → look up group for distinct QRs
-                if ($qty_req > 1 && $group_id) {
-                    $grp_items = array_values(array_filter(getInventory(), fn($i) => ($i['group_id'] ?? null) === $group_id));
-                    foreach (array_slice($grp_items, 0, $qty_req) as $gi) {
-                        $giqr = $gi['qr_code_id'] ?? null;
-                        if ($giqr && !in_array($giqr, array_column($sticker_units, 'qr'))) {
-                            $sticker_units[] = ['qr' => $giqr, 'condition' => $gi['condition'] ?? 'N/A', 'location' => $gi['location'] ?? 'N/A'];
-                        }
-                    }
-                }
             }
         }
 
@@ -691,18 +673,52 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             </div>
         </div>
 
-        <?php if ($request['request_type'] === 'borrow'): ?>
+        <?php
+        $detail_items = getRequestItems($request['id']);
+        if (!empty($detail_items)):
+        ?>
+        <div class="ar-card mb-3">
+            <div class="ar-section-label"><?php echo ucfirst($request['request_type']); ?> Items <span style="font-weight:400;color:#bbb;">(<?php echo count($detail_items); ?> unit<?php echo count($detail_items) !== 1 ? 's' : ''; ?>)</span></div>
+            <?php if ($request['request_type'] === 'borrow' && !empty($request['expected_return_date'])): ?>
+            <p style="font-size:.85rem;color:#555;margin-bottom:12px;"><strong>Expected Return:</strong> <?php echo formatDate($request['expected_return_date']); ?></p>
+            <?php endif; ?>
+            <table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+                <thead>
+                    <tr style="background:#f7f7f7;">
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">#</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">Item</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">QR Code</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">Inventory ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($detail_items as $di_idx => $di): ?>
+                    <tr style="border-bottom:1px solid #f0f0f0;">
+                        <td style="padding:8px 10px;color:#999;font-size:.75rem;"><?php echo $di_idx + 1; ?></td>
+                        <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?></td>
+                        <td style="padding:8px 10px;">
+                            <?php if (!empty($di['qr_code_id'])): ?>
+                            <span style="font-family:monospace;background:rgba(139,0,0,0.07);color:#8B0000;border-radius:5px;padding:2px 7px;font-size:.77rem;"><?php echo htmlspecialchars($di['qr_code_id']); ?></span>
+                            <?php else: ?>
+                            <span style="color:#bbb;font-size:.77rem;">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="padding:8px 10px;color:#777;font-size:.77rem;"><?php echo $di['inventory_id'] ? '#' . $di['inventory_id'] : '—'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php elseif ($request['request_type'] === 'borrow'): ?>
         <div class="ar-card mb-3">
             <div class="ar-section-label">Borrow Details</div>
-            <div class="row">
-                <div class="col-md-6 ar-info-row">
-                    <p><strong>Item:</strong><?php echo htmlspecialchars($request['item_name']); ?></p>
-                    <p><strong>QR Code:</strong><span style="font-family:monospace;background:rgba(139,0,0,0.07);color:#8B0000;border-radius:5px;padding:1px 6px;font-size:0.8rem;"><?php echo htmlspecialchars($request['qr_code_id']); ?></span></p>
-                    <p><strong>Quantity:</strong><span style="font-weight:800;color:#8B0000;"><?php echo (int)$request['quantity_requested']; ?></span> <span style="font-size:.75rem;color:rgba(0,0,0,.4);">unit(s)</span></p>
-                </div>
-                <div class="col-md-6 ar-info-row">
-                    <p><strong>Expected Return:</strong><?php echo $request['expected_return_date'] ? formatDate($request['expected_return_date']) : 'Not specified'; ?></p>
-                </div>
+            <div class="ar-info-row">
+                <p><strong>Item:</strong><?php echo htmlspecialchars($request['item_name']); ?></p>
+                <p><strong>QR Code:</strong><span style="font-family:monospace;background:rgba(139,0,0,0.07);color:#8B0000;border-radius:5px;padding:1px 6px;font-size:0.8rem;"><?php echo htmlspecialchars($request['qr_code_id']); ?></span></p>
+                <p><strong>Quantity:</strong><span style="font-weight:800;color:#8B0000;"><?php echo (int)$request['quantity_requested']; ?></span> <span style="font-size:.75rem;color:rgba(0,0,0,.4);">unit(s)</span></p>
+                <?php if (!empty($request['expected_return_date'])): ?>
+                <p><strong>Expected Return:</strong><?php echo formatDate($request['expected_return_date']); ?></p>
+                <?php endif; ?>
             </div>
         </div>
         <?php endif; ?>
@@ -844,16 +860,17 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
         var _unitQRs = <?php echo json_encode(array_values($sticker_units)); ?>;
 
         function _buildSticker(unit, unitNum, totalUnits) {
-            var qr  = unit ? unit.qr  : <?php echo json_encode($request['qr_code_id']); ?>;
-            var loc = unit ? unit.location  : <?php echo json_encode($request['item_location']); ?>;
-            var cond= unit ? unit.condition : <?php echo json_encode($request['item_condition']); ?>;
+            var qr       = unit ? unit.qr        : <?php echo json_encode($request['qr_code_id']); ?>;
+            var loc      = unit ? unit.location   : <?php echo json_encode($request['item_location']); ?>;
+            var cond     = unit ? unit.condition  : <?php echo json_encode($request['item_condition']); ?>;
+            var itemName = (unit && unit.item_name) ? unit.item_name : _sd.item;
             var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(qr);
             var unitLabel = totalUnits > 1 ? ' (Unit ' + unitNum + ' of ' + totalUnits + ')' : '';
             return '<div class="ar-sticker">'
                 + '<div class="ar-sticker-top">' + _sd.short + ' &mdash; Asset Label<span>' + _sd.institution + '</span></div>'
                 + '<div class="ar-sticker-qr"><img src="' + qrUrl + '" alt="QR" loading="eager" width="90" height="90"></div>'
                 + '<div class="ar-sticker-body">'
-                +   '<div class="ar-sticker-name">' + _esc(_sd.item) + _esc(unitLabel) + '</div>'
+                +   '<div class="ar-sticker-name">' + _esc(itemName) + _esc(unitLabel) + '</div>'
                 +   '<div class="ar-sticker-row"><strong>Location:</strong><span>' + _esc(loc) + '</span></div>'
                 +   '<div class="ar-sticker-row"><strong>Category:</strong><span>' + _esc(_sd.category) + '</span></div>'
                 +   '<div class="ar-sticker-row"><strong>Condition:</strong><span>' + _esc(cond) + '</span></div>'

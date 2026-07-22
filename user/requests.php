@@ -32,82 +32,110 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_array($cart_items) || empty($cart_items)) {
         $submit_error = 'No items in your request. Please add at least one item.';
     } else {
-        $errors = [];
-        foreach ($cart_items as $entry) {
-            $request_number = dbNextRequestNumber();
-            $payload = [
-                'request_number'   => $request_number,
-                'user_id'          => $current_user['id'],
-                'request_type'     => $safe_type,
-                'urgency'          => $urgency,
-                'receiving_method' => $receiving_method,
-                'status'           => 'pending',
-            ];
+        $errors  = [];
+        $all_inv = getInventory();
 
-            if ($safe_type === 'borrow') {
-                $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
-                $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
-                $ret_date = !empty($entry['return_date']) ? $entry['return_date'] : null;
-                $reason   = sanitizeInput($entry['reason'] ?? '');
-                if (count($unit_ids) > 1) {
-                    // One request row per unit — each gets the unit's own QR code
-                    $all_inv = getInventory();
-                    foreach ($unit_ids as $uid) {
-                        $unit_item      = findById($all_inv, (int)$uid);
-                        $unit_qr        = $unit_item['qr_code_id'] ?? generateQRCodeId();
-                        $request_number = dbNextRequestNumber();
-                        $result = dbCreateRequest(array_merge($payload, [
-                            'request_number'       => $request_number,
-                            'inventory_id'         => (int)$uid,
-                            'qr_code_id'           => $unit_qr,
-                            'reason_for_request'   => $reason,
-                            'expected_return_date' => $ret_date,
-                            'quantity_requested'   => 1,
-                        ]));
-                        if (!$result['success']) $errors[] = $result['error'];
-                        else logActivity($current_user['id'], 'CREATE', "Submitted borrow request for unit #$uid", 'requests', $result['row']['id'] ?? 0);
-                    }
-                    continue;
-                }
-                // Single-unit path: copy QR from the inventory unit
-                $single_item = $inv_id ? findById(getInventory(), $inv_id) : null;
-                $payload['inventory_id']         = $inv_id;
-                $payload['qr_code_id']           = $single_item['qr_code_id'] ?? generateQRCodeId();
-                $payload['reason_for_request']   = $reason;
-                $payload['expected_return_date']  = $ret_date;
-                $payload['quantity_requested']   = max(1, (int)($entry['qty'] ?? 1));
-            } elseif ($safe_type === 'item') {
-                $name = sanitizeInput($entry['name'] ?? '');
-                $qty  = max(1, (int)($entry['qty'] ?? 1));
-                $payload['reason_for_request']  = sanitizeInput($entry['reason'] ?? '');
-                $payload['service_description'] = $name . ($qty > 1 ? ' - Qty: ' . $qty : '');
-                $payload['quantity_requested']  = $qty;
-                // Generate a unique QR for this item request
-                $payload['qr_code_id'] = generateQRCodeId();
-            } elseif ($safe_type === 'service') {
-                $svc_type = sanitizeInput($entry['service_type'] ?? '');
-                $svc_desc = sanitizeInput($entry['description'] ?? '');
-                $svc_inv_id = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
-                $svc_item   = $svc_inv_id ? findById(getInventory(), $svc_inv_id) : null;
-                $payload['inventory_id']        = $svc_inv_id;
-                $payload['qr_code_id']          = $svc_item['qr_code_id'] ?? generateQRCodeId();
-                $payload['service_description'] = $svc_type ? "[$svc_type] $svc_desc" : $svc_desc;
-                $payload['quantity_requested']  = 1;
-            }
+        // One request per cart submission; all cart items become request_items rows
+        $request_number = dbNextRequestNumber();
+        $payload = [
+            'request_number'   => $request_number,
+            'user_id'          => $current_user['id'],
+            'request_type'     => $safe_type,
+            'urgency'          => $urgency,
+            'receiving_method' => $receiving_method,
+            'status'           => 'pending',
+            'quantity_requested' => 0, // will sum below
+        ];
 
-            $result = dbCreateRequest($payload);
-            if (!$result['success']) {
-                $errors[] = $result['error'];
-            } else {
-                logActivity($current_user['id'], 'CREATE', "Submitted $safe_type request", 'requests', $result['row']['id'] ?? 0);
-            }
+        // Collect shared fields from the first entry (return date, reason)
+        $first = $cart_items[0];
+        if ($safe_type === 'borrow') {
+            $payload['reason_for_request']   = sanitizeInput($first['reason'] ?? '');
+            $payload['expected_return_date'] = !empty($first['return_date']) ? $first['return_date'] : null;
+        } elseif ($safe_type === 'item') {
+            $payload['reason_for_request'] = sanitizeInput($first['reason'] ?? '');
+        } elseif ($safe_type === 'service') {
+            $svc_type = sanitizeInput($first['service_type'] ?? '');
+            $svc_desc = sanitizeInput($first['description'] ?? '');
+            $payload['service_description'] = $svc_type ? "[$svc_type] $svc_desc" : $svc_desc;
         }
 
-        if (empty($errors)) {
-            $count = count($cart_items);
-            redirectWithMessage('my-requests.php', ($count > 1 ? $count . ' requests' : 'Request') . ' submitted successfully!', 'success');
+        $result = dbCreateRequest($payload);
+        if (!$result['success']) {
+            $submit_error = 'Failed to create request: ' . $result['error'];
         } else {
-            $submit_error = 'Some requests failed to save: ' . implode('; ', $errors);
+            $req_id     = (int)($result['row']['id'] ?? 0);
+            $total_qty  = 0;
+
+            foreach ($cart_items as $entry) {
+                if ($safe_type === 'borrow') {
+                    $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                    $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                    if (count($unit_ids) >= 1) {
+                        // One request_item per reserved unit, each with its own QR
+                        foreach ($unit_ids as $uid) {
+                            $unit_item = findById($all_inv, (int)$uid);
+                            $unit_qr   = $unit_item['qr_code_id'] ?? generateQRCodeId();
+                            $ri = dbCreateRequestItem([
+                                'request_id'   => $req_id,
+                                'inventory_id' => (int)$uid,
+                                'qr_code_id'   => $unit_qr,
+                                'item_name'    => $unit_item['item_name'] ?? $entry['name'] ?? 'Unknown',
+                                'quantity'     => 1,
+                            ]);
+                            if (!$ri) $errors[] = "Failed to save unit #$uid";
+                            $total_qty++;
+                        }
+                    } else {
+                        // Custom/no-unit borrow
+                        $single_item = $inv_id ? findById($all_inv, $inv_id) : null;
+                        $qty = max(1, (int)($entry['qty'] ?? 1));
+                        dbCreateRequestItem([
+                            'request_id'   => $req_id,
+                            'inventory_id' => $inv_id,
+                            'qr_code_id'   => $single_item['qr_code_id'] ?? generateQRCodeId(),
+                            'item_name'    => $single_item['item_name'] ?? $entry['name'] ?? 'Unknown',
+                            'quantity'     => $qty,
+                        ]);
+                        $total_qty += $qty;
+                    }
+                } elseif ($safe_type === 'item') {
+                    $name = sanitizeInput($entry['name'] ?? '');
+                    $qty  = max(1, (int)($entry['qty'] ?? 1));
+                    // Each requested item gets its own QR code for tracking
+                    for ($q = 0; $q < $qty; $q++) {
+                        dbCreateRequestItem([
+                            'request_id'   => $req_id,
+                            'inventory_id' => null,
+                            'qr_code_id'   => generateQRCodeId(),
+                            'item_name'    => $name,
+                            'quantity'     => 1,
+                        ]);
+                    }
+                    $total_qty += $qty;
+                } elseif ($safe_type === 'service') {
+                    $svc_inv_id = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
+                    $svc_item   = $svc_inv_id ? findById($all_inv, $svc_inv_id) : null;
+                    dbCreateRequestItem([
+                        'request_id'   => $req_id,
+                        'inventory_id' => $svc_inv_id,
+                        'qr_code_id'   => $svc_item['qr_code_id'] ?? generateQRCodeId(),
+                        'item_name'    => $svc_item['item_name'] ?? 'Service Item',
+                        'quantity'     => 1,
+                    ]);
+                    $total_qty++;
+                }
+            }
+
+            // Stamp total quantity on the request
+            dbUpdateRequest($req_id, ['quantity_requested' => $total_qty]);
+            logActivity($current_user['id'], 'CREATE', "Submitted $safe_type request ($total_qty item(s))", 'requests', $req_id);
+
+            if (empty($errors)) {
+                redirectWithMessage('my-requests.php', 'Request ' . $request_number . ' submitted with ' . $total_qty . ' item(s)!', 'success');
+            } else {
+                $submit_error = 'Request saved but some items failed: ' . implode('; ', $errors);
+            }
         }
     }
 }

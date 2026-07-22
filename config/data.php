@@ -120,6 +120,23 @@ function getRequests(): array {
     });
 }
 
+// ── Request Items ─────────────────────────────────────────────────────────────
+
+function getRequestItems(int $request_id = 0): array {
+    if ($request_id > 0) {
+        $rows = supabase()->select('request_items', 'request_id=eq.' . $request_id . '&order=id.asc');
+    } else {
+        $rows = supabase()->select('request_items', 'order=id.asc');
+    }
+    if (!is_array($rows)) return [];
+    return array_map(fn($r) => array_merge($r, [
+        'id'           => (int)$r['id'],
+        'request_id'   => (int)$r['request_id'],
+        'inventory_id' => $r['inventory_id'] !== null ? (int)$r['inventory_id'] : null,
+        'quantity'     => (int)$r['quantity'],
+    ]), $rows);
+}
+
 // ── Borrow Records ────────────────────────────────────────────────────────────
 
 function getBorrowRecords(): array {

@@ -287,6 +287,11 @@ function dbUpdateUser(int $id, array $data): bool {
     return !empty($rows);
 }
 
+function dbCreateRequestItem(array $data): ?array {
+    $rows = supabase()->insert('request_items', $data);
+    return $rows[0] ?? null;
+}
+
 function dbCreateBorrowRecord(array $data): ?array {
     $rows = supabase()->insert('borrow_records', $data);
     clearDataCache('borrow_records');

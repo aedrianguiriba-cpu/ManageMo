@@ -67,6 +67,19 @@ CREATE TABLE IF NOT EXISTS requests (
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS request_items (
+    id           BIGSERIAL PRIMARY KEY,
+    request_id   INT  NOT NULL,
+    inventory_id INT,
+    qr_code_id   TEXT,
+    item_name    TEXT NOT NULL,
+    quantity     INT  NOT NULL DEFAULT 1,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Run in Supabase SQL Editor if table already exists:
+-- CREATE TABLE IF NOT EXISTS request_items (id BIGSERIAL PRIMARY KEY, request_id INT NOT NULL, inventory_id INT, qr_code_id TEXT, item_name TEXT NOT NULL, quantity INT NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+-- ALTER TABLE request_items DISABLE ROW LEVEL SECURITY;
+
 CREATE TABLE IF NOT EXISTS borrow_records (
     id                   BIGSERIAL PRIMARY KEY,
     user_id              INT  NOT NULL,
