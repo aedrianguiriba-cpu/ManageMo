@@ -90,17 +90,15 @@ $all_inventory  = getInventory();
 $inventory_items = filterByColumn($all_inventory, 'campus_id', $campus_id);
 usort($inventory_items, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
 
-// Item request catalog — all inventory items regardless of status
+// Item request catalog — all inventory items, grouped
 $all_sorted = $all_inventory;
 usort($all_sorted, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
-
 $catalog_by_category = [];
-foreach ($all_sorted as $item) {
-    $category = $item['category'] ?? 'Other';
-    $catalog_by_category[$category][] = $item;
+foreach (groupInventoryItems($all_sorted) as $group) {
+    $catalog_by_category[$group['category'] ?: 'Other'][] = $group;
 }
 
-// Borrow catalog includes available + borrowed items so users can see upcoming availability
+// Borrow catalog: available + borrowed items, grouped
 $borrow_records_all = getBorrowRecords();
 $item_avail_data = [];
 foreach ($borrow_records_all as $br) {
@@ -115,15 +113,23 @@ foreach ($borrow_records_all as $br) {
 }
 $item_avail_json = json_encode($item_avail_data);
 
-$borrow_catalog = [];
-$borrowable = array_filter($all_inventory, function($item) {
+$borrowable = array_values(array_filter($all_inventory, function($item) {
     return in_array($item['status'], ['available', 'borrowed']);
-});
+}));
 usort($borrowable, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
-foreach ($borrowable as $item) {
-    $cat = $item['category'] ?? 'Other';
-    if (!isset($borrow_catalog[$cat])) $borrow_catalog[$cat] = [];
-    $borrow_catalog[$cat][] = $item;
+$borrow_catalog = [];
+foreach (groupInventoryItems($borrowable) as $group) {
+    // Precompute per-group availability
+    $avail_units = array_values(array_filter($group['units'], fn($u) => $u['status'] === 'available'));
+    $group['available_count']    = count($avail_units);
+    $group['first_available_id'] = ($avail_units[0] ?? $group['units'][0])['id'];
+    // Aggregate return dates across all units
+    $group_ret = [];
+    foreach ($group['units'] as $u) {
+        foreach ($item_avail_data[$u['id']] ?? [] as $r) $group_ret[] = $r;
+    }
+    $group['return_records'] = $group_ret;
+    $borrow_catalog[$group['category'] ?: 'Other'][] = $group;
 }
 
 displayMessage();
@@ -891,20 +897,15 @@ if (!empty($submit_error)): ?>
                         <!-- Hidden select (drives existing JS logic unchanged) -->
                         <select id="borrow_catalog_select" name="borrow_item_name" style="display:none;" required>
                             <option value="">— Select an item —</option>
-                            <?php foreach ($borrow_catalog as $category => $items):
-                                if (!count($items)) continue; ?>
+                            <?php foreach ($borrow_catalog as $category => $groups):
+                                if (!count($groups)) continue; ?>
                             <optgroup label="<?php echo htmlspecialchars($category); ?>">
-                                <?php foreach ($items as $ci):
-                                    $qty = $ci['quantity'] ?? 0;
-                                    $borrowedRecords = $item_avail_data[$ci['id']] ?? [];
-                                    $borrowedCount = count($borrowedRecords);
-                                    $availableQty = max(0, $qty - $borrowedCount);
-                                ?>
+                                <?php foreach ($groups as $ci): ?>
                                 <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
-                                        data-item-id="<?php echo $ci['id']; ?>"
-                                        data-status="<?php echo $ci['status']; ?>"
-                                        data-quantity="<?php echo $qty; ?>"
-                                        data-available="<?php echo $availableQty; ?>"
+                                        data-item-id="<?php echo $ci['first_available_id']; ?>"
+                                        data-status="<?php echo $ci['available_count'] > 0 ? 'available' : 'borrowed'; ?>"
+                                        data-quantity="<?php echo count($ci['units']); ?>"
+                                        data-available="<?php echo $ci['available_count']; ?>"
                                         <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
                                     <?php echo htmlspecialchars($ci['item_name']); ?>
                                 </option>
@@ -932,28 +933,27 @@ if (!empty($submit_error)): ?>
                             </div>
                             <!-- Card grid -->
                             <div class="bshop-grid" id="bshop-grid">
-                                <?php foreach ($borrow_catalog as $category => $items):
-                                    foreach ($items as $ci):
-                                        $isBorrowed = $ci['status'] === 'borrowed';
-                                        $qty = $ci['quantity'] ?? 0;
-                                        $borrowedRecords = $item_avail_data[$ci['id']] ?? [];
-                                        $borrowedCount = count($borrowedRecords);
-                                        $availableQty = max(0, $qty - $borrowedCount);
+                                <?php foreach ($borrow_catalog as $category => $groups):
+                                    foreach ($groups as $ci):
+                                        $availableQty  = $ci['available_count'];
+                                        $totalUnits    = count($ci['units']);
+                                        $firstUnit     = $ci['units'][0];
                                         $retDates = [];
-                                        if ($borrowedCount > 0) {
-                                            foreach ($borrowedRecords as $r) $retDates[] = date('M j', strtotime($r['return_date']));
-                                            sort($retDates);
+                                        foreach ($ci['return_records'] as $r) {
+                                            $retDates[] = date('M j', strtotime($r['return_date']));
                                         }
+                                        sort($retDates);
+                                        $retDates = array_unique($retDates);
                                         $meta = $catMeta[$category] ?? $defaultMeta;
                                         $isPreSelected = ($auto_fill_item && $ci['item_name'] === $auto_fill_item);
                                 ?>
                                 <div class="bshop-card<?php echo $isPreSelected ? ' bshop-selected' : ''; ?>"
                                      data-value="<?php echo htmlspecialchars($ci['item_name']); ?>"
-                                     data-item-id="<?php echo $ci['id']; ?>"
-                                     data-status="<?php echo $ci['status']; ?>"
+                                     data-item-id="<?php echo $ci['first_available_id']; ?>"
+                                     data-status="<?php echo $availableQty > 0 ? 'available' : 'borrowed'; ?>"
                                      data-category="<?php echo htmlspecialchars($category); ?>"
                                      data-available="<?php echo $availableQty; ?>"
-                                     data-quantity="<?php echo $qty; ?>"
+                                     data-quantity="<?php echo $totalUnits; ?>"
                                      onclick="selectBorrowCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
                                     <div class="bshop-avail-badge <?php echo $availableQty > 0 ? 'bshop-avail-ok' : 'bshop-avail-none'; ?>">
@@ -963,17 +963,17 @@ if (!empty($submit_error)): ?>
                                         <i class="fas <?php echo $meta['icon']; ?>"></i>
                                     </div>
                                     <div class="bshop-name"><?php echo htmlspecialchars($ci['item_name']); ?></div>
-                                    <div class="bshop-desc"><?php echo htmlspecialchars($ci['description'] ?? ''); ?></div>
-                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($ci['location'] ?? ''); ?></div>
+                                    <div class="bshop-desc"><?php echo htmlspecialchars($ci['description'] ?: ($firstUnit['description'] ?? '')); ?></div>
+                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($firstUnit['location'] ?? ''); ?></div>
                                     <div class="bshop-foot">
-                                        <div class="bshop-price">₱<?php echo number_format($ci['cost'] ?? 0, 2); ?></div>
-                                        <div class="bshop-status-pill <?php echo $isBorrowed ? 'bshop-pill-borrowed' : 'bshop-pill-avail'; ?>">
-                                            <?php if ($isBorrowed && count($retDates) > 0): ?>
+                                        <div class="bshop-price">₱<?php echo number_format($firstUnit['cost'] ?? 0, 2); ?></div>
+                                        <div class="bshop-status-pill <?php echo $availableQty === 0 ? 'bshop-pill-borrowed' : 'bshop-pill-avail'; ?>">
+                                            <?php if ($availableQty === 0 && count($retDates) > 0): ?>
                                                 Returns <?php echo $retDates[0]; ?>
-                                            <?php elseif ($isBorrowed): ?>
+                                            <?php elseif ($availableQty === 0): ?>
                                                 Borrowed
                                             <?php else: ?>
-                                                Available
+                                                <?php echo $totalUnits; ?> unit<?php echo $totalUnits > 1 ? 's' : ''; ?>
                                             <?php endif; ?>
                                         </div>
                                     </div>
@@ -1053,11 +1053,11 @@ if (!empty($submit_error)): ?>
                         <!-- Hidden select (drives handleItemCatalogChange) -->
                         <select id="item_description" name="item_description" style="display:none;">
                             <option value="">— Select an item —</option>
-                            <?php foreach ($catalog_by_category as $category => $items): ?>
+                            <?php foreach ($catalog_by_category as $category => $groups): ?>
                             <optgroup label="<?php echo htmlspecialchars($category); ?>">
-                                <?php foreach ($items as $ci): ?>
+                                <?php foreach ($groups as $ci): ?>
                                 <option value="<?php echo htmlspecialchars($ci['item_name']); ?>"
-                                        data-desc="<?php echo htmlspecialchars($ci['description'] ?? ''); ?>">
+                                        data-desc="<?php echo htmlspecialchars($ci['description'] ?: ($ci['units'][0]['description'] ?? '')); ?>">
                                     <?php echo htmlspecialchars($ci['item_name']); ?>
                                 </option>
                                 <?php endforeach; ?>
@@ -1081,25 +1081,28 @@ if (!empty($submit_error)): ?>
                                 <?php endforeach; ?>
                             </div>
                             <div class="bshop-grid" id="ishop-grid">
-                                <?php foreach ($catalog_by_category as $category => $items):
-                                    foreach ($items as $ci):
-                                        $meta = $catMeta[$category] ?? $defaultMeta;
+                                <?php foreach ($catalog_by_category as $category => $groups):
+                                    foreach ($groups as $ci):
+                                        $meta      = $catMeta[$category] ?? $defaultMeta;
+                                        $firstUnit = $ci['units'][0];
+                                        $totalUnits = count($ci['units']);
+                                        $desc = $ci['description'] ?: ($firstUnit['description'] ?? '');
                                 ?>
                                 <div class="bshop-card"
                                      data-value="<?php echo htmlspecialchars($ci['item_name']); ?>"
                                      data-category="<?php echo htmlspecialchars($category); ?>"
-                                     data-desc="<?php echo htmlspecialchars($ci['description'] ?? ''); ?>"
+                                     data-desc="<?php echo htmlspecialchars($desc); ?>"
                                      onclick="selectItemReqCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
-                                    <div class="bshop-avail-badge bshop-avail-ok">Available</div>
+                                    <div class="bshop-avail-badge bshop-avail-ok"><?php echo $totalUnits; ?> unit<?php echo $totalUnits > 1 ? 's' : ''; ?></div>
                                     <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
                                         <i class="fas <?php echo $meta['icon']; ?>"></i>
                                     </div>
                                     <div class="bshop-name"><?php echo htmlspecialchars($ci['item_name']); ?></div>
-                                    <div class="bshop-desc"><?php echo htmlspecialchars($ci['description'] ?? ''); ?></div>
-                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($ci['location'] ?? ''); ?></div>
+                                    <div class="bshop-desc"><?php echo htmlspecialchars($desc); ?></div>
+                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($firstUnit['location'] ?? ''); ?></div>
                                     <div class="bshop-foot">
-                                        <div class="bshop-price">₱<?php echo number_format($ci['cost'] ?? 0, 2); ?></div>
+                                        <div class="bshop-price">₱<?php echo number_format($firstUnit['cost'] ?? 0, 2); ?></div>
                                         <div class="bshop-status-pill bshop-pill-avail"><?php echo htmlspecialchars($category); ?></div>
                                     </div>
                                 </div>
@@ -1171,11 +1174,11 @@ if (!empty($submit_error)): ?>
                         <!-- Hidden select (used by addToCart for item name + id) -->
                         <select id="item_id" name="item_id" style="display:none;" required>
                             <option value="">— Select an item —</option>
-                            <?php foreach ($inventory_items as $item): ?>
-                            <option value="<?php echo $item['id']; ?>">
-                                <?php echo htmlspecialchars($item['item_name']); ?>
+                            <?php foreach ($svc_by_cat as $__svc_groups): foreach ($__svc_groups as $__sg): $__svc_first = $__sg['units'][0]; ?>
+                            <option value="<?php echo $__svc_first['id']; ?>">
+                                <?php echo htmlspecialchars($__sg['item_name']); ?>
                             </option>
-                            <?php endforeach; ?>
+                            <?php endforeach; endforeach; ?>
                         </select>
 
                         <!-- Shop grid -->
@@ -1189,10 +1192,9 @@ if (!empty($submit_error)): ?>
                         ];
                         // Group inventory items by category for filter
                         $svc_by_cat = [];
-                        foreach ($inventory_items as $item) {
-                            $c = $item['category'] ?? 'Other';
-                            if (!isset($svc_by_cat[$c])) $svc_by_cat[$c] = [];
-                            $svc_by_cat[$c][] = $item;
+                        foreach (groupInventoryItems($inventory_items) as $group) {
+                            $c = $group['category'] ?? 'Other';
+                            $svc_by_cat[$c][] = $group;
                         }
                         ?>
                         <div class="bshop-wrap">
@@ -1209,29 +1211,34 @@ if (!empty($submit_error)): ?>
                                 <?php endforeach; ?>
                             </div>
                             <div class="bshop-grid" id="sshop-grid">
-                                <?php foreach ($inventory_items as $item):
-                                    $category = $item['category'] ?? 'Other';
-                                    $meta = $catMeta[$category] ?? $defaultMeta;
-                                    $sm = $svcStatusMeta[$item['status']] ?? ['label'=>ucfirst($item['status']),'cls'=>'bshop-pill-custom','badge'=>'bshop-avail-none'];
+                                <?php foreach ($svc_by_cat as $category => $svc_groups):
+                                    foreach ($svc_groups as $svc_grp):
+                                        $meta       = $catMeta[$category] ?? $defaultMeta;
+                                        $svc_first  = $svc_grp['units'][0];
+                                        $svc_total  = count($svc_grp['units']);
+                                        $svc_statuses = array_unique(array_column($svc_grp['units'], 'status'));
+                                        $svc_status   = count($svc_statuses) === 1 ? $svc_statuses[0] : 'mixed';
+                                        $sm = $svcStatusMeta[$svc_status] ?? ['label'=>ucfirst($svc_status),'cls'=>'bshop-pill-custom','badge'=>'bshop-avail-none'];
+                                        $svc_desc = $svc_grp['description'] ?: ($svc_first['description'] ?? '');
                                 ?>
                                 <div class="bshop-card"
-                                     data-value="<?php echo $item['id']; ?>"
+                                     data-value="<?php echo $svc_first['id']; ?>"
                                      data-category="<?php echo htmlspecialchars($category); ?>"
                                      onclick="selectServiceCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
-                                    <div class="bshop-avail-badge <?php echo $sm['badge']; ?>"><?php echo $sm['label']; ?></div>
+                                    <div class="bshop-avail-badge <?php echo $sm['badge']; ?>"><?php echo $svc_total; ?> unit<?php echo $svc_total > 1 ? 's' : ''; ?></div>
                                     <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
                                         <i class="fas <?php echo $meta['icon']; ?>"></i>
                                     </div>
-                                    <div class="bshop-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                    <div class="bshop-desc"><?php echo htmlspecialchars($item['description'] ?? ''); ?></div>
-                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($item['location'] ?? ''); ?></div>
+                                    <div class="bshop-name"><?php echo htmlspecialchars($svc_grp['item_name']); ?></div>
+                                    <div class="bshop-desc"><?php echo htmlspecialchars($svc_desc); ?></div>
+                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($svc_first['location'] ?? ''); ?></div>
                                     <div class="bshop-foot">
-                                        <div class="bshop-price">₱<?php echo number_format($item['cost'] ?? 0, 2); ?></div>
+                                        <div class="bshop-price">₱<?php echo number_format($svc_first['cost'] ?? 0, 2); ?></div>
                                         <div class="bshop-status-pill <?php echo $sm['cls']; ?>"><?php echo $sm['label']; ?></div>
                                     </div>
                                 </div>
-                                <?php endforeach; ?>
+                                <?php endforeach; endforeach; ?>
                                 <div id="sshop-empty" class="bshop-empty" style="display:none;">
                                     <i class="fas fa-search"></i><span>No items match</span>
                                 </div>
