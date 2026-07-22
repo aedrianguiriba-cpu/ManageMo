@@ -44,7 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $payload['expected_return_date'] = sanitizeInput($_POST['expected_return_date'] ?? '') ?: null;
         $payload['quantity_requested']   = max(1, (int)($_POST['borrow_quantity'] ?? 1));
     } elseif ($request_type === 'item') {
-        $custom_name = sanitizeInput($_POST['custom_item_req_name'] ?? $_POST['custom_item_name'] ?? '');
+        $selected    = sanitizeInput($_POST['item_description'] ?? '');
+        $custom_name = ($selected && $selected !== '__custom__')
+            ? $selected
+            : sanitizeInput($_POST['custom_item_req_name'] ?? $_POST['custom_item_name'] ?? '');
         $qty         = max(1, (int)($_POST['quantity'] ?? 1));
         $payload['reason_for_request']  = sanitizeInput($_POST['reason'] ?? '');
         $payload['service_description'] = $custom_name . ($qty > 1 ? ' - Qty: ' . $qty : '');
