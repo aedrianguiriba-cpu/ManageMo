@@ -800,16 +800,21 @@ function showOwnedGroup(group) {
 
     var grid = document.getElementById('ownedModalUnitsGrid');
     grid.innerHTML = '';
+    var qrApiBase = 'https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=';
     group.units.forEach(function(unit, idx) {
         var cond = unit.condition ? unit.condition.charAt(0).toUpperCase() + unit.condition.slice(1) : '—';
         var year = unit.year_owned || '—';
+        var qr   = unit.qr_code_id || '';
         var row  = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f7f7f7;border-radius:6px;font-size:0.88rem;';
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f7f7f7;border-radius:6px;font-size:0.88rem;';
         row.innerHTML =
-            '<div style="display:flex;flex-direction:column;gap:2px;">'
+            (qr ? '<img src="' + qrApiBase + encodeURIComponent(qr) + '" alt="QR" style="width:48px;height:48px;border-radius:4px;flex-shrink:0;">'
+                : '<div style="width:48px;height:48px;background:#e5e7eb;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="fas fa-qrcode" style="color:#9ca3af;font-size:1.1rem;"></i></div>')
+            + '<div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;">'
             + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1)
             +   ' <span style="font-weight:400;color:rgba(0,0,0,0.50);font-size:0.78rem;">· ' + cond + '</span></span>'
             + '<span style="color:rgba(0,0,0,0.55);font-size:0.78rem;"><i class="fas fa-calendar" style="margin-right:4px;"></i>Year: ' + year + '</span>'
+            + (qr ? '<span style="font-family:monospace;font-size:0.65rem;color:rgba(139,0,0,0.7);background:rgba(139,0,0,0.06);padding:2px 5px;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + qr + '</span>' : '')
             + '</div>';
         grid.appendChild(row);
     });

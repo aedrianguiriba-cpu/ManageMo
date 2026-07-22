@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'group_id'      => generateGroupId(),
         ];
         for ($u = 0; $u < $qty; $u++) {
-            dbCreateUserOwnedItem($base_owned);
+            dbCreateUserOwnedItem(array_merge($base_owned, ['qr_code_id' => generateQRCodeId()]));
         }
         logActivity($current_user['id'], 'CREATE', "Added $qty unit(s) of user owned item: $item_name for user_id: $user_id", 'user_owned_items', $user_id);
         redirectWithMessage('inventory.php?tab=owned', "$qty unit(s) of '$item_name' recorded successfully!", 'success');
@@ -105,11 +105,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
             'group_id'      => $group_id,
         ];
-        // Update the existing unit row (also stamps group_id if it was missing)
-        dbUpdateUserOwnedItem($owned_id, $unit_data);
-        // Create additional rows for extra units, all sharing the same group_id
+        // Update the existing unit row (preserve existing QR code; only stamp group_id if missing)
+        $existing_qr = $existing_item['qr_code_id'] ?? null;
+        dbUpdateUserOwnedItem($owned_id, array_merge($unit_data, [
+            'qr_code_id' => $existing_qr ?: generateQRCodeId(),
+        ]));
+        // Create additional rows for extra units, each with its own QR code
         for ($u = 1; $u < $qty; $u++) {
-            dbCreateUserOwnedItem(array_merge($unit_data, ['user_id' => $user_id]));
+            dbCreateUserOwnedItem(array_merge($unit_data, ['user_id' => $user_id, 'qr_code_id' => generateQRCodeId()]));
         }
         $msg = $qty > 1 ? "Unit updated and " . ($qty - 1) . " new unit(s) added for '$item_name'." : "Item updated successfully!";
         logActivity($current_user['id'], 'UPDATE', "Updated user-owned item: $item_name (qty: $qty)", 'user_owned_items', $owned_id);
@@ -1303,16 +1306,20 @@ function openOwnedGroupModal(group, ownerName, campus) {
 
     var grid = document.getElementById('ownedUnitsGrid');
     grid.innerHTML = '';
+    var qrApiBase = 'https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=';
     group.units.forEach(function(unit, idx) {
         var cond = unit.condition
             ? unit.condition.charAt(0).toUpperCase() + unit.condition.slice(1)
             : '—';
+        var qr = unit.qr_code_id || '';
         var row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f7f7f7;border-radius:6px;font-size:0.88rem;';
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f7f7f7;border-radius:6px;font-size:0.88rem;gap:10px;';
         row.innerHTML =
-            '<div>'
+            (qr ? '<img src="' + qrApiBase + encodeURIComponent(qr) + '" alt="QR" style="width:48px;height:48px;border-radius:4px;flex-shrink:0;">' : '<div style="width:48px;height:48px;background:#e5e7eb;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="fas fa-qrcode" style="color:#9ca3af;font-size:1.1rem;"></i></div>')
+            + '<div style="flex:1;min-width:0;">'
             + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1) + '</span>'
             + '<span style="color:rgba(0,0,0,0.45);font-size:0.78rem;margin-left:8px;">' + cond + '</span>'
+            + (qr ? '<div style="font-family:monospace;font-size:0.65rem;color:rgba(139,0,0,0.7);background:rgba(139,0,0,0.06);padding:2px 5px;border-radius:3px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + qr + '</div>' : '')
             + '</div>'
             + '<a href="inventory.php?action=edit_owned&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit unit"><i class="fas fa-edit"></i> Edit</a>';
         grid.appendChild(row);

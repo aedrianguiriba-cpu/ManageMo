@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS borrow_records (
 
 CREATE TABLE IF NOT EXISTS user_owned_items (
     id            BIGSERIAL PRIMARY KEY,
+    qr_code_id    TEXT UNIQUE,
     user_id       INT  NOT NULL,
     item_name     TEXT NOT NULL,
     category      TEXT NOT NULL,
@@ -93,6 +94,8 @@ CREATE TABLE IF NOT EXISTS user_owned_items (
     group_id      TEXT,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Run in Supabase SQL Editor if table already exists:
+-- ALTER TABLE user_owned_items ADD COLUMN IF NOT EXISTS qr_code_id TEXT UNIQUE;
 
 CREATE TABLE IF NOT EXISTS campuses (
     id          BIGSERIAL PRIMARY KEY,
