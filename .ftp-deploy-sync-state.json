@@ -1,7 +1,7 @@
 {
     "description": "DO NOT DELETE THIS FILE. This file is used to keep track of which files have been synced in the most recent deployment. If you delete this file a resync will need to be done (which can take a while) - read more: https://github.com/SamKirkland/FTP-Deploy-Action",
     "version": "1.0.0",
-    "generatedTime": 1784681937183,
+    "generatedTime": 1784682204453,
     "data": [
         {
             "type": "file",
@@ -13,7 +13,7 @@
             "type": "file",
             "name": ".ftp-deploy-sync-state.json",
             "size": 22271,
-            "hash": "2fb5986d31bdcd6c1921e32a14989416d0b3e32f09d845902c3ce35965ff6446"
+            "hash": "57abd92beb7d55ca7903f845d19ea47fe61e4f7dc409a95592ba9ce2cfa9b7df"
         },
         {
             "type": "file",
@@ -35,15 +35,15 @@
         },
         {
             "type": "file",
-            "name": "INFINITYFREE_TROUBLESHOOTING.md",
-            "size": 7099,
-            "hash": "f9acdb2d4b0afef11f4f2094533340f2ec56313d45454bfae5a04d1fd6591afc"
-        },
-        {
-            "type": "file",
             "name": "GITHUB_AUTO_DEPLOY.md",
             "size": 3742,
             "hash": "e157cb0c25614ae1abc16c288a99f8578a690f89733223b26665809e0d20efcd"
+        },
+        {
+            "type": "file",
+            "name": "INFINITYFREE_TROUBLESHOOTING.md",
+            "size": 7099,
+            "hash": "f9acdb2d4b0afef11f4f2094533340f2ec56313d45454bfae5a04d1fd6591afc"
         },
         {
             "type": "file",
@@ -91,15 +91,15 @@
         },
         {
             "type": "folder",
+            "name": "css"
+        },
+        {
+            "type": "folder",
             "name": "config"
         },
         {
             "type": "folder",
             "name": "database"
-        },
-        {
-            "type": "folder",
-            "name": "css"
         },
         {
             "type": "file",
@@ -131,11 +131,11 @@
         },
         {
             "type": "folder",
-            "name": "lib"
+            "name": "js"
         },
         {
             "type": "folder",
-            "name": "js"
+            "name": "lib"
         },
         {
             "type": "file",
@@ -178,12 +178,6 @@
             "hash": "0ffb3e1457786d3e07b214ff62d8ad3436286ea99bca9a5dcd209148bbb2748b"
         },
         {
-            "type": "file",
-            "name": "test_db.php",
-            "size": 1489,
-            "hash": "1542ecc153913f6e2e6b4bc089dd27350053e769b1db7c44fb09b24e431d36ac"
-        },
-        {
             "type": "folder",
             "name": "user"
         },
@@ -195,9 +189,15 @@
         },
         {
             "type": "file",
+            "name": "test_db.php",
+            "size": 1489,
+            "hash": "1542ecc153913f6e2e6b4bc089dd27350053e769b1db7c44fb09b24e431d36ac"
+        },
+        {
+            "type": "file",
             "name": ".git/FETCH_HEAD",
             "size": 217,
-            "hash": "eb0691ce3b67a9c0c042d20ba815e959086a46bb4bc22495288002eac7fb93f0"
+            "hash": "9665d9f407f789b1a30011e766d2a7ea2d5fb65c065eaf77d6b3b6fdff254f98"
         },
         {
             "type": "file",
@@ -209,11 +209,7 @@
             "type": "file",
             "name": ".git/config",
             "size": 872,
-            "hash": "622e46c813af23128a6dc5fc9527daebef12632df41e9cb498779711fceebd86"
-        },
-        {
-            "type": "folder",
-            "name": ".git/hooks"
+            "hash": "ac73a95e6996857a658dc5fa9d911b705de0c0290b942e5d37051d590641d16e"
         },
         {
             "type": "file",
@@ -225,11 +221,15 @@
             "type": "file",
             "name": ".git/index",
             "size": 6092,
-            "hash": "198c0ae89de1c2516a1abae94523346f1e4a2adce58bf8a2d9047a743c69d403"
+            "hash": "b8a3e8dfeddcf78de6dd67ac210bf2eefc7d56dedfcea001ab713b867c249399"
         },
         {
             "type": "folder",
             "name": ".git/info"
+        },
+        {
+            "type": "folder",
+            "name": ".git/hooks"
         },
         {
             "type": "folder",
@@ -298,8 +298,8 @@
         {
             "type": "file",
             "name": "admin/settings.php",
-            "size": 28244,
-            "hash": "6c5cbcf59e4ac6b053553cad85bf376ed22cb8dba26f899e8bdceac78971c84c"
+            "size": 27737,
+            "hash": "70917309381452a080a298f1212309b23c3d824af931994f15c9368b892b844f"
         },
         {
             "type": "file",
@@ -309,11 +309,17 @@
         },
         {
             "type": "folder",
-            "name": "assets/pics"
+            "name": "assets/uploads"
         },
         {
             "type": "folder",
-            "name": "assets/uploads"
+            "name": "assets/pics"
+        },
+        {
+            "type": "file",
+            "name": "css/style.css",
+            "size": 20996,
+            "hash": "c042e0735effedb858c424f3d3a71ad32e7657fb95acf9afcc055f27bc282136"
         },
         {
             "type": "file",
@@ -323,21 +329,9 @@
         },
         {
             "type": "file",
-            "name": "config/data.php",
-            "size": 11287,
-            "hash": "863bbee0f71d6ac833c296d9da366e473c1809b80b89c3aa270827f61bb5e349"
-        },
-        {
-            "type": "file",
             "name": "config/departments_custom.json",
             "size": 276,
             "hash": "c57711f4467a721640d3235ece6d3aee6da4eb206f02686d0084b8a525bef12b"
-        },
-        {
-            "type": "file",
-            "name": "config/mock_data.php",
-            "size": 14415,
-            "hash": "9ea48ea0a52c2007ad56785697bea0a1a18e829b67d285f6803dd342491409e1"
         },
         {
             "type": "file",
@@ -347,9 +341,27 @@
         },
         {
             "type": "file",
+            "name": "config/data.php",
+            "size": 11287,
+            "hash": "863bbee0f71d6ac833c296d9da366e473c1809b80b89c3aa270827f61bb5e349"
+        },
+        {
+            "type": "file",
+            "name": "config/mock_data.php",
+            "size": 14415,
+            "hash": "9ea48ea0a52c2007ad56785697bea0a1a18e829b67d285f6803dd342491409e1"
+        },
+        {
+            "type": "file",
             "name": "config/supabase.php",
             "size": 5038,
             "hash": "33567a82bcc92bbb65eaf1bfbf0ac4ddbd9e0fb1bbb0672bac599cf2f0f8220e"
+        },
+        {
+            "type": "file",
+            "name": "database/erd.mmd",
+            "size": 8082,
+            "hash": "11234baa654f2cb866d7be01c6ea8e5df324c69d12c18ec4557d49d181731546"
         },
         {
             "type": "file",
@@ -365,21 +377,9 @@
         },
         {
             "type": "file",
-            "name": "database/erd.mmd",
-            "size": 8082,
-            "hash": "11234baa654f2cb866d7be01c6ea8e5df324c69d12c18ec4557d49d181731546"
-        },
-        {
-            "type": "file",
             "name": "database/schema.sql",
             "size": 26882,
             "hash": "cc77a496a08710464af7d3a0fd7e99856e85078f26fb518d8778b189b88ce963"
-        },
-        {
-            "type": "file",
-            "name": "css/style.css",
-            "size": 20996,
-            "hash": "c042e0735effedb858c424f3d3a71ad32e7657fb95acf9afcc055f27bc282136"
         },
         {
             "type": "file",
@@ -395,27 +395,27 @@
         },
         {
             "type": "file",
-            "name": "includes/topbar.php",
-            "size": 2961,
-            "hash": "8258a5ac23f067ea94130df57a43a259586117dbcc85fb612ad8edd8760e18df"
-        },
-        {
-            "type": "file",
             "name": "includes/navbar.php",
             "size": 9995,
             "hash": "b1870136bf6a4aca720d6c7399b665f64932a82fe0bc507573d5cbd290a92ee5"
         },
         {
             "type": "file",
-            "name": "lib/qrcode.php",
-            "size": 1771,
-            "hash": "2780ff104f70ab3ceed0ac445d4f6e412a236b0a99da37f541554bf757621016"
+            "name": "includes/topbar.php",
+            "size": 2961,
+            "hash": "8258a5ac23f067ea94130df57a43a259586117dbcc85fb612ad8edd8760e18df"
         },
         {
             "type": "file",
             "name": "js/script.js",
             "size": 1215,
             "hash": "f9dbd54fb5a2e683edad7138d025e81a5e565a824452d2f165f010c6fd205b9c"
+        },
+        {
+            "type": "file",
+            "name": "lib/qrcode.php",
+            "size": 1771,
+            "hash": "2780ff104f70ab3ceed0ac445d4f6e412a236b0a99da37f541554bf757621016"
         },
         {
             "type": "file",
@@ -458,6 +458,12 @@
             "name": "user/settings.php",
             "size": 23735,
             "hash": "34b186796ae07e4bd360a4774e89051274c6803a64191dd32233987fdb393a09"
+        },
+        {
+            "type": "file",
+            "name": ".git/info/exclude",
+            "size": 240,
+            "hash": "6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
         },
         {
             "type": "file",
@@ -509,21 +515,27 @@
         },
         {
             "type": "file",
-            "name": ".git/hooks/pre-receive.sample",
-            "size": 544,
-            "hash": "a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
-        },
-        {
-            "type": "file",
             "name": ".git/hooks/pre-rebase.sample",
             "size": 4898,
             "hash": "4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
         },
         {
             "type": "file",
+            "name": ".git/hooks/pre-receive.sample",
+            "size": 544,
+            "hash": "a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+        },
+        {
+            "type": "file",
             "name": ".git/hooks/prepare-commit-msg.sample",
             "size": 1492,
             "hash": "e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+        },
+        {
+            "type": "file",
+            "name": ".git/hooks/push-to-checkout.sample",
+            "size": 2783,
+            "hash": "a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
         },
         {
             "type": "file",
@@ -539,25 +551,13 @@
         },
         {
             "type": "file",
-            "name": ".git/hooks/push-to-checkout.sample",
-            "size": 2783,
-            "hash": "a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
-        },
-        {
-            "type": "file",
-            "name": ".git/info/exclude",
-            "size": 240,
-            "hash": "6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+            "name": ".git/logs/HEAD",
+            "size": 218,
+            "hash": "94e3e6577de9e4b55857c026e055f50f73d54a240f492cb2e283807342baad3e"
         },
         {
             "type": "folder",
             "name": ".git/logs/refs"
-        },
-        {
-            "type": "file",
-            "name": ".git/logs/HEAD",
-            "size": 218,
-            "hash": "39da2b42bb0f7fc587b2801fb5c281e545ce1f4e41b76b26407dbbfd9409cb95"
         },
         {
             "type": "folder",
@@ -569,11 +569,11 @@
         },
         {
             "type": "folder",
-            "name": ".git/refs/heads"
+            "name": ".git/refs/remotes"
         },
         {
             "type": "folder",
-            "name": ".git/refs/remotes"
+            "name": ".git/refs/heads"
         },
         {
             "type": "folder",
@@ -584,6 +584,10 @@
             "name": ".github/workflows/deploy.yml",
             "size": 1273,
             "hash": "f5041837cc181e79b386b81398f9d538e07273dffdba926dfbd09ed23924f98a"
+        },
+        {
+            "type": "folder",
+            "name": "assets/uploads/approval_letters"
         },
         {
             "type": "file",
@@ -599,17 +603,7 @@
         },
         {
             "type": "folder",
-            "name": "assets/uploads/approval_letters"
-        },
-        {
-            "type": "folder",
             "name": ".git/logs/refs/heads"
-        },
-        {
-            "type": "file",
-            "name": ".git/objects/pack/pack-f674cefc94125e0693a69a2b656bce084906428b.idx",
-            "size": 11264,
-            "hash": "dfe381ecae885d7a283ccc5431ec301d021764b62a3e23095155c8b6ac98d4f1"
         },
         {
             "type": "folder",
@@ -617,25 +611,31 @@
         },
         {
             "type": "file",
-            "name": ".git/objects/pack/pack-f674cefc94125e0693a69a2b656bce084906428b.pack",
-            "size": 854402,
-            "hash": "4986a710ac16f60350502ed017ae79de603319dc41715fffbc608d9739ec61b5"
+            "name": ".git/objects/pack/pack-33006d609aae26e9ac4f2cb0982577edf5c14489.idx",
+            "size": 11516,
+            "hash": "1f0a31b4aabc0131cfa511e50470ae9f5d6e6f05f6a7879546f9ec2f558dc6e8"
         },
         {
             "type": "file",
-            "name": ".git/objects/pack/pack-f674cefc94125e0693a69a2b656bce084906428b.rev",
-            "size": 1508,
-            "hash": "27e2fa52686063333cefca716188eee13fe46e0b2b537db9b131b7b313e1aab8"
+            "name": ".git/objects/pack/pack-33006d609aae26e9ac4f2cb0982577edf5c14489.pack",
+            "size": 862525,
+            "hash": "55f8387f0a6f2c9fa8de72c20cced862501b3a3c55cf59c7be4ea2e7c882c8b3"
+        },
+        {
+            "type": "file",
+            "name": ".git/objects/pack/pack-33006d609aae26e9ac4f2cb0982577edf5c14489.rev",
+            "size": 1544,
+            "hash": "1a6e9ca1e8728c5e798fc10c442730447088971665aff5b7045d1e2c3d3f2f13"
+        },
+        {
+            "type": "folder",
+            "name": ".git/refs/remotes/origin"
         },
         {
             "type": "file",
             "name": ".git/refs/heads/main",
             "size": 41,
-            "hash": "55d1a0831977ff2870d55a1904e3104582aff82c292a89f09e2b5eeb2adcd3d6"
-        },
-        {
-            "type": "folder",
-            "name": ".git/refs/remotes/origin"
+            "hash": "23705cc5ace165c7ea0f43d637e28d19ad00b7437f2ad04acd040f26a9c81f5f"
         },
         {
             "type": "file",
@@ -647,7 +647,7 @@
             "type": "file",
             "name": ".git/logs/refs/heads/main",
             "size": 227,
-            "hash": "ea979a32c8a128266f2d962e6202ba072a4673b3ecdf4051279410785e1c62f9"
+            "hash": "e9df910e916e20181d85ccc8770359a47bac4cc9140d557c8e0483d2c66a3353"
         },
         {
             "type": "folder",
@@ -663,19 +663,19 @@
             "type": "file",
             "name": ".git/refs/remotes/origin/main",
             "size": 41,
-            "hash": "55d1a0831977ff2870d55a1904e3104582aff82c292a89f09e2b5eeb2adcd3d6"
+            "hash": "23705cc5ace165c7ea0f43d637e28d19ad00b7437f2ad04acd040f26a9c81f5f"
         },
         {
             "type": "file",
             "name": ".git/logs/refs/remotes/origin/changes-1",
             "size": 312,
-            "hash": "f061ba694a7ecd92af2b9d7c5567c86f76735611a4afb1ba1075af56c4892f9c"
+            "hash": "d0c0e12a413353ebeda186211ac2a26bdb09a061cd7bfc4aec300a1048f21bcf"
         },
         {
             "type": "file",
             "name": ".git/logs/refs/remotes/origin/main",
             "size": 312,
-            "hash": "ed0b25dc296f80c9c75474ef51de07613a81bfd851e4f3eb6ba3550466d249f1"
+            "hash": "b7e834cb2e29bbc443d29f8c99f91d59362961de880b511cb51dc870bb3c7e67"
         }
     ]
 }
