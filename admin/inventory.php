@@ -211,6 +211,8 @@ displayMessage();
         <div class="ai-card-sub">Fill in the details for the new item</div>
         <hr class="ai-divider mt-0">
         <form method="POST" action="">
+            <!-- campus_id is always 1 — all inventory originates from the supply office -->
+            <input type="hidden" name="campus_id" value="1">
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Item Name *</label>
@@ -218,25 +220,28 @@ displayMessage();
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Category *</label>
-                    <input type="text" class="form-control" name="category" placeholder="e.g., Furniture, Electronics" required>
+                    <select class="form-select" name="category" required>
+                        <option value="">Select Category</option>
+                        <option value="Office Supplies">Office Supplies</option>
+                        <option value="Furniture">Furniture</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Equipment">Equipment</option>
+                        <option value="Cleaning Supplies">Cleaning Supplies</option>
+                        <option value="Medical &amp; Safety">Medical &amp; Safety</option>
+                        <option value="Sports &amp; Recreation">Sports &amp; Recreation</option>
+                        <option value="Tools &amp; Hardware">Tools &amp; Hardware</option>
+                        <option value="Books &amp; Publications">Books &amp; Publications</option>
+                        <option value="Laboratory Supplies">Laboratory Supplies</option>
+                        <option value="Electrical Supplies">Electrical Supplies</option>
+                        <option value="Other">Other</option>
+                    </select>
                 </div>
             </div>
             <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label class="form-label">Campus *</label>
-                    <select class="form-select" name="campus_id" required>
-                        <option value="">Select Campus</option>
-                        <?php foreach ($campuses as $campus): ?>
-                            <option value="<?php echo $campus['id']; ?>"><?php echo htmlspecialchars($campus['name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
                 <div class="col-md-6">
                     <label class="form-label">Quantity *</label>
                     <input type="number" class="form-control" name="quantity" value="1" min="1" required>
                 </div>
-            </div>
-            <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Condition *</label>
                     <select class="form-select" name="condition" required>
@@ -246,16 +251,18 @@ displayMessage();
                         <option value="poor">Poor</option>
                     </select>
                 </div>
+            </div>
+            <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Cost</label>
                     <input type="number" class="form-control" name="cost" step="0.01" placeholder="0.00">
                 </div>
-            </div>
-            <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Location / Building</label>
                     <input type="text" class="form-control" name="location">
                 </div>
+            </div>
+            <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Purchase Date</label>
                     <input type="date" class="form-control" name="purchase_date">
