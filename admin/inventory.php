@@ -14,21 +14,26 @@ $page = $_GET['page'] ?? 1;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'add') {
         $item_name    = sanitizeInput($_POST['item_name']);
-        $new_item = dbCreateInventory([
-            'qr_code_id'    => generateQRCodeId(),
+        $qty          = max(1, (int)$_POST['quantity']);
+        $base_data    = [
             'item_name'     => $item_name,
             'category'      => sanitizeInput($_POST['category']),
             'description'   => sanitizeInput($_POST['description']),
             'campus_id'     => (int)$_POST['campus_id'],
-            'quantity'      => max(0, (int)$_POST['quantity']),
+            'quantity'      => 1,
             'location'      => sanitizeInput($_POST['location']),
             'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
             'cost'          => is_numeric($_POST['cost'] ?? '') ? (float)$_POST['cost'] : null,
             'condition'     => sanitizeInput($_POST['condition']),
             'status'        => 'available',
-        ]);
-        logActivity($current_user['id'], 'CREATE', "Added new inventory item: $item_name", 'inventory', $new_item['id'] ?? 0);
-        redirectWithMessage('inventory.php', 'Item added successfully!', 'success');
+        ];
+        $first_id = null;
+        for ($u = 0; $u < $qty; $u++) {
+            $row = dbCreateInventory(array_merge($base_data, ['qr_code_id' => generateQRCodeId()]));
+            if ($u === 0) $first_id = $row['id'] ?? 0;
+        }
+        logActivity($current_user['id'], 'CREATE', "Added $qty unit(s) of inventory item: $item_name", 'inventory', $first_id);
+        redirectWithMessage('inventory.php', "$qty unit(s) of '$item_name' added successfully!", 'success');
 
     } elseif ($action === 'add_owned') {
         $item_name = sanitizeInput($_POST['item_name']);
@@ -456,9 +461,15 @@ displayMessage();
     usort($maintenance_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($borrowed_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($owned_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
-    
+
     $status_colors = ['available'=>'success','requested'=>'info','borrowed'=>'warning','maintenance'=>'info'];
-    
+
+    // Group same-name items into cards; each group contains individual unit rows
+    $grouped_available   = groupInventoryItems($available_items);
+    $grouped_requested   = groupInventoryItems($requested_items);
+    $grouped_maintenance = groupInventoryItems($maintenance_items);
+    $grouped_borrowed    = groupInventoryItems($borrowed_items);
+
     // Pagination settings
     $items_per_page = 6;
     $current_page_available = isset($_GET['page_available']) ? (int)$_GET['page_available'] : 1;
@@ -467,31 +478,31 @@ displayMessage();
     $current_page_borrowed = isset($_GET['page_borrowed']) ? (int)$_GET['page_borrowed'] : 1;
     $current_page_owned = isset($_GET['page_owned']) ? (int)$_GET['page_owned'] : 1;
     $current_tab = isset($_GET['tab']) ? $_GET['tab'] : 'available';
-    
-    // Calculate pagination
+
+    // Tab badges count units; pagination is over groups
     $total_available = count($available_items);
     $total_requested = count($requested_items);
     $total_maintenance = count($maintenance_items);
     $total_borrowed = count($borrowed_items);
     $total_owned = count($owned_items);
-    
-    $pages_available = ceil($total_available / $items_per_page);
-    $pages_requested = ceil($total_requested / $items_per_page);
-    $pages_maintenance = ceil($total_maintenance / $items_per_page);
-    $pages_borrowed = ceil($total_borrowed / $items_per_page);
+
+    $pages_available = ceil(count($grouped_available) / $items_per_page);
+    $pages_requested = ceil(count($grouped_requested) / $items_per_page);
+    $pages_maintenance = ceil(count($grouped_maintenance) / $items_per_page);
+    $pages_borrowed = ceil(count($grouped_borrowed) / $items_per_page);
     $pages_owned = ceil($total_owned / $items_per_page);
-    
+
     $offset_available = ($current_page_available - 1) * $items_per_page;
     $offset_requested = ($current_page_requested - 1) * $items_per_page;
     $offset_maintenance = ($current_page_maintenance - 1) * $items_per_page;
     $offset_borrowed = ($current_page_borrowed - 1) * $items_per_page;
     $offset_owned = ($current_page_owned - 1) * $items_per_page;
-    
-    $available_items_page = array_slice($available_items, $offset_available, $items_per_page);
-    $requested_items_page = array_slice($requested_items, $offset_requested, $items_per_page);
-    $maintenance_items_page = array_slice($maintenance_items, $offset_maintenance, $items_per_page);
-    $borrowed_items_page = array_slice($borrowed_items, $offset_borrowed, $items_per_page);
-    $owned_items_page = array_slice($owned_items, $offset_owned, $items_per_page);
+
+    $available_items_page   = array_slice($grouped_available, $offset_available, $items_per_page);
+    $requested_items_page   = array_slice($grouped_requested, $offset_requested, $items_per_page);
+    $maintenance_items_page = array_slice($grouped_maintenance, $offset_maintenance, $items_per_page);
+    $borrowed_items_page    = array_slice($grouped_borrowed, $offset_borrowed, $items_per_page);
+    $owned_items_page       = array_slice($owned_items, $offset_owned, $items_per_page);
     ?>
 
     <!-- TAB NAVIGATION -->
@@ -533,46 +544,53 @@ displayMessage();
     <div id="tab-available" style="display: <?php echo $current_tab === 'available' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($available_items_page) > 0):
-                foreach ($available_items_page as $item):
-                    $ic = getCampus($item['campus_id']);
-                    $unit_qrs = getItemUnitQRCodes($item);
+                foreach ($available_items_page as $group):
+                    $ic = getCampus($group['campus_id']);
+                    $unit_count = count($group['units']);
+                    $conditions = array_unique(array_column($group['units'], 'condition'));
+                    $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
-                    <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
-                        <?php echo htmlspecialchars($item['item_name']); ?>
+                    <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
+                        <?php echo htmlspecialchars($group['item_name']); ?>
                     </div>
-                    <div style="font-size: 0.75rem; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 0.5px;">
-                        <?php echo htmlspecialchars($item['category']); ?>
-                    </div>
-                </div>
-                <span class="ai-badge ai-badge-success" style="font-size: 0.7rem; padding: 4px 8px;"><i class="fas fa-check-circle"></i></span>
-            </div>
-            
-            <div style="border-top: 1px solid rgba(0,0,0,0.07); border-bottom: 1px solid rgba(0,0,0,0.07); padding: 12px 0; margin: 12px 0; font-size: 0.9rem;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Quantity</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo $item['quantity']; ?> units</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Condition</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo ucfirst($item['condition']); ?></div>
+                    <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
+                        <?php echo htmlspecialchars($group['category']); ?>
                     </div>
                 </div>
+                <span style="background:rgba(34,197,94,0.12);color:#15803d;font-weight:700;font-size:0.76rem;padding:3px 10px;border-radius:10px;">
+                    <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                </span>
             </div>
-
-            <div style="display: flex; gap: 8px; justify-content: space-between;">
-                <button type="button" class="ai-btn-sm" style="background: rgba(59,130,246,0.10); color: #1d4ed8; flex: 1; border: none; border-radius: 8px;" onclick="openDetailModal(<?php echo htmlspecialchars(json_encode($item)); ?>, <?php echo htmlspecialchars(json_encode($unit_qrs)); ?>)">
-                    <i class="fas fa-eye"></i> View Details
+            <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Campus</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($ic['name']); ?></div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Condition</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo $cond_label; ?></div>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px;min-height:22px;">
+                <?php foreach (array_slice($group['units'], 0, 2) as $u): ?>
+                <span class="ai-qr-chip" style="font-size:0.68rem;"><?php echo htmlspecialchars($u['qr_code_id']); ?></span>
+                <?php endforeach; ?>
+                <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
+                    onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
+                    <i class="fas fa-eye"></i> View &amp; Manage Units
                 </button>
-                <a href="inventory.php?action=edit&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-edit" style="flex: 1; text-align: center;"><i class="fas fa-edit"></i></a>
-                <a href="inventory.php?action=delete&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-delete delete-btn" style="flex: 1; text-align: center;"><i class="fas fa-trash"></i></a>
             </div>
         </div>
         <?php endforeach; else: ?>
-        <div class="ai-empty" style="grid-column: 1 / -1;"><i class="fas fa-box-open"></i>No available items</div>
+        <div class="ai-empty" style="grid-column:1/-1;"><i class="fas fa-box-open"></i>No available items</div>
         <?php endif; ?>
         </div>
         
@@ -592,62 +610,53 @@ displayMessage();
     <div id="tab-requested" style="display: <?php echo $current_tab === 'requested' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($requested_items_page) > 0):
-                foreach ($requested_items_page as $item):
-                    $ic = getCampus($item['campus_id']);
-                    $unit_qrs = getItemUnitQRCodes($item);
+                foreach ($requested_items_page as $group):
+                    $ic = getCampus($group['campus_id']);
+                    $unit_count = count($group['units']);
+                    $conditions = array_unique(array_column($group['units'], 'condition'));
+                    $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
-                    <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
-                        <?php echo htmlspecialchars($item['item_name']); ?>
+                    <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
+                        <?php echo htmlspecialchars($group['item_name']); ?>
                     </div>
-                    <div style="font-size: 0.75rem; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 0.5px;">
-                        <?php echo htmlspecialchars($item['category']); ?>
+                    <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
+                        <?php echo htmlspecialchars($group['category']); ?>
                     </div>
                 </div>
-                <span class="ai-badge ai-badge-info" style="font-size: 0.7rem; padding: 4px 8px;"><i class="fas fa-list-check"></i></span>
+                <span style="background:rgba(59,130,246,0.12);color:#1d4ed8;font-weight:700;font-size:0.76rem;padding:3px 10px;border-radius:10px;">
+                    <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                </span>
             </div>
-            
-            <div style="border-top: 1px solid rgba(0,0,0,0.07); border-bottom: 1px solid rgba(0,0,0,0.07); padding: 12px 0; margin: 12px 0; font-size: 0.9rem;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+            <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Campus</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo htmlspecialchars($ic['name']); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Campus</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($ic['name']); ?></div>
                     </div>
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Quantity</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo $item['quantity']; ?> units</div>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Condition</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo ucfirst($item['condition']); ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Department</div>
-                        <div style="font-weight: 600; color: #1a1d23; font-size: 0.9rem;"><?php 
-                            if ($item['campus_id'] == 1) {
-                                $dept = isset($item['college_id']) && $item['college_id'] ? $item['college_id'] : 'Admin';
-                                $depts = array_merge(getMainCampusColleges(), getMainCampusOffices());
-                                echo isset($depts[$dept]) ? htmlspecialchars(substr(explode(' (', $depts[$dept])[0], 0, 18)) : htmlspecialchars($dept);
-                            }
-                        ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Condition</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo $cond_label; ?></div>
                     </div>
                 </div>
             </div>
-
-            <div style="display: flex; gap: 8px; justify-content: space-between;">
-                <button type="button" class="ai-btn-sm" style="background: rgba(59,130,246,0.10); color: #1d4ed8; flex: 1; border: none; border-radius: 8px;" onclick="openDetailModal(<?php echo htmlspecialchars(json_encode($item)); ?>, <?php echo htmlspecialchars(json_encode($unit_qrs)); ?>)">
-                    <i class="fas fa-eye"></i> View Details
+            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px;min-height:22px;">
+                <?php foreach (array_slice($group['units'], 0, 2) as $u): ?>
+                <span class="ai-qr-chip" style="font-size:0.68rem;"><?php echo htmlspecialchars($u['qr_code_id']); ?></span>
+                <?php endforeach; ?>
+                <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
+                    onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
+                    <i class="fas fa-eye"></i> View &amp; Manage Units
                 </button>
-                <a href="inventory.php?action=edit&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-edit" style="flex: 1; text-align: center;"><i class="fas fa-edit"></i></a>
-                <a href="inventory.php?action=delete&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-delete delete-btn" style="flex: 1; text-align: center;"><i class="fas fa-trash"></i></a>
             </div>
         </div>
         <?php endforeach; else: ?>
-        <div class="ai-empty" style="grid-column: 1 / -1;"><i class="fas fa-inbox"></i>No requested items</div>
+        <div class="ai-empty" style="grid-column:1/-1;"><i class="fas fa-inbox"></i>No requested items</div>
         <?php endif; ?>
         </div>
         
@@ -667,62 +676,53 @@ displayMessage();
     <div id="tab-borrowed" style="display: <?php echo $current_tab === 'borrowed' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($borrowed_items_page) > 0):
-                foreach ($borrowed_items_page as $item):
-                    $ic = getCampus($item['campus_id']);
-                    $unit_qrs = getItemUnitQRCodes($item);
+                foreach ($borrowed_items_page as $group):
+                    $ic = getCampus($group['campus_id']);
+                    $unit_count = count($group['units']);
+                    $conditions = array_unique(array_column($group['units'], 'condition'));
+                    $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
-                    <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
-                        <?php echo htmlspecialchars($item['item_name']); ?>
+                    <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
+                        <?php echo htmlspecialchars($group['item_name']); ?>
                     </div>
-                    <div style="font-size: 0.75rem; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 0.5px;">
-                        <?php echo htmlspecialchars($item['category']); ?>
+                    <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
+                        <?php echo htmlspecialchars($group['category']); ?>
                     </div>
                 </div>
-                <span class="ai-badge ai-badge-warning" style="font-size: 0.7rem; padding: 4px 8px;"><i class="fas fa-hand-holding-heart"></i></span>
+                <span style="background:rgba(245,158,11,0.12);color:#b45309;font-weight:700;font-size:0.76rem;padding:3px 10px;border-radius:10px;">
+                    <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                </span>
             </div>
-            
-            <div style="border-top: 1px solid rgba(0,0,0,0.07); border-bottom: 1px solid rgba(0,0,0,0.07); padding: 12px 0; margin: 12px 0; font-size: 0.9rem;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+            <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Campus</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo htmlspecialchars($ic['name']); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Campus</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($ic['name']); ?></div>
                     </div>
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Quantity</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo $item['quantity']; ?> units</div>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Condition</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo ucfirst($item['condition']); ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Department</div>
-                        <div style="font-weight: 600; color: #1a1d23; font-size: 0.9rem;"><?php 
-                            if ($item['campus_id'] == 1) {
-                                $dept = isset($item['college_id']) && $item['college_id'] ? $item['college_id'] : 'Admin';
-                                $depts = array_merge(getMainCampusColleges(), getMainCampusOffices());
-                                echo isset($depts[$dept]) ? htmlspecialchars(substr(explode(' (', $depts[$dept])[0], 0, 18)) : htmlspecialchars($dept);
-                            }
-                        ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Condition</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo $cond_label; ?></div>
                     </div>
                 </div>
             </div>
-
-            <div style="display: flex; gap: 8px; justify-content: space-between;">
-                <button type="button" class="ai-btn-sm" style="background: rgba(59,130,246,0.10); color: #1d4ed8; flex: 1; border: none; border-radius: 8px;" onclick="openDetailModal(<?php echo htmlspecialchars(json_encode($item)); ?>, <?php echo htmlspecialchars(json_encode($unit_qrs)); ?>)">
-                    <i class="fas fa-eye"></i> View Details
+            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px;min-height:22px;">
+                <?php foreach (array_slice($group['units'], 0, 2) as $u): ?>
+                <span class="ai-qr-chip" style="font-size:0.68rem;"><?php echo htmlspecialchars($u['qr_code_id']); ?></span>
+                <?php endforeach; ?>
+                <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
+                    onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
+                    <i class="fas fa-eye"></i> View &amp; Manage Units
                 </button>
-                <a href="inventory.php?action=edit&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-edit" style="flex: 1; text-align: center;"><i class="fas fa-edit"></i></a>
-                <a href="inventory.php?action=delete&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-delete delete-btn" style="flex: 1; text-align: center;"><i class="fas fa-trash"></i></a>
             </div>
         </div>
         <?php endforeach; else: ?>
-        <div class="ai-empty" style="grid-column: 1 / -1;"><i class="fas fa-hand-holding-heart"></i>No borrowed items</div>
+        <div class="ai-empty" style="grid-column:1/-1;"><i class="fas fa-hand-holding-heart"></i>No borrowed items</div>
         <?php endif; ?>
         </div>
         
@@ -742,62 +742,53 @@ displayMessage();
     <div id="tab-maintenance" style="display: <?php echo $current_tab === 'maintenance' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($maintenance_items_page) > 0):
-                foreach ($maintenance_items_page as $item):
-                    $ic = getCampus($item['campus_id']);
-                    $unit_qrs = getItemUnitQRCodes($item);
+                foreach ($maintenance_items_page as $group):
+                    $ic = getCampus($group['campus_id']);
+                    $unit_count = count($group['units']);
+                    $conditions = array_unique(array_column($group['units'], 'condition'));
+                    $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);">
-            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
-                    <div style="font-weight: 800; font-size: 1rem; color: #1a1d23; margin-bottom: 4px;">
-                        <?php echo htmlspecialchars($item['item_name']); ?>
+                    <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
+                        <?php echo htmlspecialchars($group['item_name']); ?>
                     </div>
-                    <div style="font-size: 0.75rem; color: rgba(0,0,0,0.50); text-transform: uppercase; letter-spacing: 0.5px;">
-                        <?php echo htmlspecialchars($item['category']); ?>
+                    <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
+                        <?php echo htmlspecialchars($group['category']); ?>
                     </div>
                 </div>
-                <span class="ai-badge ai-badge-warning" style="font-size: 0.7rem; padding: 4px 8px;"><i class="fas fa-wrench"></i></span>
+                <span style="background:rgba(245,158,11,0.12);color:#b45309;font-weight:700;font-size:0.76rem;padding:3px 10px;border-radius:10px;">
+                    <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                </span>
             </div>
-            
-            <div style="border-top: 1px solid rgba(0,0,0,0.07); border-bottom: 1px solid rgba(0,0,0,0.07); padding: 12px 0; margin: 12px 0; font-size: 0.9rem;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+            <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Campus</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo htmlspecialchars($ic['name']); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Campus</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($ic['name']); ?></div>
                     </div>
                     <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Quantity</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo $item['quantity']; ?> units</div>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Condition</div>
-                        <div style="font-weight: 600; color: #1a1d23;"><?php echo ucfirst($item['condition']); ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.7rem; color: rgba(0,0,0,0.50); text-transform: uppercase;">Department</div>
-                        <div style="font-weight: 600; color: #1a1d23; font-size: 0.9rem;"><?php 
-                            if ($item['campus_id'] == 1) {
-                                $dept = isset($item['college_id']) && $item['college_id'] ? $item['college_id'] : 'Admin';
-                                $depts = array_merge(getMainCampusColleges(), getMainCampusOffices());
-                                echo isset($depts[$dept]) ? htmlspecialchars(substr(explode(' (', $depts[$dept])[0], 0, 18)) : htmlspecialchars($dept);
-                            }
-                        ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Condition</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo $cond_label; ?></div>
                     </div>
                 </div>
             </div>
-
-            <div style="display: flex; gap: 8px; justify-content: space-between;">
-                <button type="button" class="ai-btn-sm" style="background: rgba(59,130,246,0.10); color: #1d4ed8; flex: 1; border: none; border-radius: 8px;" onclick="openDetailModal(<?php echo htmlspecialchars(json_encode($item)); ?>, <?php echo htmlspecialchars(json_encode($unit_qrs)); ?>)">
-                    <i class="fas fa-eye"></i> View Details
+            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px;min-height:22px;">
+                <?php foreach (array_slice($group['units'], 0, 2) as $u): ?>
+                <span class="ai-qr-chip" style="font-size:0.68rem;"><?php echo htmlspecialchars($u['qr_code_id']); ?></span>
+                <?php endforeach; ?>
+                <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
+                    onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
+                    <i class="fas fa-eye"></i> View &amp; Manage Units
                 </button>
-                <a href="inventory.php?action=edit&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-edit" style="flex: 1; text-align: center;"><i class="fas fa-edit"></i></a>
-                <a href="inventory.php?action=delete&id=<?php echo $item['id']; ?>" class="ai-btn-sm ai-btn-delete delete-btn" style="flex: 1; text-align: center;"><i class="fas fa-trash"></i></a>
             </div>
         </div>
         <?php endforeach; else: ?>
-        <div class="ai-empty" style="grid-column: 1 / -1;"><i class="fas fa-tools"></i>No items in maintenance</div>
+        <div class="ai-empty" style="grid-column:1/-1;"><i class="fas fa-tools"></i>No items in maintenance</div>
         <?php endif; ?>
         </div>
         
@@ -1028,57 +1019,46 @@ displayMessage();
 </style>
 
 <script>
-function openDetailModal(item, units) {
-    // Populate header
-    document.getElementById('detailModalTitle').textContent = item.item_name;
-    document.getElementById('detailModalCategory').textContent = item.category + ' • ' + item.created_at;
-    
-    // Populate info
-    var campuses = <?php echo json_encode(getAllCampuses()); ?>;
-    var campus = campuses.find(c => c.id == item.campus_id);
+function openGroupModal(group, campus) {
+    document.getElementById('detailModalTitle').textContent = group.item_name;
+    document.getElementById('detailModalCategory').textContent =
+        group.category + ' · ' + campus.name + ' · ' + group.units.length + ' unit(s)';
+
     document.getElementById('detailCampus').textContent = campus ? campus.name : 'Unknown';
-    document.getElementById('detailQuantity').textContent = item.quantity + ' units';
-    document.getElementById('detailCondition').textContent = item.condition.charAt(0).toUpperCase() + item.condition.slice(1);
-    document.getElementById('detailCost').textContent = item.cost ? '₱' + parseFloat(item.cost).toFixed(2) : 'N/A';
-    document.getElementById('detailLocation').textContent = item.location;
-    document.getElementById('detailDescription').textContent = item.description || 'No description available';
-    
-    // Generate QR codes grid
+    document.getElementById('detailQuantity').textContent = group.units.length + ' unit(s)';
+
+    var condSet = [...new Set(group.units.map(function(u){ return u.condition; }))];
+    document.getElementById('detailCondition').textContent =
+        condSet.length === 1 ? condSet[0].charAt(0).toUpperCase() + condSet[0].slice(1) : 'Mixed';
+
+    document.getElementById('detailCost').textContent = group.cost ? '₱' + parseFloat(group.cost).toFixed(2) : 'N/A';
+    document.getElementById('detailLocation').textContent = group.location || 'N/A';
+    document.getElementById('detailDescription').textContent = group.description || 'No description available';
+
     var grid = document.getElementById('qrCodesGrid');
     grid.innerHTML = '';
-    var apiBase = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=';
-    
-    units.forEach(function(qr, idx) {
-        var col = document.createElement('div');
-        col.className = 'col-6 col-md-4 text-center';
-        col.innerHTML = '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;">'
-            + '<img src="' + apiBase + encodeURIComponent(qr) + '" alt="' + qr + '" style="width:120px;height:120px;border-radius:6px; object-fit: contain; margin-bottom: 8px;">'
-            + '<div style="font-size:0.7rem;font-family:monospace;word-break:break-all;margin:8px 0;color:rgba(0,0,0,0.50);background:rgba(0,0,0,0.03);padding:6px;border-radius:4px;">' + qr + '</div>'
-            + '<div style="font-size:0.8rem;font-weight:700;color:#8B0000;margin-top:4px;">Unit ' + (idx+1) + '</div>'
-            + '</div>';
-        grid.appendChild(col);
-    });
-    
-    // Show modal
-    new bootstrap.Modal(document.getElementById('detailModal')).show();
-}
-
-function openQRModal(itemId, itemName, units) {
-    document.getElementById('qrUnitsModalTitle').innerHTML = '<i class="fas fa-qrcode me-2 text-danger"></i>' + itemName + ' &mdash; ' + units.length + ' Units';
-    var grid = document.getElementById('qrUnitsGrid');
-    grid.innerHTML = '';
     var apiBase = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=';
-    units.forEach(function(qr, idx) {
+    var statusColors = { available:'success', borrowed:'warning', requested:'info', maintenance:'warning' };
+
+    group.units.forEach(function(unit, idx) {
+        var sc = statusColors[unit.status] || 'secondary';
         var col = document.createElement('div');
-        col.className = 'col-6 col-md-4 col-lg-3 text-center';
-        col.innerHTML = '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;">'
-            + '<img src="' + apiBase + encodeURIComponent(qr) + '" alt="' + qr + '" style="width:100px;height:100px;border-radius:6px;">'
-            + '<div style="font-size:0.65rem;font-family:monospace;word-break:break-all;margin-top:6px;color:rgba(0,0,0,0.50);">' + qr + '</div>'
-            + '<div style="font-size:0.70rem;font-weight:700;color:#8B0000;margin-top:3px;">Unit ' + (idx+1) + '</div>'
+        col.className = 'col-6 col-md-4';
+        col.innerHTML =
+            '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center;">'
+            + '<img src="' + apiBase + encodeURIComponent(unit.qr_code_id) + '" alt="QR" style="width:100px;height:100px;border-radius:6px;margin-bottom:8px;">'
+            + '<div style="font-family:monospace;font-size:0.67rem;word-break:break-all;margin-bottom:6px;color:rgba(0,0,0,0.55);background:rgba(0,0,0,0.03);padding:4px;border-radius:4px;">' + unit.qr_code_id + '</div>'
+            + '<div style="font-size:0.78rem;font-weight:700;color:#1a1d23;margin-bottom:4px;">Unit ' + (idx + 1) + '</div>'
+            + '<span class="ai-badge ai-badge-' + sc + '" style="font-size:0.7rem;margin-bottom:8px;">' + unit.status + '</span>'
+            + '<div style="display:flex;gap:4px;justify-content:center;margin-top:6px;">'
+            + '<a href="inventory.php?action=edit&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit"><i class="fas fa-edit"></i></a>'
+            + '<a href="inventory.php?action=delete&id=' + unit.id + '" class="ai-btn-sm ai-btn-delete delete-btn" title="Delete"><i class="fas fa-trash"></i></a>'
+            + '</div>'
             + '</div>';
         grid.appendChild(col);
     });
-    new bootstrap.Modal(document.getElementById('qrUnitsModal')).show();
+
+    new bootstrap.Modal(document.getElementById('detailModal')).show();
 }
 
 // Toggle tabs

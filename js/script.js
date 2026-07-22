@@ -5,8 +5,8 @@ $(document).ready(function() {
         $('.alert').fadeOut('slow');
     }, 5000);
 
-    // Delete confirmation
-    $('.delete-btn').on('click', function(e) {
+    // Delete confirmation — uses delegation to cover dynamically-created buttons (e.g. in modals)
+    $(document).on('click', '.delete-btn', function(e) {
         if (!confirm('Are you sure you want to delete this item?')) {
             e.preventDefault();
         }

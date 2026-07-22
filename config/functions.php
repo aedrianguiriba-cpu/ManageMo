@@ -80,17 +80,43 @@ function generateQRCodeId() {
     return 'QR-' . strtoupper(uniqid(sprintf("%08x", mt_rand())));
 }
 
-// Generate per-unit QR code IDs for an inventory item.
-// Returns an array where each element is a unique QR code for one physical unit.
-// e.g. item with qr_code_id='QR-ABC' and quantity=3 → ['QR-ABC-U01','QR-ABC-U02','QR-ABC-U03']
+// Returns QR code(s) for an inventory item.
+// Items with quantity=1 (the new per-unit model) return their own QR code directly.
+// Legacy items with quantity>1 still get derived per-unit suffixes for backward compat.
 function getItemUnitQRCodes($item) {
     $base = $item['qr_code_id'];
     $qty  = max(1, (int)($item['quantity'] ?? 1));
+    if ($qty === 1) return [$base];
     $units = [];
     for ($i = 1; $i <= $qty; $i++) {
         $units[] = $base . '-U' . str_pad($i, 2, '0', STR_PAD_LEFT);
     }
     return $units;
+}
+
+// Groups a flat array of inventory items by item_name + category + campus_id.
+// Each group has a 'units' key containing the individual item rows.
+function groupInventoryItems(array $items): array {
+    $groups = [];
+    foreach ($items as $item) {
+        $key = strtolower(trim($item['item_name']))
+             . '||' . strtolower(trim($item['category'] ?? ''))
+             . '||' . (int)$item['campus_id'];
+        if (!isset($groups[$key])) {
+            $groups[$key] = [
+                'item_name'   => $item['item_name'],
+                'category'    => $item['category'] ?? '',
+                'campus_id'   => (int)$item['campus_id'],
+                'location'    => $item['location'] ?? '',
+                'description' => $item['description'] ?? '',
+                'cost'        => $item['cost'],
+                'created_at'  => $item['created_at'] ?? '',
+                'units'       => [],
+            ];
+        }
+        $groups[$key]['units'][] = $item;
+    }
+    return array_values($groups);
 }
 
 // Generate random token
