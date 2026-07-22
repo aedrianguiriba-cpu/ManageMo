@@ -401,6 +401,27 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             'request_number' => $request['request_number'] ?? 'REQ-' . str_pad($request['id'], 5, '0', STR_PAD_LEFT),
         ]);
 
+        // Build per-unit QR data for sticker sheet
+        $sticker_units = [];
+        if ($item) {
+            $group_id = $item['group_id'] ?? null;
+            $qty_req  = (int)($request['quantity_requested'] ?? 1);
+            if ($group_id) {
+                $group_items = array_values(array_filter(getInventory(), fn($i) => ($i['group_id'] ?? null) === $group_id));
+            } else {
+                $group_items = [$item];
+            }
+            // For qty > 1 (old model), cap to requested count; for qty=1 show just this unit
+            $units_to_show = $qty_req > 1 ? array_slice($group_items, 0, $qty_req) : [$item];
+            foreach ($units_to_show as $u) {
+                $sticker_units[] = [
+                    'qr'        => $u['qr_code_id'] ?? 'N/A',
+                    'condition' => $u['condition'] ?? 'N/A',
+                    'location'  => $u['location'] ?? 'N/A',
+                ];
+            }
+        }
+
         $status_colors = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'success'];
         $urgency_colors = ['low'=>'info','medium'=>'warning','high'=>'danger','critical'=>'danger'];
         $type_labels = ['item'=>'Item Request','borrow'=>'Borrow Request','service'=>'Service Request'];
@@ -658,7 +679,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                 <div class="ar-sticker-sheet-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;">
                     <div>
                         <div style="font-weight:800;font-size:1rem;color:#0f172a;"><i class="fas fa-qrcode me-2" style="color:#8B0000;"></i>Print QR Sticker Sheet</div>
-                        <div style="font-size:.78rem;color:rgba(0,0,0,.44);margin-top:2px;"><?php echo (int)$request['quantity_requested']; ?> sticker(s) &mdash; based on requested quantity &mdash; print on label paper (A4 / Letter)</div>
+                        <div style="font-size:.78rem;color:rgba(0,0,0,.44);margin-top:2px;"><?php echo max(1, count($sticker_units)); ?> sticker(s) &mdash; one per unit with its unique QR code &mdash; print on label paper (A4 / Letter)</div>
                     </div>
                     <button onclick="document.getElementById('arStickerPrint').classList.remove('open')" style="border:none;background:none;font-size:1.3rem;cursor:pointer;color:rgba(0,0,0,.4);line-height:1;padding:2px 6px;">&times;</button>
                 </div>
@@ -684,27 +705,28 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             institution: 'Pampanga State University',
             short: 'PSU',
             item:      <?php echo json_encode($request['item_name']); ?>,
-            qr:        <?php echo json_encode($request['qr_code_id']); ?>,
-            location:  <?php echo json_encode($request['item_location']); ?>,
             category:  <?php echo json_encode($request['item_category']); ?>,
-            condition: <?php echo json_encode($request['item_condition']); ?>,
             reqno:     <?php echo json_encode($request['request_number']); ?>,
             requester: <?php echo json_encode($request['full_name']); ?>
         };
-        var _sqty = <?php echo (int)$request['quantity_requested']; ?>;
+        var _unitQRs = <?php echo json_encode(array_values($sticker_units)); ?>;
 
-        function _buildSticker() {
-            var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(_sd.qr);
+        function _buildSticker(unit, unitNum, totalUnits) {
+            var qr  = unit ? unit.qr  : <?php echo json_encode($request['qr_code_id']); ?>;
+            var loc = unit ? unit.location  : <?php echo json_encode($request['item_location']); ?>;
+            var cond= unit ? unit.condition : <?php echo json_encode($request['item_condition']); ?>;
+            var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(qr);
+            var unitLabel = totalUnits > 1 ? ' (Unit ' + unitNum + ' of ' + totalUnits + ')' : '';
             return '<div class="ar-sticker">'
                 + '<div class="ar-sticker-top">' + _sd.short + ' &mdash; Asset Label<span>' + _sd.institution + '</span></div>'
                 + '<div class="ar-sticker-qr"><img src="' + qrUrl + '" alt="QR" loading="eager" width="90" height="90"></div>'
                 + '<div class="ar-sticker-body">'
-                +   '<div class="ar-sticker-name">' + _esc(_sd.item) + '</div>'
-                +   '<div class="ar-sticker-row"><strong>Location:</strong><span>' + _esc(_sd.location) + '</span></div>'
+                +   '<div class="ar-sticker-name">' + _esc(_sd.item) + _esc(unitLabel) + '</div>'
+                +   '<div class="ar-sticker-row"><strong>Location:</strong><span>' + _esc(loc) + '</span></div>'
                 +   '<div class="ar-sticker-row"><strong>Category:</strong><span>' + _esc(_sd.category) + '</span></div>'
-                +   '<div class="ar-sticker-row"><strong>Condition:</strong><span>' + _esc(_sd.condition) + '</span></div>'
+                +   '<div class="ar-sticker-row"><strong>Condition:</strong><span>' + _esc(cond) + '</span></div>'
                 +   '<div class="ar-sticker-row"><strong>Issued To:</strong><span>' + _esc(_sd.requester) + '</span></div>'
-                +   '<div class="ar-sticker-code">' + _esc(_sd.qr) + '</div>'
+                +   '<div class="ar-sticker-code">' + _esc(qr) + '</div>'
                 + '</div>'
                 + '<div class="ar-sticker-foot">Req: ' + _esc(_sd.reqno) + ' &bull; ManageMo</div>'
                 + '</div>';
@@ -715,8 +737,9 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
             return d.innerHTML;
         }
         function _renderStickers() {
+            var units = _unitQRs.length > 0 ? _unitQRs : [null];
             var h = '';
-            for (var i = 0; i < _sqty; i++) h += _buildSticker();
+            units.forEach(function(unit, i) { h += _buildSticker(unit, i + 1, units.length); });
             document.getElementById('stickerGrid').innerHTML = h;
         }
         function openStickerSheet() {

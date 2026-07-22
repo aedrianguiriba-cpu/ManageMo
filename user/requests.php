@@ -45,10 +45,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
 
             if ($safe_type === 'borrow') {
-                $inv_id = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                $unit_ids  = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                $inv_id    = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                $ret_date  = !empty($entry['return_date']) ? $entry['return_date'] : null;
+                $reason    = sanitizeInput($entry['reason'] ?? '');
+                if (count($unit_ids) > 1) {
+                    // Create one request row per reserved unit
+                    foreach ($unit_ids as $uid) {
+                        $request_number = dbNextRequestNumber();
+                        $unit_payload = array_merge($payload, [
+                            'request_number'      => $request_number,
+                            'inventory_id'        => (int)$uid,
+                            'reason_for_request'  => $reason,
+                            'expected_return_date' => $ret_date,
+                            'quantity_requested'  => 1,
+                        ]);
+                        $result = dbCreateRequest($unit_payload);
+                        if (!$result['success']) {
+                            $errors[] = $result['error'];
+                        } else {
+                            logActivity($current_user['id'], 'CREATE', "Submitted borrow request for unit #$uid", 'requests', $result['row']['id'] ?? 0);
+                        }
+                    }
+                    continue;
+                }
                 $payload['inventory_id']         = $inv_id;
-                $payload['reason_for_request']   = sanitizeInput($entry['reason'] ?? '');
-                $payload['expected_return_date']  = !empty($entry['return_date']) ? $entry['return_date'] : null;
+                $payload['reason_for_request']   = $reason;
+                $payload['expected_return_date']  = $ret_date;
                 $payload['quantity_requested']   = max(1, (int)($entry['qty'] ?? 1));
             } elseif ($safe_type === 'item') {
                 $name = sanitizeInput($entry['name'] ?? '');
@@ -123,6 +146,7 @@ foreach (groupInventoryItems($borrowable) as $group) {
     $avail_units = array_values(array_filter($group['units'], fn($u) => $u['status'] === 'available'));
     $group['available_count']    = count($avail_units);
     $group['first_available_id'] = ($avail_units[0] ?? $group['units'][0])['id'];
+    $group['available_unit_ids'] = array_column($avail_units, 'id');
     // Aggregate return dates across all units
     $group_ret = [];
     foreach ($group['units'] as $u) {
@@ -906,6 +930,7 @@ if (!empty($submit_error)): ?>
                                         data-status="<?php echo $ci['available_count'] > 0 ? 'available' : 'borrowed'; ?>"
                                         data-quantity="<?php echo count($ci['units']); ?>"
                                         data-available="<?php echo $ci['available_count']; ?>"
+                                        data-unit-ids="<?php echo htmlspecialchars(json_encode($ci['available_unit_ids'])); ?>"
                                         <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
                                     <?php echo htmlspecialchars($ci['item_name']); ?>
                                 </option>
@@ -954,6 +979,7 @@ if (!empty($submit_error)): ?>
                                      data-category="<?php echo htmlspecialchars($category); ?>"
                                      data-available="<?php echo $availableQty; ?>"
                                      data-quantity="<?php echo $totalUnits; ?>"
+                                     data-unit-ids="<?php echo htmlspecialchars(json_encode($ci['available_unit_ids'])); ?>"
                                      onclick="selectBorrowCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
                                     <div class="bshop-avail-badge <?php echo $availableQty > 0 ? 'bshop-avail-ok' : 'bshop-avail-none'; ?>">
@@ -1092,6 +1118,7 @@ if (!empty($submit_error)): ?>
                                      data-value="<?php echo htmlspecialchars($ci['item_name']); ?>"
                                      data-category="<?php echo htmlspecialchars($category); ?>"
                                      data-desc="<?php echo htmlspecialchars($desc); ?>"
+                                     data-total="<?php echo $totalUnits; ?>"
                                      onclick="selectItemReqCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
                                     <div class="bshop-avail-badge bshop-avail-ok"><?php echo $totalUnits; ?> unit<?php echo $totalUnits > 1 ? 's' : ''; ?></div>
@@ -1646,6 +1673,16 @@ function selectItemReqCard(card) {
     var select = document.getElementById('item_description');
     select.value = card.getAttribute('data-value');
     handleItemCatalogChange(select);
+    var total = parseInt(card.getAttribute('data-total')) || 0;
+    var qtyInput = document.getElementById('quantity');
+    if (total > 0 && card.getAttribute('data-value') !== '__custom__') {
+        qtyInput.max = total;
+        qtyInput.title = 'Maximum available: ' + total;
+        if (parseInt(qtyInput.value) > total) qtyInput.value = total;
+    } else {
+        qtyInput.removeAttribute('max');
+        qtyInput.removeAttribute('title');
+    }
     updateSummary();
 }
 
@@ -1741,8 +1778,12 @@ function addToCart() {
         var qty = parseInt(document.getElementById('borrow_quantity').value) || 1;
         var reason = document.getElementById('reason').value.trim();
         var borrowCard = document.querySelector('#bshop-grid .bshop-card.bshop-selected');
-        var inventoryId = borrowCard ? (borrowCard.getAttribute('data-item-id') || '') : '';
-        entry = { type:'borrow', name:name, inventory_id:inventoryId, qty:qty, return_date:rd, reason:reason };
+        var unitIdsRaw = borrowCard ? (borrowCard.getAttribute('data-unit-ids') || '[]') : '[]';
+        var unitIds = [];
+        try { unitIds = JSON.parse(unitIdsRaw); } catch(e) { unitIds = []; }
+        var inventoryId = unitIds.length > 0 ? unitIds[0] : (borrowCard ? (borrowCard.getAttribute('data-item-id') || '') : '');
+        var selectedUnitIds = unitIds.slice(0, qty);
+        entry = { type:'borrow', name:name, inventory_id:inventoryId, unit_ids:selectedUnitIds, qty:qty, return_date:rd, reason:reason };
     } else if (type === 'item') {
         var sel2 = document.getElementById('item_description');
         var name2 = (sel2.value && sel2.value !== '__custom__') ? sel2.value : document.getElementById('custom_item_req_name').value.trim();
