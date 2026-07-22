@@ -35,6 +35,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'CREATE', "Added $qty unit(s) of inventory item: $item_name", 'inventory', $first_id);
         redirectWithMessage('inventory.php', "$qty unit(s) of '$item_name' added successfully!", 'success');
 
+    } elseif ($action === 'add_units') {
+        $ref_id = (int)$_POST['ref_id'];
+        $qty    = max(1, (int)$_POST['quantity']);
+        $ref_item = findById(getInventory(), $ref_id);
+        if (!$ref_item) {
+            redirectWithMessage('inventory.php', 'Reference item not found.', 'danger');
+        }
+        $base_data = [
+            'item_name'     => $ref_item['item_name'],
+            'category'      => $ref_item['category'],
+            'description'   => $ref_item['description'],
+            'campus_id'     => $ref_item['campus_id'],
+            'quantity'      => 1,
+            'location'      => $ref_item['location'],
+            'purchase_date' => !empty($_POST['purchase_date']) ? sanitizeInput($_POST['purchase_date']) : ($ref_item['purchase_date'] ?? null),
+            'cost'          => $ref_item['cost'],
+            'condition'     => sanitizeInput($_POST['condition']),
+            'status'        => 'available',
+        ];
+        for ($u = 0; $u < $qty; $u++) {
+            dbCreateInventory(array_merge($base_data, ['qr_code_id' => generateQRCodeId()]));
+        }
+        $item_name = $ref_item['item_name'];
+        logActivity($current_user['id'], 'CREATE', "Added $qty unit(s) to existing item: $item_name", 'inventory', $ref_id);
+        redirectWithMessage('inventory.php', "$qty unit(s) added to '$item_name' successfully!", 'success');
+
     } elseif ($action === 'add_owned') {
         $item_name = sanitizeInput($_POST['item_name']);
         $user_id   = (int)$_POST['user_id'];
@@ -592,7 +618,11 @@ displayMessage();
             <div style="display:flex;gap:8px;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
-                    <i class="fas fa-eye"></i> View &amp; Manage Units
+                    <i class="fas fa-eye"></i> View &amp; Manage
+                </button>
+                <button type="button" class="ai-btn-sm" style="background:rgba(34,197,94,0.10);color:#15803d;border:none;border-radius:8px;white-space:nowrap;"
+                    onclick="openAddUnitsModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
+                    <i class="fas fa-plus"></i> Add Units
                 </button>
             </div>
         </div>
@@ -658,7 +688,11 @@ displayMessage();
             <div style="display:flex;gap:8px;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
-                    <i class="fas fa-eye"></i> View &amp; Manage Units
+                    <i class="fas fa-eye"></i> View &amp; Manage
+                </button>
+                <button type="button" class="ai-btn-sm" style="background:rgba(34,197,94,0.10);color:#15803d;border:none;border-radius:8px;white-space:nowrap;"
+                    onclick="openAddUnitsModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
+                    <i class="fas fa-plus"></i> Add Units
                 </button>
             </div>
         </div>
@@ -724,7 +758,11 @@ displayMessage();
             <div style="display:flex;gap:8px;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
-                    <i class="fas fa-eye"></i> View &amp; Manage Units
+                    <i class="fas fa-eye"></i> View &amp; Manage
+                </button>
+                <button type="button" class="ai-btn-sm" style="background:rgba(34,197,94,0.10);color:#15803d;border:none;border-radius:8px;white-space:nowrap;"
+                    onclick="openAddUnitsModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
+                    <i class="fas fa-plus"></i> Add Units
                 </button>
             </div>
         </div>
@@ -790,7 +828,11 @@ displayMessage();
             <div style="display:flex;gap:8px;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, <?php echo htmlspecialchars(json_encode($ic)); ?>)">
-                    <i class="fas fa-eye"></i> View &amp; Manage Units
+                    <i class="fas fa-eye"></i> View &amp; Manage
+                </button>
+                <button type="button" class="ai-btn-sm" style="background:rgba(34,197,94,0.10);color:#15803d;border:none;border-radius:8px;white-space:nowrap;"
+                    onclick="openAddUnitsModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
+                    <i class="fas fa-plus"></i> Add Units
                 </button>
             </div>
         </div>
@@ -1207,5 +1249,62 @@ function showOwnedItemDetails(item, ownerName) {
         </div>
     </div>
 </div>
+
+<!-- Add Units to Existing Item Modal -->
+<div class="modal fade" id="addUnitsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:8px;border:1px solid #e5e7eb;">
+            <div class="modal-header" style="border-bottom:1px solid #e5e7eb;">
+                <div>
+                    <h5 class="modal-title" id="addUnitsModalTitle" style="font-size:1.05rem;font-weight:700;margin-bottom:3px;"></h5>
+                    <small id="addUnitsModalSub" style="color:rgba(0,0,0,0.45);font-size:0.8rem;"></small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="?action=add_units">
+                <div class="modal-body" style="padding:24px;">
+                    <input type="hidden" name="ref_id" id="addUnitsRefId">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Units to add *</label>
+                        <input type="number" class="form-control" name="quantity" value="1" min="1" required>
+                        <div class="form-text">Each unit gets its own unique QR code.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Condition *</label>
+                        <select class="form-select" name="condition" required>
+                            <option value="excellent">Excellent</option>
+                            <option value="good" selected>Good</option>
+                            <option value="fair">Fair</option>
+                            <option value="poor">Poor</option>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold">Purchase Date <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="date" class="form-control" name="purchase_date">
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #e5e7eb;">
+                    <button type="button" class="btn ai-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn ai-btn-primary"><i class="fas fa-plus"></i> Add Units</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openAddUnitsModal(group) {
+    var firstUnit = group.units[0];
+    document.getElementById('addUnitsRefId').value = firstUnit.id;
+    document.getElementById('addUnitsModalTitle').textContent = 'Add Units — ' + group.item_name;
+    document.getElementById('addUnitsModalSub').textContent =
+        group.category + ' · ' + group.units.length + ' existing unit(s)';
+    // Reset form fields
+    document.querySelector('#addUnitsModal input[name="quantity"]').value = 1;
+    document.querySelector('#addUnitsModal select[name="condition"]').value = 'good';
+    document.querySelector('#addUnitsModal input[name="purchase_date"]').value = '';
+    new bootstrap.Modal(document.getElementById('addUnitsModal')).show();
+}
+</script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
