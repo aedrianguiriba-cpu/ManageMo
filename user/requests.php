@@ -163,9 +163,11 @@ foreach (groupInventoryItems($all_sorted) as $group) {
     $catalog_by_category[$group['category'] ?: 'Other'][] = $group;
 }
 
-// Borrow catalog: available + borrowed items, grouped
+// Borrow catalog: available + borrowed + requested items, grouped
 $borrow_records_all = getBorrowRecords();
 $item_avail_data = [];
+
+// Return dates from active/overdue borrow records (already delivered)
 foreach ($borrow_records_all as $br) {
     if (in_array($br['status'], ['active', 'overdue']) && empty($br['actual_return_date'])) {
         $iid = $br['inventory_id'];
@@ -176,10 +178,26 @@ foreach ($borrow_records_all as $br) {
         ];
     }
 }
+
+// Return dates from pending/approved borrow requests (not yet delivered, no borrow record yet)
+foreach (getRequests() as $req) {
+    if ($req['request_type'] === 'borrow'
+        && in_array($req['status'], ['pending', 'approved'])
+        && !empty($req['inventory_id'])
+        && !empty($req['expected_return_date'])) {
+        $iid = (int)$req['inventory_id'];
+        if (!isset($item_avail_data[$iid])) $item_avail_data[$iid] = [];
+        $item_avail_data[$iid][] = [
+            'return_date' => $req['expected_return_date'],
+            'is_overdue'  => false,
+        ];
+    }
+}
+
 $item_avail_json = json_encode($item_avail_data);
 
 $borrowable = array_values(array_filter($all_inventory, function($item) {
-    return in_array($item['status'], ['available', 'borrowed']);
+    return in_array($item['status'], ['available', 'borrowed', 'requested']);
 }));
 usort($borrowable, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
 $borrow_catalog = [];
@@ -1624,7 +1642,7 @@ function renderItemAvailCal(select) {
     var itemId   = parseInt(opt.getAttribute('data-item-id'));
     var status   = opt.getAttribute('data-status');
     var totalQty = parseInt(opt.getAttribute('data-quantity')) || 0;
-    if (!itemId || status !== 'borrowed') {
+    if (!itemId || status === 'available') {
         wrap.style.display = 'none';
         iacCurrentId = null;
         return;
