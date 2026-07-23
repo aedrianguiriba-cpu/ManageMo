@@ -6,8 +6,19 @@
 
 require_once __DIR__ . '/supabase.php';
 
-// ── Cache TTL in seconds (60s balances freshness vs. API call reduction) ──────
+// ── Cache TTL in seconds ──────────────────────────────────────────────────────
 const DB_CACHE_TTL = 60;
+
+// Shared invalidation flag file — written by any admin write; checked by all sessions.
+define('DB_CACHE_FLAG_FILE', sys_get_temp_dir() . '/managemo_cache_invalidated.txt');
+
+function _globalCacheInvalidatedAt(): int {
+    static $t = null;
+    if ($t === null) {
+        $t = file_exists(DB_CACHE_FLAG_FILE) ? (int)file_get_contents(DB_CACHE_FLAG_FILE) : 0;
+    }
+    return $t;
+}
 
 // ── In-request + session cache ────────────────────────────────────────────────
 function _dbCache(string $key, callable $loader): array {
@@ -16,10 +27,12 @@ function _dbCache(string $key, callable $loader): array {
     // Layer 1: in-request memory (free)
     if (array_key_exists($key, $c)) return $c[$key];
 
-    // Layer 2: session cache with TTL
+    // Layer 2: session cache with TTL, invalidated by global flag
     if (session_status() === PHP_SESSION_ACTIVE) {
         $entry = $_SESSION['_db_cache'][$key] ?? null;
-        if ($entry && (time() - $entry['ts']) < DB_CACHE_TTL) {
+        if ($entry
+            && (time() - $entry['ts']) < DB_CACHE_TTL
+            && $entry['ts'] >= _globalCacheInvalidatedAt()) {
             $c[$key] = $entry['data'];
             return $c[$key];
         }
@@ -36,11 +49,11 @@ function _dbCache(string $key, callable $loader): array {
     return $data;
 }
 
-// Call this after any write/update/delete so the next request re-fetches fresh data.
+// Call this after any write/update/delete so all sessions re-fetch fresh data.
 function clearDataCache(string ...$keys): void {
-    static $c;
-    // Clear in-request static cache via a fresh include trick isn't possible,
-    // so we just nuke the session entries; the static array lives until request ends.
+    // Write global invalidation timestamp so other users' session caches also expire.
+    @file_put_contents(DB_CACHE_FLAG_FILE, time());
+
     if (session_status() !== PHP_SESSION_ACTIVE) return;
     if (empty($keys)) {
         unset($_SESSION['_db_cache']);
