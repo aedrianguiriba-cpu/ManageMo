@@ -128,6 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]));
             if (!$result['success']) {
                 $errors[] = 'Failed to save ' . htmlspecialchars($unit['item_name']) . ': ' . $result['error'];
+            } elseif (!empty($unit['inventory_id'])) {
+                // Mark the physical unit unavailable immediately so no one else can request it
+                $inv_status = ($safe_type === 'service') ? 'maintenance' : 'requested';
+                dbUpdateInventory((int)$unit['inventory_id'], ['status' => $inv_status]);
             }
         }
 

@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action_type === 'disapprove') {
         foreach ($group_reqs as $gr) {
             dbUpdateRequest((int)$gr['id'], ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
-            if (!empty($gr['inventory_id']) && in_array($gr['request_type'], ['borrow', 'service'])) {
+            if (!empty($gr['inventory_id'])) {
                 $inv = findById(getInventory(), (int)$gr['inventory_id']);
                 if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
                     dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);

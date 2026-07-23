@@ -107,8 +107,9 @@ foreach ($campus_stats as $cs) {
     $campus_borrowed_js[] = $cs['stats']['borrowed'];
     $campus_maint_js[]    = $cs['stats']['maintenance'];
 }
-$maintenance_total = array_sum($campus_maint_js);
-$computed_available = $total_items - $borrowed_items - $maintenance_total;
+$maintenance_total  = array_sum($campus_maint_js);
+$requested_total    = array_sum(array_map(fn($cs) => $cs['stats']['requested'] ?? 0, $campus_stats));
+$computed_available = $total_items - $borrowed_items - $maintenance_total - $requested_total;
 ?>
 <style>
 /* ── KPI grid ── */
