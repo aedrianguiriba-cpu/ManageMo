@@ -32,128 +32,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!is_array($cart_items) || empty($cart_items)) {
         $submit_error = 'No items in your request. Please add at least one item.';
     } else {
-        $errors  = [];
-        $all_inv = getInventory();
+        $errors   = [];
+        $all_inv  = getInventory();
+        $group_id = generateGroupId(); // shared across all units in this submission
 
-        // One request per cart submission; all cart items become request_items rows
-        $request_number = dbNextRequestNumber();
-        $request_group_id = generateGroupId(); // links all items in this submission
-        $payload = [
-            'request_number'   => $request_number,
-            'group_id'         => $request_group_id,
+        // Pre-fetch latest request number once to avoid N round-trips
+        $base_rows = supabase()->select('requests', 'select=request_number&order=id.desc&limit=1');
+        preg_match('/REQ-(\d+)$/', $base_rows[0]['request_number'] ?? 'REQ-00000', $_m);
+        $next_num = isset($_m[1]) ? (int)$_m[1] + 1 : 1;
+
+        // Shared fields from first cart entry
+        $first  = $cart_items[0];
+        $shared = [
             'user_id'          => $current_user['id'],
             'request_type'     => $safe_type,
+            'group_id'         => $group_id,
             'urgency'          => $urgency,
             'receiving_method' => $receiving_method,
             'status'           => 'pending',
-            'quantity_requested' => 0, // will sum below
+            'quantity_requested' => 1, // every row = 1 physical unit
         ];
-
-        // Collect shared fields from the first entry (return date, reason)
-        $first = $cart_items[0];
         if ($safe_type === 'borrow') {
-            $payload['reason_for_request']   = sanitizeInput($first['reason'] ?? '');
-            $payload['expected_return_date'] = !empty($first['return_date']) ? $first['return_date'] : null;
+            $shared['reason_for_request']   = sanitizeInput($first['reason'] ?? '');
+            $shared['expected_return_date'] = !empty($first['return_date']) ? $first['return_date'] : null;
         } elseif ($safe_type === 'item') {
-            $payload['reason_for_request'] = sanitizeInput($first['reason'] ?? '');
+            $shared['reason_for_request'] = sanitizeInput($first['reason'] ?? '');
         } elseif ($safe_type === 'service') {
             $svc_type = sanitizeInput($first['service_type'] ?? '');
             $svc_desc = sanitizeInput($first['description'] ?? '');
-            $payload['service_description'] = $svc_type ? "[$svc_type] $svc_desc" : $svc_desc;
+            $shared['service_description'] = $svc_type ? "[$svc_type] $svc_desc" : $svc_desc;
         }
 
-        $result = dbCreateRequest($payload);
-        if (!$result['success']) {
-            $submit_error = 'Failed to create request: ' . $result['error'];
-        } else {
-            $req_id     = (int)($result['row']['id'] ?? 0);
-            $total_qty  = 0;
+        // Collect all units to create as individual request rows
+        $units_to_save = []; // each: ['inventory_id', 'qr_code_id', 'item_name']
 
-            foreach ($cart_items as $entry) {
-                if ($safe_type === 'borrow') {
-                    $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
-                    $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
-                    $qty      = max(1, (int)($entry['qty'] ?? 1));
+        foreach ($cart_items as $entry) {
+            if ($safe_type === 'borrow') {
+                $unit_ids    = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                $inv_id      = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                $qty         = max(1, (int)($entry['qty'] ?? 1));
+                $fallback    = ($inv_id ? findById($all_inv, $inv_id) : null)
+                            ?? (!empty($unit_ids) ? findById($all_inv, (int)$unit_ids[0]) : null);
 
-                    if (count($unit_ids) >= 1) {
-                        // Create one request_item per quantity; use specific unit IDs where available,
-                        // then fall back to the first inventory_id with a new QR (old single-row model)
-                        $fallback_item = findById($all_inv, (int)$unit_ids[0]);
-                        for ($q = 0; $q < $qty; $q++) {
-                            $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : (int)$unit_ids[0];
-                            $unit_item = findById($all_inv, $uid) ?? $fallback_item;
-                            // Only reuse the stored QR for the first occurrence of this uid
-                            $use_stored_qr = isset($unit_ids[$q]);
-                            $unit_qr   = ($use_stored_qr && $unit_item && $unit_item['qr_code_id'])
-                                         ? $unit_item['qr_code_id']
-                                         : generateQRCodeId();
-                            $ri = dbCreateRequestItem([
-                                'request_id'   => $req_id,
-                                'inventory_id' => $uid,
-                                'qr_code_id'   => $unit_qr,
-                                'item_name'    => $unit_item['item_name'] ?? $entry['name'] ?? 'Unknown',
-                                'quantity'     => 1,
-                            ]);
-                            if (!$ri) $errors[] = "Failed to save unit #$uid";
-                            $total_qty++;
-                        }
-                    } else {
-                        // No unit IDs — create one request_item per quantity unit
-                        $single_item = $inv_id ? findById($all_inv, $inv_id) : null;
-                        for ($q = 0; $q < $qty; $q++) {
-                            dbCreateRequestItem([
-                                'request_id'   => $req_id,
-                                'inventory_id' => $inv_id,
-                                'qr_code_id'   => ($q === 0 && $single_item && $single_item['qr_code_id'])
-                                                  ? $single_item['qr_code_id']
-                                                  : generateQRCodeId(),
-                                'item_name'    => $single_item['item_name'] ?? $entry['name'] ?? 'Unknown',
-                                'quantity'     => 1,
-                            ]);
-                        }
-                        $total_qty += $qty;
-                    }
-                } elseif ($safe_type === 'item') {
-                    $name     = sanitizeInput($entry['name'] ?? '');
-                    $qty      = max(1, (int)($entry['qty'] ?? 1));
-                    $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
-                    $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
-                    // Each unit gets its own QR; link to the matching inventory unit when available
-                    for ($q = 0; $q < $qty; $q++) {
-                        $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
-                        $unit_item = $uid ? findById($all_inv, $uid) : null;
-                        dbCreateRequestItem([
-                            'request_id'   => $req_id,
-                            'inventory_id' => $uid,
-                            'qr_code_id'   => generateQRCodeId(),
-                            'item_name'    => $unit_item['item_name'] ?? $name,
-                            'quantity'     => 1,
-                        ]);
-                    }
-                    $total_qty += $qty;
-                } elseif ($safe_type === 'service') {
-                    $svc_inv_id = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
-                    $svc_item   = $svc_inv_id ? findById($all_inv, $svc_inv_id) : null;
-                    dbCreateRequestItem([
-                        'request_id'   => $req_id,
-                        'inventory_id' => $svc_inv_id,
-                        'qr_code_id'   => $svc_item['qr_code_id'] ?? generateQRCodeId(),
-                        'item_name'    => $svc_item['item_name'] ?? 'Service Item',
-                        'quantity'     => 1,
-                    ]);
-                    $total_qty++;
+                for ($q = 0; $q < $qty; $q++) {
+                    $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
+                    $unit_item = ($uid ? findById($all_inv, $uid) : null) ?? $fallback;
+                    // Reuse inventory QR only for the first slot that owns this uid; generate fresh otherwise
+                    $unit_qr   = ($uid && isset($unit_ids[$q]) && $unit_item && $unit_item['qr_code_id'])
+                                 ? $unit_item['qr_code_id']
+                                 : generateQRCodeId();
+                    $units_to_save[] = [
+                        'inventory_id' => $uid,
+                        'qr_code_id'   => $unit_qr,
+                        'item_name'    => $unit_item['item_name'] ?? $entry['name'] ?? 'Unknown',
+                    ];
                 }
+            } elseif ($safe_type === 'item') {
+                $name     = sanitizeInput($entry['name'] ?? '');
+                $qty      = max(1, (int)($entry['qty'] ?? 1));
+                $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                for ($q = 0; $q < $qty; $q++) {
+                    $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
+                    $unit_item = $uid ? findById($all_inv, $uid) : null;
+                    $units_to_save[] = [
+                        'inventory_id' => $uid,
+                        'qr_code_id'   => generateQRCodeId(),
+                        'item_name'    => $unit_item['item_name'] ?? $name,
+                    ];
+                }
+            } elseif ($safe_type === 'service') {
+                $svc_inv_id = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
+                $svc_item   = $svc_inv_id ? findById($all_inv, $svc_inv_id) : null;
+                $units_to_save[] = [
+                    'inventory_id' => $svc_inv_id,
+                    'qr_code_id'   => $svc_item['qr_code_id'] ?? generateQRCodeId(),
+                    'item_name'    => $svc_item['item_name'] ?? 'Service Item',
+                ];
             }
+        }
 
-            // Stamp total quantity on the request
-            dbUpdateRequest($req_id, ['quantity_requested' => $total_qty]);
-            logActivity($current_user['id'], 'CREATE', "Submitted $safe_type request ($total_qty item(s))", 'requests', $req_id);
-
-            if (empty($errors)) {
-                redirectWithMessage('my-requests.php', 'Request ' . $request_number . ' submitted with ' . $total_qty . ' item(s)!', 'success');
-            } else {
-                $submit_error = 'Request saved but some items failed: ' . implode('; ', $errors);
+        // Create one request row per unit — each gets its own request_number
+        $first_req_number = null;
+        foreach ($units_to_save as $unit) {
+            $req_number = 'REQ-' . str_pad($next_num++, 5, '0', STR_PAD_LEFT);
+            if (!$first_req_number) $first_req_number = $req_number;
+            $result = dbCreateRequest(array_merge($shared, [
+                'request_number' => $req_number,
+                'inventory_id'   => $unit['inventory_id'],
+                'qr_code_id'     => $unit['qr_code_id'],
+            ]));
+            if (!$result['success']) {
+                $errors[] = 'Failed to save ' . htmlspecialchars($unit['item_name']) . ': ' . $result['error'];
             }
+        }
+
+        $total_qty = count($units_to_save);
+        logActivity($current_user['id'], 'CREATE', "Submitted $safe_type group $group_id ($total_qty unit(s))", 'requests', 0);
+
+        if (empty($errors)) {
+            redirectWithMessage('my-requests.php', count($units_to_save) . ' item(s) submitted successfully (Group: ' . $group_id . ')!', 'success');
+        } else {
+            $submit_error = 'Some requests failed to save: ' . implode('; ', $errors);
         }
     }
 }

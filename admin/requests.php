@@ -15,113 +15,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $request_id  = (int)sanitizeInput($_POST['request_id']);
     $action_type = sanitizeInput($_POST['action']);
 
+    // Resolve the full group this action applies to
+    $trigger_req = findById(getRequests(), $request_id);
+    $gid         = !empty($trigger_req['group_id']) ? $trigger_req['group_id'] : null;
+    $group_reqs  = $gid
+        ? array_values(array_filter(getRequests(), fn($r) => ($r['group_id'] ?? '') === $gid))
+        : ($trigger_req ? [$trigger_req] : []);
+    $redirect_param = $gid ? 'group_id=' . urlencode($gid) : 'id=' . $request_id;
+
     if ($action_type === 'approve') {
-        $req   = findById(getRequests(), $request_id);
-        $items = getRequestItems($request_id);
-        dbUpdateRequest($request_id, ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
-        foreach ($items as $ri) {
-            if (empty($ri['inventory_id'])) continue;
-            if ($req['request_type'] === 'borrow')  dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'requested']);
-            if ($req['request_type'] === 'service') dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'maintenance']);
+        foreach ($group_reqs as $gr) {
+            dbUpdateRequest((int)$gr['id'], ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+            if (!empty($gr['inventory_id'])) {
+                if ($gr['request_type'] === 'borrow')  dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'requested']);
+                if ($gr['request_type'] === 'service') dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'maintenance']);
+            }
         }
-        logActivity($current_user['id'], 'APPROVE', "Approved request #$request_id", 'requests', $request_id);
-        redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request approved successfully!', 'success');
+        logActivity($current_user['id'], 'APPROVE', "Approved group $gid (" . count($group_reqs) . " units)", 'requests', $request_id);
+        redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request approved successfully!', 'success');
 
     } elseif ($action_type === 'disapprove') {
-        $req   = findById(getRequests(), $request_id);
-        $items = getRequestItems($request_id);
-        dbUpdateRequest($request_id, ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
-        if (in_array($req['request_type'], ['borrow', 'service'])) {
-            foreach ($items as $ri) {
-                if (empty($ri['inventory_id'])) continue;
-                $inv = findById(getInventory(), (int)$ri['inventory_id']);
+        foreach ($group_reqs as $gr) {
+            dbUpdateRequest((int)$gr['id'], ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+            if (!empty($gr['inventory_id']) && in_array($gr['request_type'], ['borrow', 'service'])) {
+                $inv = findById(getInventory(), (int)$gr['inventory_id']);
                 if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
-                    dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'available']);
+                    dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);
                 }
             }
         }
-        logActivity($current_user['id'], 'DISAPPROVE', "Disapproved request #$request_id", 'requests', $request_id);
-        redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request disapproved.', 'info');
+        logActivity($current_user['id'], 'DISAPPROVE', "Disapproved group $gid", 'requests', $request_id);
+        redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request disapproved.', 'info');
 
     } elseif ($action_type === 'change_receiving_method') {
         $new_method = sanitizeInput($_POST['receiving_method'] ?? '');
         if (in_array($new_method, ['delivery', 'pickup'])) {
-            dbUpdateRequest($request_id, ['receiving_method' => $new_method]);
-            logActivity($current_user['id'], 'UPDATE', "Changed receiving method of request #$request_id to $new_method", 'requests', $request_id);
-            redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Receiving method updated to ' . ucfirst($new_method) . '.', 'success');
+            foreach ($group_reqs as $gr) {
+                dbUpdateRequest((int)$gr['id'], ['receiving_method' => $new_method]);
+            }
+            redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Receiving method updated to ' . ucfirst($new_method) . '.', 'success');
         }
 
     } elseif ($action_type === 'mark_out_for_delivery') {
-        dbUpdateRequest($request_id, ['delivery_status' => 'out_for_delivery']);
-        $req_data    = findById(getRequests(), $request_id);
-        $notif_user  = findById(getUsers(), $req_data['user_id'] ?? 0);
-        $req_num     = $req_data['request_number'] ?? 'REQ-' . str_pad($request_id, 5, '0', STR_PAD_LEFT);
-        $recv_method = $req_data['receiving_method'] ?? 'delivery';
+        foreach ($group_reqs as $gr) {
+            dbUpdateRequest((int)$gr['id'], ['delivery_status' => 'out_for_delivery']);
+        }
+        $notif_user  = findById(getUsers(), $trigger_req['user_id'] ?? 0);
+        $recv_method = $trigger_req['receiving_method'] ?? 'delivery';
         if ($notif_user) {
             $stage = ($recv_method === 'pickup') ? 'pickup_ready' : 'out_for_delivery';
-            sendDeliveryEmail($notif_user['email'], $notif_user['full_name'], $req_num, $stage);
+            sendDeliveryEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], $stage);
         }
-        logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as out for delivery", 'requests', $request_id);
-        $label = ($recv_method === 'pickup') ? 'Marked as Ready for Pickup. Email notification sent.' : 'Marked as Out for Delivery. Email notification sent.';
-        redirectWithMessage('requests.php?action=view&id=' . $request_id, $label, 'success');
+        $label = ($recv_method === 'pickup') ? 'Marked as Ready for Pickup.' : 'Marked as Out for Delivery.';
+        redirectWithMessage('requests.php?action=view&' . $redirect_param, $label, 'success');
 
     } elseif ($action_type === 'mark_delivered') {
-        $req   = findById(getRequests(), $request_id);
-        $items = getRequestItems($request_id);
-        dbUpdateRequest($request_id, ['delivery_status' => 'delivered', 'status' => 'delivered']);
-        if ($req && $req['request_type'] === 'borrow') {
-            foreach ($items as $ri) {
-                if (empty($ri['inventory_id'])) continue;
-                dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'borrowed']);
+        foreach ($group_reqs as $gr) {
+            dbUpdateRequest((int)$gr['id'], ['delivery_status' => 'delivered', 'status' => 'delivered']);
+            if ($gr['request_type'] === 'borrow' && !empty($gr['inventory_id'])) {
+                dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'borrowed']);
                 dbCreateBorrowRecord([
-                    'user_id'              => (int)$req['user_id'],
-                    'inventory_id'         => (int)$ri['inventory_id'],
-                    'request_id'           => $request_id,
+                    'user_id'              => (int)$gr['user_id'],
+                    'inventory_id'         => (int)$gr['inventory_id'],
+                    'request_id'           => (int)$gr['id'],
                     'borrow_date'          => date('Y-m-d'),
-                    'expected_return_date' => $req['expected_return_date'] ?? null,
+                    'expected_return_date' => $gr['expected_return_date'] ?? null,
                     'status'               => 'active',
-                    'notes'                => $req['reason_for_request'] ?? null,
+                    'notes'                => $gr['reason_for_request'] ?? null,
                 ]);
             }
         }
-        logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as delivered", 'requests', $request_id);
-        redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request marked as Delivered.', 'success');
+        logActivity($current_user['id'], 'UPDATE', "Delivered group $gid", 'requests', $request_id);
+        redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Marked as Delivered.', 'success');
 
     } elseif ($action_type === 'mark_returned') {
-        $req   = findById(getRequests(), $request_id);
-        $items = getRequestItems($request_id);
-        if ($req && $req['request_type'] === 'borrow') {
-            $borrow_records = getBorrowRecords();
+        $borrow_records = getBorrowRecords();
+        foreach ($group_reqs as $gr) {
             foreach ($borrow_records as $br) {
-                if ((int)$br['request_id'] === $request_id && $br['status'] === 'active') {
-                    supabase()->updateById('borrow_records', (int)$br['id'], [
-                        'status'             => 'returned',
-                        'actual_return_date' => date('Y-m-d'),
-                    ]);
-                    clearDataCache('borrow_records');
+                if ((int)$br['request_id'] === (int)$gr['id'] && $br['status'] === 'active') {
+                    supabase()->updateById('borrow_records', (int)$br['id'], ['status' => 'returned', 'actual_return_date' => date('Y-m-d')]);
                 }
             }
-            foreach ($items as $ri) {
-                if (empty($ri['inventory_id'])) continue;
-                dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'available']);
-            }
+            if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);
+            dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
         }
-        dbUpdateRequest($request_id, ['status' => 'completed']);
-        logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as returned/completed", 'requests', $request_id);
-        redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Item returned and request completed.', 'success');
+        clearDataCache('borrow_records');
+        redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Items returned and request completed.', 'success');
 
     } elseif ($action_type === 'mark_completed') {
-        $req   = findById(getRequests(), $request_id);
-        $items = getRequestItems($request_id);
-        if ($req && in_array($req['request_type'], ['service', 'item'])) {
-            foreach ($items as $ri) {
-                if (empty($ri['inventory_id'])) continue;
-                dbUpdateInventory((int)$ri['inventory_id'], ['status' => 'available']);
-            }
+        foreach ($group_reqs as $gr) {
+            if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);
+            dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
         }
-        dbUpdateRequest($request_id, ['status' => 'completed']);
-        logActivity($current_user['id'], 'UPDATE', "Marked request #$request_id as completed", 'requests', $request_id);
-        redirectWithMessage('requests.php?action=view&id=' . $request_id, 'Request marked as completed.', 'success');
+        redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request marked as completed.', 'success');
     }
 }
 
@@ -136,6 +122,28 @@ displayMessage();
 $all_requests   = getRequests();
 $users_data     = getUsers();
 $inventory_data = getInventory();
+
+// Build a request_id → [request_items] map for display (avoids per-row queries)
+$_all_req_items = getRequestItems();
+$_req_items_map = [];
+foreach ($_all_req_items as $_ri) {
+    $_req_items_map[(int)$_ri['request_id']][] = $_ri;
+}
+
+// Helper: get first item name for a request (falls back to inventory then 'Unknown Item')
+function _reqFirstItemName(array $req_items_map, int $req_id, array $inventory_data): string {
+    $ri = $req_items_map[$req_id][0] ?? null;
+    if ($ri && !empty($ri['item_name'])) return $ri['item_name'];
+    if ($ri && !empty($ri['inventory_id'])) {
+        $inv = findById($inventory_data, (int)$ri['inventory_id']);
+        if ($inv) return $inv['item_name'];
+    }
+    return 'Unknown Item';
+}
+function _reqFirstQR(array $req_items_map, int $req_id): string {
+    $ri = $req_items_map[$req_id][0] ?? null;
+    return ($ri && !empty($ri['qr_code_id'])) ? $ri['qr_code_id'] : 'N/A';
+}
 
 // Apply filters
 $filtered_requests = $all_requests;
@@ -153,25 +161,49 @@ usort($filtered_requests, function($a, $b) {
     return strcmp($b['created_at'], $a['created_at']);
 });
 
-// Calculate pagination
-$total = count($filtered_requests);
-$total_pages = ceil($total / ITEMS_PER_PAGE);
+// Group filtered requests by group_id (or use id as fallback key)
+$grouped_filtered = [];
+$seen_group_keys  = [];
+foreach ($filtered_requests as $req) {
+    $gkey = !empty($req['group_id']) ? 'gid:' . $req['group_id'] : 'id:' . $req['id'];
+    if (!isset($grouped_filtered[$gkey])) {
+        $grouped_filtered[$gkey] = ['rows' => [], 'first' => $req];
+    }
+    $grouped_filtered[$gkey]['rows'][] = $req;
+}
+$grouped_filtered = array_values($grouped_filtered);
 
-// Get requests for current page
-$offset = ($page - 1) * ITEMS_PER_PAGE;
+// Paginate on groups, not individual rows
+$total      = count($grouped_filtered);
+$total_pages = max(1, ceil($total / ITEMS_PER_PAGE));
+$offset     = ($page - 1) * ITEMS_PER_PAGE;
+
 $requests = [];
+foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
+    $req   = $grp['first'];
+    $rows  = $grp['rows'];
+    $user  = findById($users_data, $req['user_id']);
 
-foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
-    $user = findById($users_data, $req['user_id']);
-    $item = findById($inventory_data, $req['inventory_id']);
-    
+    // Collect item names across all rows in the group
+    $grp_names = [];
+    foreach ($rows as $_r) {
+        $_inv = !empty($_r['inventory_id']) ? findById($inventory_data, (int)$_r['inventory_id']) : null;
+        $n = $_inv['item_name']
+          ?? _reqFirstItemName($_req_items_map, (int)$_r['id'], $inventory_data);
+        if ($n && $n !== 'Unknown Item') $grp_names[] = $n;
+    }
+    $grp_names     = array_values(array_unique($grp_names));
+    $grp_name_str  = !empty($grp_names) ? implode(', ', array_slice($grp_names, 0, 3)) . (count($grp_names) > 3 ? '…' : '') : 'N/A';
+
     $requests[] = array_merge($req, [
-        'full_name'  => $user['full_name']  ?? 'Unknown',
-        'email'      => $user['email']      ?? 'N/A',
-        'campus_id'  => $user['campus_id']  ?? NULL,
-        'college_id' => $user['college_id'] ?? NULL,
-        'item_name'  => $item['item_name']  ?? 'Unknown Item',
-        'qr_code_id' => $item['qr_code_id'] ?? 'N/A'
+        'full_name'   => $user['full_name']  ?? 'Unknown',
+        'email'       => $user['email']      ?? 'N/A',
+        'campus_id'   => $user['campus_id']  ?? null,
+        'college_id'  => $user['college_id'] ?? null,
+        'item_name'   => $grp_name_str,
+        'qr_code_id'  => $req['qr_code_id'] ?? _reqFirstQR($_req_items_map, (int)$req['id']),
+        'unit_count'  => count($rows),
+        'group_id'    => $req['group_id'] ?? null,
     ]);
 }
 ?>
@@ -444,59 +476,92 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
     <?php if ($action === 'view'): ?>
         <!-- View Request Details -->
         <?php
-        $request_id = sanitizeInput($_GET['id']);
-        $request = findById(getRequests(), (int)$request_id);
+        $view_group_id  = sanitizeInput($_GET['group_id'] ?? '');
+        $view_single_id = (int)sanitizeInput($_GET['id'] ?? 0);
+
+        // Resolve the group of requests to display
+        $all_reqs_for_view = getRequests();
+        if ($view_group_id) {
+            $group_view_reqs = array_values(array_filter($all_reqs_for_view, fn($r) => ($r['group_id'] ?? '') === $view_group_id));
+            $request = $group_view_reqs[0] ?? null;
+        } elseif ($view_single_id) {
+            $request = findById($all_reqs_for_view, $view_single_id);
+            $group_view_reqs = $request && !empty($request['group_id'])
+                ? array_values(array_filter($all_reqs_for_view, fn($r) => ($r['group_id'] ?? '') === $request['group_id']))
+                : ($request ? [$request] : []);
+        } else {
+            $request = null;
+            $group_view_reqs = [];
+        }
 
         if (!$request) {
             die('<div class="alert alert-danger">Request not found</div>');
         }
-        
+
         $user = findById(getUsers(), $request['user_id']);
-        $item = $request['inventory_id'] ? findById(getInventory(), $request['inventory_id']) : null;
-        // For item/service requests with no inventory link, derive item name from description
-        $fallback_item_name = $item['item_name'] ?? (trim($request['service_description'] ?? '') ?: 'Not specified');
-        $fallback_qr        = $item['qr_code_id'] ?? ($request['request_number'] ?? 'N/A');
-        
+
+        // Resolve item info: for grouped requests, build from each request row directly
+        $sticker_units = [];
+        foreach ($group_view_reqs as $_gr) {
+            $_gr_inv = !empty($_gr['inventory_id']) ? findById(getInventory(), (int)$_gr['inventory_id']) : null;
+            $_gr_qr  = $_gr['qr_code_id'] ?? ($_gr_inv['qr_code_id'] ?? null);
+            // Also check legacy request_items for this row
+            if (!$_gr_qr) {
+                $leg_ri = $_req_items_map[(int)$_gr['id']][0] ?? null;
+                $_gr_qr = $leg_ri['qr_code_id'] ?? null;
+            }
+            if (!$_gr_qr) continue;
+            $sticker_units[] = [
+                'qr'        => $_gr_qr,
+                'item_name' => $_gr_inv['item_name'] ?? ($_gr['service_description'] ?? 'N/A'),
+                'condition' => $_gr_inv['condition'] ?? 'N/A',
+                'location'  => $_gr_inv['location']  ?? 'N/A',
+                'req_num'   => $_gr['request_number'] ?? '',
+            ];
+        }
+        // Fallback: try legacy request_items
+        if (empty($sticker_units)) {
+            foreach (getRequestItems($request['id']) as $ri) {
+                $ri_qr = $ri['qr_code_id'] ?? null;
+                if (!$ri_qr) continue;
+                $ri_inv = !empty($ri['inventory_id']) ? findById(getInventory(), (int)$ri['inventory_id']) : null;
+                $sticker_units[] = [
+                    'qr'        => $ri_qr,
+                    'item_name' => $ri['item_name'] ?? ($ri_inv['item_name'] ?? 'N/A'),
+                    'condition' => $ri_inv['condition'] ?? 'N/A',
+                    'location'  => $ri_inv['location']  ?? 'N/A',
+                    'req_num'   => $request['request_number'] ?? '',
+                ];
+            }
+        }
+
+        // Build display-level item info from first unit
+        $first_unit_inv = !empty($request['inventory_id']) ? findById(getInventory(), (int)$request['inventory_id']) : null;
+        $first_ri_leg   = $_req_items_map[(int)$request['id']][0] ?? null;
+        $fallback_item_name = $first_unit_inv['item_name']
+                           ?? $first_ri_leg['item_name']
+                           ?? (trim($request['service_description'] ?? '') ?: 'Not specified');
+        $fallback_qr = $request['qr_code_id']
+                    ?? $first_unit_inv['qr_code_id']
+                    ?? $first_ri_leg['qr_code_id']
+                    ?? $request['request_number']
+                    ?? 'N/A';
+        $item = $first_unit_inv;
+
         $request = array_merge($request, [
-            'full_name' => $user['full_name'] ?? 'Unknown',
-            'email' => $user['email'] ?? 'N/A',
-            'phone' => $user['phone'] ?? 'N/A',
-            'campus_id' => $user['campus_id'] ?? null,
-            'college_id' => $user['college_id'] ?? null,
+            'full_name'          => $user['full_name'] ?? 'Unknown',
+            'email'              => $user['email'] ?? 'N/A',
+            'phone'              => $user['phone'] ?? 'N/A',
+            'campus_id'          => $user['campus_id'] ?? null,
+            'college_id'         => $user['college_id'] ?? null,
             'item_name'          => $fallback_item_name,
             'qr_code_id'         => $fallback_qr,
             'item_location'      => $item['location']   ?? 'N/A',
             'item_category'      => $item['category']   ?? ucfirst($request['request_type'] ?? 'Request'),
             'item_condition'     => $item['condition']  ?? 'N/A',
-            'quantity_requested' => $request['quantity_requested'] ?? 1,
-            'request_number' => $request['request_number'] ?? 'REQ-' . str_pad($request['id'], 5, '0', STR_PAD_LEFT),
+            'quantity_requested' => count($group_view_reqs) ?: ($request['quantity_requested'] ?? 1),
+            'request_number'     => $request['request_number'] ?? 'REQ-' . str_pad($request['id'], 5, '0', STR_PAD_LEFT),
         ]);
-
-        // Build per-unit QR sticker data from request_items (one entry per physical unit)
-        $sticker_units = [];
-        foreach (getRequestItems($request['id']) as $ri) {
-            $ri_qr  = $ri['qr_code_id'] ?? null;
-            if (!$ri_qr) continue;
-            $ri_inv = !empty($ri['inventory_id']) ? findById(getInventory(), (int)$ri['inventory_id']) : null;
-            $sticker_units[] = [
-                'qr'        => $ri_qr,
-                'item_name' => $ri['item_name'] ?? ($ri_inv['item_name'] ?? ($item['item_name'] ?? 'N/A')),
-                'condition' => $ri_inv['condition'] ?? ($item['condition'] ?? 'N/A'),
-                'location'  => $ri_inv['location']  ?? ($item['location']  ?? 'N/A'),
-            ];
-        }
-        // Fallback for legacy requests with no request_items rows
-        if (empty($sticker_units)) {
-            $fb_qr = $request['qr_code_id'] ?? ($item['qr_code_id'] ?? null);
-            if ($fb_qr) {
-                $sticker_units[] = [
-                    'qr'        => $fb_qr,
-                    'item_name' => $item['item_name'] ?? 'N/A',
-                    'condition' => $item['condition'] ?? 'N/A',
-                    'location'  => $item['location']  ?? 'N/A',
-                ];
-            }
-        }
 
         $status_colors = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'secondary'];
         $urgency_colors = ['low'=>'info','medium'=>'warning','high'=>'danger','critical'=>'danger'];
@@ -677,11 +742,35 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
         </div>
 
         <?php
-        $detail_items = getRequestItems($request['id']);
-        if (!empty($detail_items)):
+        // Build detail units: prefer new model (each requests row = 1 unit), fall back to request_items
+        $detail_units = [];
+        if (count($group_view_reqs) > 0) {
+            foreach ($group_view_reqs as $_du) {
+                $_du_inv = !empty($_du['inventory_id']) ? findById(getInventory(), (int)$_du['inventory_id']) : null;
+                $detail_units[] = [
+                    'item_name'    => $_du_inv['item_name'] ?? ($_du['service_description'] ?? 'N/A'),
+                    'qr_code_id'   => $_du['qr_code_id'] ?? ($_du_inv['qr_code_id'] ?? null),
+                    'inventory_id' => $_du['inventory_id'] ?? null,
+                    'req_num'      => $_du['request_number'] ?? '',
+                ];
+            }
+        }
+        // Fallback to legacy request_items if no new-model units found with QR
+        if (empty(array_filter($detail_units, fn($u) => !empty($u['qr_code_id'])))) {
+            $leg_items = getRequestItems($request['id']);
+            if (!empty($leg_items)) {
+                $detail_units = array_map(fn($ri) => [
+                    'item_name'    => $ri['item_name'],
+                    'qr_code_id'   => $ri['qr_code_id'] ?? null,
+                    'inventory_id' => $ri['inventory_id'] ?? null,
+                    'req_num'      => '',
+                ], $leg_items);
+            }
+        }
+        if (!empty($detail_units)):
         ?>
         <div class="ar-card mb-3">
-            <div class="ar-section-label"><?php echo ucfirst($request['request_type']); ?> Items <span style="font-weight:400;color:#bbb;">(<?php echo count($detail_items); ?> unit<?php echo count($detail_items) !== 1 ? 's' : ''; ?>)</span></div>
+            <div class="ar-section-label"><?php echo ucfirst($request['request_type']); ?> Units <span style="font-weight:400;color:#bbb;">(<?php echo count($detail_units); ?> unit<?php echo count($detail_units) !== 1 ? 's' : ''; ?>)</span></div>
             <?php if ($request['request_type'] === 'borrow' && !empty($request['expected_return_date'])): ?>
             <p style="font-size:.85rem;color:#555;margin-bottom:12px;"><strong>Expected Return:</strong> <?php echo formatDate($request['expected_return_date']); ?></p>
             <?php endif; ?>
@@ -695,7 +784,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($detail_items as $di_idx => $di): ?>
+                <?php foreach ($detail_units as $di_idx => $di): ?>
                     <tr style="border-bottom:1px solid #f0f0f0;">
                         <td style="padding:8px 10px;color:#999;font-size:.75rem;"><?php echo $di_idx + 1; ?></td>
                         <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?></td>
@@ -968,21 +1057,38 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
         } elseif ($active_tab === 'service') {
             $filtered_requests = array_values(array_filter($filtered_requests, fn($r) => $r['request_type'] === 'service'));
         }
-        // Re-paginate
-        $total       = count($filtered_requests);
-        $total_pages = ceil($total / ITEMS_PER_PAGE);
+        // Group then paginate
+        $tab_grouped = [];
+        foreach ($filtered_requests as $rr) {
+            $gk = !empty($rr['group_id']) ? 'gid:'.$rr['group_id'] : 'id:'.$rr['id'];
+            if (!isset($tab_grouped[$gk])) $tab_grouped[$gk] = ['rows'=>[],'first'=>$rr];
+            $tab_grouped[$gk]['rows'][] = $rr;
+        }
+        $tab_grouped = array_values($tab_grouped);
+        $total       = count($tab_grouped);
+        $total_pages = max(1, ceil($total / ITEMS_PER_PAGE));
         $offset      = ($page - 1) * ITEMS_PER_PAGE;
         $requests    = [];
-        foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $rr) {
-            $u = findById($users_data, $rr['user_id']);
-            $it = findById($inventory_data, $rr['inventory_id']);
+        foreach (array_slice($tab_grouped, $offset, ITEMS_PER_PAGE) as $grp) {
+            $rr   = $grp['first'];
+            $rows = $grp['rows'];
+            $u    = findById($users_data, $rr['user_id']);
+            $grp_names = [];
+            foreach ($rows as $_r) {
+                $_inv = !empty($_r['inventory_id']) ? findById($inventory_data, (int)$_r['inventory_id']) : null;
+                $n = $_inv['item_name'] ?? _reqFirstItemName($_req_items_map, (int)$_r['id'], $inventory_data);
+                if ($n && $n !== 'Unknown Item') $grp_names[] = $n;
+            }
+            $grp_names = array_values(array_unique($grp_names));
             $requests[] = array_merge($rr, [
                 'full_name'  => $u['full_name']  ?? 'Unknown',
                 'email'      => $u['email']      ?? 'N/A',
                 'campus_id'  => $u['campus_id']  ?? null,
                 'college_id' => $u['college_id'] ?? null,
-                'item_name'  => $it['item_name'] ?? 'Unknown Item',
-                'qr_code_id' => $it['qr_code_id'] ?? 'N/A',
+                'item_name'  => !empty($grp_names) ? implode(', ', array_slice($grp_names,0,3)).(count($grp_names)>3?'…':'') : 'N/A',
+                'qr_code_id' => $rr['qr_code_id'] ?? _reqFirstQR($_req_items_map, (int)$rr['id']),
+                'unit_count' => count($rows),
+                'group_id'   => $rr['group_id'] ?? null,
             ]);
         }
         ?>
@@ -1061,7 +1167,10 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                     <td><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
                     <td><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
                     <td style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
-                    <td><a href="requests.php?action=view&id=<?php echo $req['id']; ?>&tab=item" class="ar-btn-view"><i class="fas fa-eye"></i> View</a></td>
+                    <td>
+                        <?php $view_href_item = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']).'&tab=item' : 'requests.php?action=view&id='.$req['id'].'&tab=item'; ?>
+                        <a href="<?php echo $view_href_item; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
+                    </td>
                 </tr>
                 <?php endforeach; else: ?>
                 <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-box-open"></i>No item requests found</div></td></tr>
@@ -1106,6 +1215,7 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                 </tr>
                 <?php endforeach; else: ?>
                 <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-tools"></i>No service requests found</div></td></tr>
+
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1144,7 +1254,10 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                     <td><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
                     <td><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
                     <td style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
-                    <td><a href="requests.php?action=view&id=<?php echo $req['id']; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View</a></td>
+                    <td>
+                        <?php $view_href_all = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']) : 'requests.php?action=view&id='.$req['id']; ?>
+                        <a href="<?php echo $view_href_all; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
+                    </td>
                 </tr>
                 <?php endforeach; else: ?>
                 <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div></td></tr>
@@ -1202,7 +1315,8 @@ foreach (array_slice($filtered_requests, $offset, ITEMS_PER_PAGE) as $req) {
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span class="ar-badge <?php echo $status_colors_t[$rs]??'ar-badge-secondary';?>"><?php echo ucfirst($rs);?></span>
-                    <a href="requests.php?action=view&id=<?php echo $req['id'];?>" class="ar-btn-view" style="font-size:.77rem;"><i class="fas fa-eye"></i> View</a>
+                    <?php $trk_href = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']) : 'requests.php?action=view&id='.$req['id']; ?>
+                    <a href="<?php echo $trk_href;?>" class="ar-btn-view" style="font-size:.77rem;"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count'];?></span><?php endif; ?></a>
                 </div>
             </div>
             <div class="ar-tracker-body">

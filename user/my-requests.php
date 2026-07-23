@@ -19,35 +19,70 @@ $all_inventory  = getInventory();
 $all_users      = getUsers();
 $admin_user     = null;
 
-// Build enriched request list for this user
-$my_requests = [];
+// Build enriched request list for this user (one row per DB record)
+$raw_requests = [];
 foreach ($all_requests as $req) {
     if ($req['user_id'] != $user_id) continue;
-    $item = findById($all_inventory, $req['inventory_id']);
+    $item     = !empty($req['inventory_id']) ? findById($all_inventory, (int)$req['inventory_id']) : null;
     $approver = $req['approved_by'] ? findById($all_users, $req['approved_by']) : null;
-    $req['item_name']       = $item['item_name']       ?? null;
-    $req['item_category']   = $item['category']        ?? null;
-    $req['approver_name']   = $approver['full_name']   ?? null;
+    $req['item_name']     = $item['item_name']     ?? null;
+    $req['item_category'] = $item['category']      ?? null;
+    $req['approver_name'] = $approver['full_name'] ?? null;
+    $raw_requests[] = $req;
+}
+
+// Filter individual rows first (so stats remain accurate)
+$filtered_mine = $raw_requests;
+if ($status_filter) {
+    $filtered_mine = array_values(array_filter($filtered_mine, fn($r) => $r['status'] === $status_filter));
+}
+if ($type_filter) {
+    $filtered_mine = array_values(array_filter($filtered_mine, fn($r) => $r['request_type'] === $type_filter));
+}
+
+// Group by group_id; each group → one card
+$my_groups = [];
+foreach ($filtered_mine as $req) {
+    $gkey = !empty($req['group_id']) ? 'gid:' . $req['group_id'] : 'id:' . $req['id'];
+    if (!isset($my_groups[$gkey])) {
+        $my_groups[$gkey] = ['rows' => [], 'first' => $req];
+    }
+    $my_groups[$gkey]['rows'][] = $req;
+}
+$my_groups = array_values($my_groups);
+
+// Sort groups newest-first by first row's created_at
+usort($my_groups, fn($a, $b) => strcmp($b['first']['created_at'], $a['first']['created_at']));
+
+// Build display-ready $my_requests (one entry per group)
+$my_requests = [];
+foreach ($my_groups as $grp) {
+    $req  = $grp['first'];
+    $rows = $grp['rows'];
+    // Collect item names
+    $names = [];
+    foreach ($rows as $_r) {
+        $n = $_r['item_name'] ?? null;
+        if ($n) $names[] = $n;
+    }
+    $names = array_values(array_unique($names));
+    $req['item_name']  = !empty($names) ? implode(', ', array_slice($names, 0, 2)) . (count($names) > 2 ? '…' : '') : null;
+    $req['unit_count'] = count($rows);
+    $req['group_rows'] = $rows;
     $my_requests[] = $req;
 }
 
-// Filter
-if ($status_filter) {
-    $my_requests = array_values(array_filter($my_requests, fn($r) => $r['status'] === $status_filter));
+// Stats (unfiltered, counted by group)
+$all_mine_raw = array_filter($all_requests, fn($r) => $r['user_id'] == $user_id);
+$all_mine_groups = [];
+foreach ($all_mine_raw as $r) {
+    $k = !empty($r['group_id']) ? 'gid:'.$r['group_id'] : 'id:'.$r['id'];
+    $all_mine_groups[$k] = $r; // last row per group; status should be uniform
 }
-if ($type_filter) {
-    $my_requests = array_values(array_filter($my_requests, fn($r) => $r['request_type'] === $type_filter));
-}
-
-// Sort newest first
-usort($my_requests, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
-
-// Stats (unfiltered)
-$all_mine = array_filter(getRequests(), fn($r) => $r['user_id'] == $user_id);
-$stat_total       = count($all_mine);
-$stat_pending     = count(array_filter($all_mine, fn($r) => $r['status'] === 'pending'));
-$stat_approved    = count(array_filter($all_mine, fn($r) => $r['status'] === 'approved'));
-$stat_disapproved = count(array_filter($all_mine, fn($r) => $r['status'] === 'disapproved'));
+$stat_total       = count($all_mine_groups);
+$stat_pending     = count(array_filter($all_mine_groups, fn($r) => $r['status'] === 'pending'));
+$stat_approved    = count(array_filter($all_mine_groups, fn($r) => $r['status'] === 'approved'));
+$stat_disapproved = count(array_filter($all_mine_groups, fn($r) => $r['status'] === 'disapproved'));
 
 displayMessage();
 ?>
@@ -390,10 +425,18 @@ displayMessage();
         <!-- Head -->
         <div class="mrt-card-head">
             <div>
-                <div class="mrt-req-num"><?php echo htmlspecialchars($req['request_number']); ?></div>
+                <div class="mrt-req-num">
+                    <?php echo htmlspecialchars($req['request_number']); ?>
+                    <?php if ($req['unit_count'] > 1): ?>
+                    <span style="font-size:.70rem;background:rgba(139,0,0,.15);color:#8B0000;border-radius:3px;padding:0 6px;margin-left:4px;"><?php echo $req['unit_count']; ?> units</span>
+                    <?php endif; ?>
+                </div>
                 <div class="mrt-item-name"><?php echo htmlspecialchars($item_display); ?></div>
                 <div class="mrt-meta">
                     Submitted <?php echo date('M j, Y g:i A', strtotime($req['created_at'])); ?>
+                    <?php if (!empty($req['group_id'])): ?>
+                    &bull; <span style="font-family:monospace;font-size:.72rem;color:rgba(0,0,0,.38);"><?php echo htmlspecialchars($req['group_id']); ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
