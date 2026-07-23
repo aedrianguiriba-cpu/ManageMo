@@ -374,8 +374,7 @@ displayMessage();
         // disapproved  → steps 1–2 done, step 3 rejected, steps 4–5 inactive
         //
         // delivery_status: 'pending_delivery' | 'out_for_delivery' | 'delivered'
-        // Derived: approved → 'out_for_delivery'; we store it on the req if present.
-        $delivery_status = $req['delivery_status'] ?? ($status === 'approved' ? 'out_for_delivery' : null);
+        $delivery_status = $req['delivery_status'] ?? ($status === 'approved' ? 'pending_delivery' : null);
 
         $s1_dot = 'done'; $s1_lbl = 'done-lbl';
 

@@ -478,6 +478,83 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     background:rgba(139,0,0,.05); border-top:1px solid rgba(139,0,0,.1);
     padding:3px 6px; text-align:center; font-size:6px; color:rgba(0,0,0,.38);
 }
+
+/* ===== MOBILE ===== */
+@media (max-width: 680px) {
+    /* Scrollable type tabs */
+    .ar-type-tabs {
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap; scrollbar-width: none; padding-bottom: 1px;
+    }
+    .ar-type-tabs::-webkit-scrollbar { display: none; }
+    .ar-type-tab { white-space: nowrap; padding: 9px 12px; font-size: 0.80rem; }
+    .ar-tab-count { display: none; }
+
+    /* Filter card */
+    .ar-filter-card { padding: 12px 14px; gap: 8px; }
+    .ar-filter-card .form-select { min-width: 0 !important; width: 100%; }
+
+    /* View toggle */
+    .ar-view-toggle { width: 100%; }
+    .ar-vt-btn { flex: 1; display: inline-flex; justify-content: center; align-items: center; }
+
+    /* Table → stacked card list on mobile */
+    .ar-table-card {
+        overflow: visible; background: transparent;
+        border: none; box-shadow: none; border-radius: 0;
+    }
+    .ar-table-scroll { overflow: visible; }
+    .ar-table, .ar-table tbody { display: block; min-width: 0 !important; }
+    .ar-table thead { display: none; }
+    .ar-table tr {
+        display: block;
+        border: 1px solid #e5e7eb; border-radius: 10px;
+        margin-bottom: 10px; background: #fff;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05); overflow: hidden;
+    }
+    .ar-table tr:last-child { margin-bottom: 0; }
+    .ar-table tr:hover td { background: transparent; }
+    .ar-table td {
+        display: grid; grid-template-columns: 76px 1fr;
+        gap: 0 10px; align-items: start;
+        padding: 9px 14px; border-bottom: 1px solid #f0f0f0;
+        font-size: 0.84rem; white-space: normal;
+    }
+    .ar-table tr td:last-child { border-bottom: none; }
+    .ar-table td::before {
+        content: attr(data-label);
+        font-size: 0.64rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.4px;
+        color: #bbb; padding-top: 2px; line-height: 1.4;
+    }
+    /* Actions cell: full-width */
+    .ar-table td:last-child {
+        display: block !important;
+        position: static !important;
+        background: #f7f7f7 !important;
+        text-align: center; padding: 10px 14px;
+    }
+    .ar-table td:last-child::before { display: none; }
+    .ar-btn-view {
+        width: 100%; justify-content: center;
+        padding: 8px 12px; font-size: 0.84rem;
+    }
+
+    /* Compact stepper */
+    .ar-stepper-wrap { padding: 14px 10px; }
+    .ar-steps { gap: 0; }
+    .ar-step-dot { width: 26px; height: 26px; font-size: 0.58rem; }
+    .ar-step-lbl { font-size: 0.54rem; max-width: 44px; margin-top: 5px; }
+    .ar-step-line { margin-top: -14px; }
+
+    /* Tracker card stacks on mobile */
+    .ar-tracker-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .ar-tracker-head > div:last-child { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+
+    /* Detail view header */
+    .ar-mob-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+    .ar-mob-header > div:last-child { display: flex; flex-wrap: wrap; gap: 8px; }
+}
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -578,7 +655,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         ?>
 
         <!-- Header row -->
-        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2 ar-mob-header">
             <div>
                 <div style="font-size:1.1rem;font-weight:800;color:#1a1d23;">Request <?php echo htmlspecialchars($request['request_number']); ?></div>
                 <div style="font-size:0.81rem;color:rgba(0,0,0,0.42);">Submitted <?php echo formatDate($request['created_at']); ?></div>
@@ -783,13 +860,14 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             <?php if ($request['request_type'] === 'borrow' && !empty($request['expected_return_date'])): ?>
             <p style="font-size:.85rem;color:#555;margin-bottom:12px;"><strong>Expected Return:</strong> <?php echo formatDate($request['expected_return_date']); ?></p>
             <?php endif; ?>
-            <table style="width:100%;border-collapse:collapse;font-size:.83rem;">
+            <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+            <table style="width:100%;border-collapse:collapse;font-size:.83rem;min-width:380px;">
                 <thead>
                     <tr style="background:#f7f7f7;">
-                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">#</th>
-                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">Item</th>
-                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">QR Code</th>
-                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;">Inventory ID</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">#</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Item</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">QR Code</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Inventory ID</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -809,6 +887,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 <?php endforeach; ?>
                 </tbody>
             </table>
+            </div>
         </div>
         <?php elseif ($request['request_type'] === 'borrow'): ?>
         <div class="ar-card mb-3">
@@ -1145,19 +1224,19 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <?php if ($active_tab === 'item'): ?>
         <!-- Item Requests dedicated table -->
         <div class="ar-table-card"><div class="ar-table-scroll">
-            <table class="ar-table">
+            <table class="ar-table ar-table-item">
                 <thead><tr>
                     <th>Request ID</th><th>Requester</th><th>Department</th><th>Item Requested</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($requests) > 0): foreach ($requests as $req): ?>
                 <tr>
-                    <td><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
-                    <td>
+                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
+                    <td data-label="Requester">
                         <div style="font-weight:700;font-size:0.87rem;"><?php echo htmlspecialchars($req['full_name']); ?></div>
                         <div style="font-size:0.76rem;color:rgba(0,0,0,0.45);"><?php echo htmlspecialchars($req['email']); ?></div>
                     </td>
-                    <td>
+                    <td data-label="Dept">
                         <?php if (!empty($req['college_id'])): ?>
                         <span class="ar-badge" style="background:rgba(59,130,246,0.12);color:#1d4ed8;border:1px solid rgba(59,130,246,0.20);font-size:0.73rem;">
                             <i class="fas fa-graduation-cap me-1"></i><?php echo htmlspecialchars($req['college_id']); ?>
@@ -1167,15 +1246,15 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <span style="font-size:0.78rem;color:rgba(0,0,0,0.45);"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($req_campus); ?></span>
                         <?php else: ?><span style="font-size:0.78rem;color:rgba(0,0,0,0.30);">—</span><?php endif; ?>
                     </td>
-                    <td>
+                    <td data-label="Item">
                         <div style="font-size:0.87rem;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($req['item_name']); ?></div>
                         <?php if (!empty($req['qr_code_id']) && $req['qr_code_id'] !== 'N/A'): ?>
                         <div style="font-size:0.72rem;font-family:monospace;color:rgba(139,0,0,0.70);margin-top:2px;"><?php echo htmlspecialchars($req['qr_code_id']); ?></div>
                         <?php endif; ?>
                     </td>
-                    <td><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
-                    <td><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
-                    <td style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
+                    <td data-label="Urgency"><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
+                    <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
+                    <td data-label="Date" style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
                     <td>
                         <?php $view_href_item = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']).'&tab=item' : 'requests.php?action=view&id='.$req['id'].'&tab=item'; ?>
                         <a href="<?php echo $view_href_item; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
@@ -1190,19 +1269,19 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <?php elseif ($active_tab === 'service'): ?>
         <!-- Service Requests dedicated table -->
         <div class="ar-table-card"><div class="ar-table-scroll">
-            <table class="ar-table">
+            <table class="ar-table ar-table-service">
                 <thead><tr>
                     <th>Request ID</th><th>Requester</th><th>Department</th><th>Service Description</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($requests) > 0): foreach ($requests as $req): ?>
                 <tr>
-                    <td><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
-                    <td>
+                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
+                    <td data-label="Requester">
                         <div style="font-weight:700;font-size:0.87rem;"><?php echo htmlspecialchars($req['full_name']); ?></div>
                         <div style="font-size:0.76rem;color:rgba(0,0,0,0.45);"><?php echo htmlspecialchars($req['email']); ?></div>
                     </td>
-                    <td>
+                    <td data-label="Dept">
                         <?php if (!empty($req['college_id'])): ?>
                         <span class="ar-badge" style="background:rgba(59,130,246,0.12);color:#1d4ed8;border:1px solid rgba(59,130,246,0.20);font-size:0.73rem;">
                             <i class="fas fa-graduation-cap me-1"></i><?php echo htmlspecialchars($req['college_id']); ?>
@@ -1212,14 +1291,14 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <span style="font-size:0.78rem;color:rgba(0,0,0,0.45);"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($req_campus); ?></span>
                         <?php else: ?><span style="font-size:0.78rem;color:rgba(0,0,0,0.30);">—</span><?php endif; ?>
                     </td>
-                    <td style="max-width:260px;">
-                        <div style="font-size:0.84rem;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;" title="<?php echo htmlspecialchars($req['service_description'] ?? $req['reason_for_request'] ?? ''); ?>">
+                    <td data-label="Service" style="max-width:260px;">
+                        <div style="font-size:0.84rem;color:#374151;" title="<?php echo htmlspecialchars($req['service_description'] ?? $req['reason_for_request'] ?? ''); ?>">
                             <?php echo htmlspecialchars(mb_strimwidth($req['service_description'] ?? $req['reason_for_request'] ?? 'No description', 0, 70, '…')); ?>
                         </div>
                     </td>
-                    <td><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
-                    <td><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
-                    <td style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
+                    <td data-label="Urgency"><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
+                    <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
+                    <td data-label="Date" style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
                     <td><a href="requests.php?action=view&id=<?php echo $req['id']; ?>&tab=service" class="ar-btn-view"><i class="fas fa-eye"></i> View</a></td>
                 </tr>
                 <?php endforeach; else: ?>
@@ -1231,7 +1310,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         </div></div>
         <?php else: ?>
         <div id="tableView"><div class="ar-table-card"><div class="ar-table-scroll">
-            <table class="ar-table">
+            <table class="ar-table ar-table-all">
                 <thead><tr>
                     <th>Request ID</th><th>Requester</th><th>Department</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
                 </tr></thead>
@@ -1239,12 +1318,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 <?php if (count($requests) > 0):
                     foreach ($requests as $req): ?>
                 <tr>
-                    <td><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
-                    <td>
+                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
+                    <td data-label="Requester">
                         <div style="font-weight:700;font-size:0.87rem;"><?php echo htmlspecialchars($req['full_name']); ?></div>
                         <div style="font-size:0.76rem;color:rgba(0,0,0,0.45);"><?php echo htmlspecialchars($req['email']); ?></div>
                     </td>
-                    <td>
+                    <td data-label="Dept">
                         <?php if (!empty($req['college_id'])): ?>
                         <span class="ar-badge" style="background:rgba(59,130,246,0.12);color:#1d4ed8;border:1px solid rgba(59,130,246,0.20);font-size:0.73rem;">
                             <i class="fas fa-graduation-cap me-1"></i><?php echo htmlspecialchars($req['college_id']); ?>
@@ -1259,10 +1338,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <span style="font-size:0.78rem;color:rgba(0,0,0,0.30);">—</span>
                         <?php endif; ?>
                     </td>
-                    <td style="color:rgba(0,0,0,0.55);"><?php echo $type_labels[$req['request_type']] ?? ucfirst($req['request_type']); ?></td>
-                    <td><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
-                    <td><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
-                    <td style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
+                    <td data-label="Type" style="color:rgba(0,0,0,0.55);"><?php echo $type_labels[$req['request_type']] ?? ucfirst($req['request_type']); ?></td>
+                    <td data-label="Urgency"><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
+                    <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
+                    <td data-label="Date" style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
                     <td>
                         <?php $view_href_all = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']) : 'requests.php?action=view&id='.$req['id']; ?>
                         <a href="<?php echo $view_href_all; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
