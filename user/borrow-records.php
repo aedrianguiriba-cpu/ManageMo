@@ -272,7 +272,7 @@ displayMessage();
         <div class="table-responsive">
             <table class="table">
                 <thead><tr>
-                    <th>Item</th><th>QR Code</th><th>Borrowed</th>
+                    <th>Item</th><th>Borrowed</th>
                     <th>Expected Return</th><th>Returned On</th><th>Status</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
@@ -311,7 +311,6 @@ displayMessage();
                 ?>
                 <tr <?php if ($is_request): ?>style="background:rgba(245,158,11,0.03);"<?php endif; ?>>
                     <td><span class="br-item-name"><?php echo htmlspecialchars($rec['item_name']); ?></span></td>
-                    <td><span class="br-qr-chip"><?php echo htmlspecialchars($rec['qr_code_id']); ?></span></td>
                     <td>
                         <span class="br-date"><?php echo formatDate($rec['borrow_date'], 'M d, Y'); ?></span>
                         <?php if ($is_request): ?><br><small style="color:#bbb;font-size:0.68rem;">Requested</small><?php endif; ?>
@@ -334,7 +333,7 @@ displayMessage();
                     <td><span class="br-notes"><?php echo $rec['notes'] ? htmlspecialchars($rec['notes']) : '—'; ?></span></td>
                 </tr>
                 <?php endforeach; else: ?>
-                <tr><td colspan="7">
+                <tr><td colspan="6">
                     <div class="br-empty"><i class="fas fa-box-open"></i><p>No borrow records found.</p></div>
                 </td></tr>
                 <?php endif; ?>
