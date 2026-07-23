@@ -1641,23 +1641,21 @@ function renderItemAvailCal(select) {
     }
     var opt      = select.options[select.selectedIndex];
     var itemId   = parseInt(opt.getAttribute('data-item-id'));
-    var status   = opt.getAttribute('data-status');
     var totalQty = parseInt(opt.getAttribute('data-quantity')) || 0;
-    if (!itemId || status === 'available') {
+    if (!itemId) {
         wrap.style.display = 'none';
         iacCurrentId = null;
         return;
     }
     iacCurrentId = itemId;
 
-    // Aggregate return records across ALL units in the group (not just the first unit)
+    // Aggregate return records across ALL units in the group
     var allUnitIds = [];
     try { allUnitIds = JSON.parse(opt.getAttribute('data-all-unit-ids') || '[]'); } catch(e) {}
     if (!allUnitIds.length) allUnitIds = [itemId];
     var records = [];
     allUnitIds.forEach(function(uid) {
-        var recs = itemAvailData[uid] || [];
-        recs.forEach(function(r) { records.push(r); });
+        (itemAvailData[uid] || []).forEach(function(r) { records.push(r); });
     });
     // Deduplicate by return_date
     var seen = {};
@@ -1666,6 +1664,12 @@ function renderItemAvailCal(select) {
         seen[r.return_date] = true;
         return true;
     });
+
+    // Hide calendar if no return records at all
+    if (records.length === 0) {
+        wrap.style.display = 'none';
+        return;
+    }
     var bar     = document.getElementById('iac-status-bar');
 
     // Sort records by return date ascending
@@ -1678,7 +1682,7 @@ function renderItemAvailCal(select) {
     }).join('');
     bar.innerHTML = '<div class="iac-bar-top">'
                   + '<i class="fas fa-clock"></i>'
-                  + '<span><strong>' + records.length + ' of ' + totalQty + ' units currently borrowed</strong></span>'
+                  + '<span><strong>' + records.length + ' of ' + totalQty + ' units requested or borrowed</strong></span>'
                   + '</div>'
                   + '<div class="iac-bar-chips"><span class="iac-bar-chips-label">Expected returns:</span>' + retChips + '</div>';
     bar.className = 'iac-bar iac-bar-borrowed';
