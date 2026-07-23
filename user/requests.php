@@ -991,6 +991,7 @@ if (!empty($submit_error)): ?>
                                         data-quantity="<?php echo count($ci['units']); ?>"
                                         data-available="<?php echo $ci['available_count']; ?>"
                                         data-unit-ids="<?php echo htmlspecialchars(json_encode($ci['available_unit_ids'])); ?>"
+                                        data-all-unit-ids="<?php echo htmlspecialchars(json_encode(array_column($ci['units'], 'id'))); ?>"
                                         <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
                                     <?php echo htmlspecialchars($ci['item_name']); ?>
                                 </option>
@@ -1649,7 +1650,22 @@ function renderItemAvailCal(select) {
     }
     iacCurrentId = itemId;
 
-    var records = itemAvailData[itemId] || [];
+    // Aggregate return records across ALL units in the group (not just the first unit)
+    var allUnitIds = [];
+    try { allUnitIds = JSON.parse(opt.getAttribute('data-all-unit-ids') || '[]'); } catch(e) {}
+    if (!allUnitIds.length) allUnitIds = [itemId];
+    var records = [];
+    allUnitIds.forEach(function(uid) {
+        var recs = itemAvailData[uid] || [];
+        recs.forEach(function(r) { records.push(r); });
+    });
+    // Deduplicate by return_date
+    var seen = {};
+    records = records.filter(function(r) {
+        if (!r.return_date || seen[r.return_date]) return false;
+        seen[r.return_date] = true;
+        return true;
+    });
     var bar     = document.getElementById('iac-status-bar');
 
     // Sort records by return date ascending
@@ -1667,9 +1683,11 @@ function renderItemAvailCal(select) {
                   + '<div class="iac-bar-chips"><span class="iac-bar-chips-label">Expected returns:</span>' + retChips + '</div>';
     bar.className = 'iac-bar iac-bar-borrowed';
 
-    // Navigate to the month of the earliest return
-    var earliest = new Date(records[0].return_date + 'T00:00:00');
-    iacViewDate  = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+    // Navigate to the month of the earliest return (guard against empty records)
+    if (records.length > 0) {
+        var earliest = new Date(records[0].return_date + 'T00:00:00');
+        iacViewDate  = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+    }
 
     wrap.style.display = 'block';
     renderIacGrid(records);
