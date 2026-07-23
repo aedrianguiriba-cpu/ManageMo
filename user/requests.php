@@ -77,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 for ($q = 0; $q < $qty; $q++) {
                     $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
                     $unit_item = ($uid ? findById($all_inv, $uid) : null) ?? $fallback;
-                    // Reuse inventory QR only for the first slot that owns this uid; generate fresh otherwise
-                    $unit_qr   = ($uid && isset($unit_ids[$q]) && $unit_item && $unit_item['qr_code_id'])
+                    // Always use the inventory item's own QR; generate only when no inventory row exists
+                    $unit_qr   = ($unit_item && !empty($unit_item['qr_code_id']))
                                  ? $unit_item['qr_code_id']
                                  : generateQRCodeId();
                     $units_to_save[] = [
@@ -95,9 +95,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 for ($q = 0; $q < $qty; $q++) {
                     $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
                     $unit_item = $uid ? findById($all_inv, $uid) : null;
+                    // Use inventory QR if linked; generate only for truly custom (no inventory row) items
+                    $unit_qr   = ($unit_item && !empty($unit_item['qr_code_id']))
+                                 ? $unit_item['qr_code_id']
+                                 : generateQRCodeId();
                     $units_to_save[] = [
                         'inventory_id' => $uid,
-                        'qr_code_id'   => generateQRCodeId(),
+                        'qr_code_id'   => $unit_qr,
                         'item_name'    => $unit_item['item_name'] ?? $name,
                     ];
                 }
