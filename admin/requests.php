@@ -294,12 +294,13 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     border:1px solid #e5e7eb; border-radius:8px;
     box-shadow:0 1px 4px rgba(0,0,0,0.06); overflow:hidden;
 }
-.ar-table { width:100%; border-collapse:collapse; }
+.ar-table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.ar-table { width:100%; border-collapse:collapse; min-width:640px; }
 .ar-table th {
     font-size:0.69rem; font-weight:700; text-transform:uppercase;
     letter-spacing:0.5px; color:#999;
     padding:12px 16px; border-bottom:1px solid #e5e7eb;
-    background:#f7f7f7;
+    background:#f7f7f7; white-space:nowrap;
 }
 .ar-table td {
     padding:12px 16px; border-bottom:1px solid #e5e7eb;
@@ -307,6 +308,14 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 }
 .ar-table tr:last-child td { border-bottom:none; }
 .ar-table tr:hover td { background:#f7f7f7; }
+/* Sticky Actions column on mobile */
+.ar-table th:last-child,
+.ar-table td:last-child {
+    position:sticky; right:0; z-index:2;
+    background:#f7f7f7;
+}
+.ar-table td:last-child { background:#fff; }
+.ar-table tr:hover td:last-child { background:#f7f7f7; }
 
 .ar-badge {
     display:inline-flex; align-items:center;
@@ -1135,7 +1144,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         ?>
         <?php if ($active_tab === 'item'): ?>
         <!-- Item Requests dedicated table -->
-        <div class="ar-table-card">
+        <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table">
                 <thead><tr>
                     <th>Request ID</th><th>Requester</th><th>Department</th><th>Item Requested</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
@@ -1177,10 +1186,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 <?php endif; ?>
                 </tbody>
             </table>
-        </div>
+        </div></div>
         <?php elseif ($active_tab === 'service'): ?>
         <!-- Service Requests dedicated table -->
-        <div class="ar-table-card">
+        <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table">
                 <thead><tr>
                     <th>Request ID</th><th>Requester</th><th>Department</th><th>Service Description</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
@@ -1219,9 +1228,9 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 <?php endif; ?>
                 </tbody>
             </table>
-        </div>
+        </div></div>
         <?php else: ?>
-        <div id="tableView"><div class="ar-table-card">
+        <div id="tableView"><div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table">
                 <thead><tr>
                     <th>Request ID</th><th>Requester</th><th>Department</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
