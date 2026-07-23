@@ -22,11 +22,45 @@ $borrow_records = [];
 foreach ($user_borrows as $borrow) {
     $item   = findById($all_inventory, $borrow['inventory_id']);
     $record = array_merge($borrow, [
-        'item_name'  => $item['item_name']  ?? $borrow['item_name']  ?? 'Unknown',
-        'qr_code_id' => $item['qr_code_id'] ?? $borrow['qr_code_id'] ?? 'N/A',
+        'item_name'   => $item['item_name']  ?? $borrow['item_name']  ?? 'Unknown',
+        'qr_code_id'  => $item['qr_code_id'] ?? $borrow['qr_code_id'] ?? 'N/A',
+        '_from_table' => 'borrow_records',
     ]);
     if (!$status_filter || $active_tab !== 'borrow' || $record['status'] === $status_filter) {
         $borrow_records[] = $record;
+    }
+}
+
+// Include borrow requests not yet delivered (no borrow_record row yet)
+// Only show these when no status filter is active (they're neither active/returned/overdue)
+if (!$status_filter || $active_tab !== 'borrow') {
+    $already_request_ids = array_column($user_borrows, 'request_id');
+    foreach (getRequests() as $req) {
+        if ($req['user_id'] != $user_id) continue;
+        if ($req['request_type'] !== 'borrow') continue;
+        if (!in_array($req['status'], ['pending', 'approved', 'delivered'])) continue;
+        // Skip if a borrow_record already exists for this request (status = delivered with record)
+        if (in_array($req['id'], $already_request_ids)) continue;
+        $item = !empty($req['inventory_id']) ? findById($all_inventory, (int)$req['inventory_id']) : null;
+        $ds   = $req['delivery_status'] ?? null;
+        $display_status = match(true) {
+            $req['status'] === 'approved' && $ds === 'out_for_delivery' => 'out_for_delivery',
+            $req['status'] === 'approved' => 'approved',
+            default => $req['status'],
+        };
+        $borrow_records[] = [
+            'id'                   => 'req-' . $req['id'],
+            'user_id'              => $req['user_id'],
+            'inventory_id'         => $req['inventory_id'],
+            'item_name'            => $item['item_name']  ?? 'Unknown',
+            'qr_code_id'           => $req['qr_code_id'] ?? ($item['qr_code_id'] ?? 'N/A'),
+            'borrow_date'          => $req['created_at'],
+            'expected_return_date' => $req['expected_return_date'] ?? null,
+            'actual_return_date'   => null,
+            'status'               => $display_status,
+            'notes'                => $req['reason_for_request'] ?? null,
+            '_from_table'          => 'requests',
+        ];
     }
 }
 usort($borrow_records, fn($a, $b) => strcmp($b['borrow_date'], $a['borrow_date']));
@@ -56,6 +90,7 @@ usort($service_requests, fn($a, $b) => strcmp($b['created_at'], $a['created_at']
 $stat_borrow_active   = count(filterByColumn($user_borrows, 'status', 'active'));
 $stat_borrow_returned = count(filterByColumn($user_borrows, 'status', 'returned'));
 $stat_borrow_overdue  = count(filterByColumn($user_borrows, 'status', 'overdue'));
+$stat_borrow_pending  = count(array_filter($borrow_records, fn($r) => ($r['_from_table'] ?? '') === 'requests'));
 
 $all_mine_item    = array_filter(getRequests(), fn($r) => $r['user_id'] == $user_id && $r['request_type'] === 'item');
 $all_mine_service = array_filter(getRequests(), fn($r) => $r['user_id'] == $user_id && $r['request_type'] === 'service');
@@ -171,7 +206,7 @@ displayMessage();
     <div class="br-tabs mb-4">
         <a href="borrow-records.php?tab=borrow" class="br-tab <?php echo $active_tab === 'borrow' ? 'active' : ''; ?>">
             <i class="fas fa-hand-holding"></i> Borrow Records
-            <span class="br-tab-count"><?php echo count($user_borrows); ?></span>
+            <span class="br-tab-count"><?php echo count($user_borrows) + $stat_borrow_pending; ?></span>
         </a>
         <a href="borrow-records.php?tab=item" class="br-tab <?php echo $active_tab === 'item' ? 'active' : ''; ?>">
             <i class="fas fa-shopping-cart"></i> Item Requests
@@ -194,6 +229,12 @@ displayMessage();
     <?php endif; ?>
 
     <div class="br-stats">
+        <?php if ($stat_borrow_pending > 0): ?>
+        <div class="br-stat-card">
+            <div class="br-stat-icon" style="color:#b45309;"><i class="fas fa-hourglass-half"></i></div>
+            <div><div class="br-stat-val"><?php echo $stat_borrow_pending; ?></div><div class="br-stat-lbl">In Progress</div></div>
+        </div>
+        <?php endif; ?>
         <div class="br-stat-card">
             <div class="br-stat-icon" style="color:#1d4ed8;"><i class="fas fa-hand-holding"></i></div>
             <div><div class="br-stat-val"><?php echo $stat_borrow_active; ?></div><div class="br-stat-lbl">Active</div></div>
@@ -208,7 +249,7 @@ displayMessage();
         </div>
         <div class="br-stat-card">
             <div class="br-stat-icon" style="color:#4b5563;"><i class="fas fa-list"></i></div>
-            <div><div class="br-stat-val"><?php echo count($user_borrows); ?></div><div class="br-stat-lbl">Total</div></div>
+            <div><div class="br-stat-val"><?php echo count($user_borrows) + $stat_borrow_pending; ?></div><div class="br-stat-lbl">Total</div></div>
         </div>
     </div>
 
@@ -238,28 +279,56 @@ displayMessage();
                 <?php if (count($borrow_records) > 0):
                     foreach ($borrow_records as $rec):
                         $days_overdue = 0;
-                        if ($rec['status'] === 'active' && strtotime($rec['expected_return_date']) < time()) {
+                        if ($rec['status'] === 'active' && !empty($rec['expected_return_date']) && strtotime($rec['expected_return_date']) < time()) {
                             $days_overdue = floor((time() - strtotime($rec['expected_return_date'])) / 86400);
                         }
                         $is_overdue_active = $days_overdue > 0 && $rec['status'] === 'active';
-                        $bmap  = ['active'=>'br-badge-active','returned'=>'br-badge-returned','overdue'=>'br-badge-overdue'];
-                        $bimap = ['active'=>'fa-circle-dot','returned'=>'fa-check','overdue'=>'fa-clock'];
+                        $is_request = ($rec['_from_table'] ?? '') === 'requests';
+                        $bmap  = [
+                            'active'           => 'br-badge-active',
+                            'returned'         => 'br-badge-returned',
+                            'overdue'          => 'br-badge-overdue',
+                            'pending'          => 'br-badge-pending',
+                            'approved'         => 'br-badge-approved',
+                            'out_for_delivery' => 'br-badge-active',
+                        ];
+                        $bimap = [
+                            'active'           => 'fa-circle-dot',
+                            'returned'         => 'fa-check',
+                            'overdue'          => 'fa-clock',
+                            'pending'          => 'fa-hourglass-half',
+                            'approved'         => 'fa-check-circle',
+                            'out_for_delivery' => 'fa-truck',
+                        ];
+                        $status_labels = [
+                            'active'           => 'Active',
+                            'returned'         => 'Returned',
+                            'overdue'          => 'Overdue',
+                            'pending'          => 'Pending',
+                            'approved'         => 'Approved',
+                            'out_for_delivery' => 'Out for Delivery',
+                        ];
                 ?>
-                <tr>
+                <tr <?php if ($is_request): ?>style="background:rgba(245,158,11,0.03);"<?php endif; ?>>
                     <td><span class="br-item-name"><?php echo htmlspecialchars($rec['item_name']); ?></span></td>
                     <td><span class="br-qr-chip"><?php echo htmlspecialchars($rec['qr_code_id']); ?></span></td>
-                    <td><span class="br-date"><?php echo formatDate($rec['borrow_date'], 'M d, Y'); ?></span></td>
                     <td>
+                        <span class="br-date"><?php echo formatDate($rec['borrow_date'], 'M d, Y'); ?></span>
+                        <?php if ($is_request): ?><br><small style="color:#bbb;font-size:0.68rem;">Requested</small><?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if (!empty($rec['expected_return_date'])): ?>
                         <span class="br-date <?php echo $is_overdue_active ? 'br-date-warn' : ''; ?>">
                             <?php echo formatDate($rec['expected_return_date'], 'M d, Y'); ?>
                             <?php if ($is_overdue_active): ?><br><small>(<?php echo $days_overdue; ?>d overdue)</small><?php endif; ?>
                         </span>
+                        <?php else: ?><span style="color:#bbb;">—</span><?php endif; ?>
                     </td>
                     <td><span class="br-date"><?php echo $rec['actual_return_date'] ? formatDate($rec['actual_return_date'], 'M d, Y') : '—'; ?></span></td>
                     <td>
-                        <span class="br-badge <?php echo $bmap[$rec['status']] ?? 'br-badge-active'; ?>">
+                        <span class="br-badge <?php echo $bmap[$rec['status']] ?? 'br-badge-pending'; ?>">
                             <i class="fas <?php echo $bimap[$rec['status']] ?? 'fa-circle'; ?>" style="font-size:0.65rem;"></i>
-                            <?php echo ucfirst($rec['status']); ?>
+                            <?php echo $status_labels[$rec['status']] ?? ucfirst($rec['status']); ?>
                         </span>
                     </td>
                     <td><span class="br-notes"><?php echo $rec['notes'] ? htmlspecialchars($rec['notes']) : '—'; ?></span></td>
