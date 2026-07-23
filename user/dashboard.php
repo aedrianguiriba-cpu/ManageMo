@@ -87,12 +87,25 @@ $owned_items_total = array_reduce($user_owned_items, function($carry, $item) {
     return $carry + $item['quantity'];
 }, 0);
 
-// Build item return map from borrow records (for calendar + item cards)
+// Build item return map from borrow records + pending/approved borrow requests
 $item_return_map = [];
+
+// Source 1: delivered borrow records (active/overdue)
 foreach ($all_borrow as $br) {
     if (in_array($br['status'], ['active', 'overdue']) && empty($br['actual_return_date'])) {
-        $iid = $br['inventory_id'];
+        $iid = (int)$br['inventory_id'];
         if (!isset($item_return_map[$iid])) $item_return_map[$iid] = $br['expected_return_date'];
+    }
+}
+
+// Source 2: pending/approved borrow requests (not yet delivered, no borrow record yet)
+foreach (getRequests() as $req) {
+    if ($req['request_type'] === 'borrow'
+        && in_array($req['status'], ['pending', 'approved'])
+        && !empty($req['inventory_id'])
+        && !empty($req['expected_return_date'])) {
+        $iid = (int)$req['inventory_id'];
+        if (!isset($item_return_map[$iid])) $item_return_map[$iid] = $req['expected_return_date'];
     }
 }
 
@@ -101,8 +114,10 @@ $cal_events = [];
 foreach ($campus_inventory as $item) {
     if (isset($item_return_map[$item['id']])) {
         $d = $item_return_map[$item['id']];
-        if (!isset($cal_events[$d])) $cal_events[$d] = [];
-        $cal_events[$d][] = ['name' => $item['item_name'], 'category' => $item['category'] ?? 'Other'];
+        if ($d) {
+            if (!isset($cal_events[$d])) $cal_events[$d] = [];
+            $cal_events[$d][] = ['name' => $item['item_name'], 'category' => $item['category'] ?? 'Other'];
+        }
     }
 }
 $cal_events_json = json_encode($cal_events);
