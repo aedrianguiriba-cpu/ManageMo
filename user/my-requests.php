@@ -19,20 +19,13 @@ $all_inventory  = getInventory();
 $all_users      = getUsers();
 $admin_user     = null;
 
-// Map request_id → first request_items row, for custom items with no linked inventory row
-$_all_req_items = getRequestItems();
-$_req_items_map = [];
-foreach ($_all_req_items as $_ri) {
-    $_req_items_map[(int)$_ri['request_id']][] = $_ri;
-}
-
 // Build enriched request list for this user (one row per DB record)
 $raw_requests = [];
 foreach ($all_requests as $req) {
     if ($req['user_id'] != $user_id) continue;
     $item     = !empty($req['inventory_id']) ? findById($all_inventory, (int)$req['inventory_id']) : null;
     $approver = $req['approved_by'] ? findById($all_users, $req['approved_by']) : null;
-    $req['item_name']     = $item['item_name'] ?? ($_req_items_map[$req['id']][0]['item_name'] ?? null);
+    $req['item_name']     = $item['item_name']     ?? null;
     $req['item_category'] = $item['category']      ?? null;
     $req['approver_name'] = $approver['full_name'] ?? null;
     $raw_requests[] = $req;
@@ -90,6 +83,17 @@ $stat_total       = count($all_mine_groups);
 $stat_pending     = count(array_filter($all_mine_groups, fn($r) => $r['status'] === 'pending'));
 $stat_approved    = count(array_filter($all_mine_groups, fn($r) => $r['status'] === 'approved'));
 $stat_disapproved = count(array_filter($all_mine_groups, fn($r) => $r['status'] === 'disapproved'));
+
+// Pagination (over grouped requests)
+$per_page     = 5;
+$total_items  = count($my_requests);
+$total_pages  = max(1, (int)ceil($total_items / $per_page));
+$page         = max(1, min($total_pages, (int)($_GET['page'] ?? 1)));
+$offset       = ($page - 1) * $per_page;
+$my_requests_page = array_slice($my_requests, $offset, $per_page);
+
+// Preserve current filters in pagination links
+$pager_qs = array_filter(['status' => $status_filter, 'type' => $type_filter]);
 
 displayMessage();
 ?>
@@ -352,7 +356,7 @@ displayMessage();
         </a>
     </div>
     <?php else: ?>
-    <?php foreach ($my_requests as $req):
+    <?php foreach ($my_requests_page as $req):
         $status  = $req['status'];  // pending | approved | disapproved
         $rtype   = $req['request_type'];
         $urgency = $req['urgency'] ?? 'medium';
@@ -614,6 +618,40 @@ displayMessage();
 
     </div>
     <?php endforeach; ?>
+
+    <!-- Pagination -->
+    <?php if ($total_pages > 1): ?>
+    <div class="d-flex justify-content-center align-items-center gap-2 mt-3 mb-2">
+        <?php
+        $mk_link = function($p) use ($pager_qs) {
+            return 'my-requests.php?' . http_build_query(array_merge($pager_qs, ['page' => $p]));
+        };
+        ?>
+        <a href="<?php echo $mk_link(max(1, $page - 1)); ?>"
+           class="btn btn-sm <?php echo $page <= 1 ? 'disabled' : ''; ?>"
+           style="background:#fff;border:1px solid #e5e7eb;color:#555;font-weight:600;<?php echo $page <= 1 ? 'pointer-events:none;opacity:0.5;' : ''; ?>">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+        <a href="<?php echo $mk_link($i); ?>"
+           class="btn btn-sm"
+           style="min-width:38px; font-weight:700; <?php echo $i === $page
+                ? 'background:#8B0000;border:1px solid #8B0000;color:#fff;'
+                : 'background:#fff;border:1px solid #e5e7eb;color:#555;'; ?>">
+            <?php echo $i; ?>
+        </a>
+        <?php endfor; ?>
+        <a href="<?php echo $mk_link(min($total_pages, $page + 1)); ?>"
+           class="btn btn-sm <?php echo $page >= $total_pages ? 'disabled' : ''; ?>"
+           style="background:#fff;border:1px solid #e5e7eb;color:#555;font-weight:600;<?php echo $page >= $total_pages ? 'pointer-events:none;opacity:0.5;' : ''; ?>">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+    </div>
+    <div class="text-center" style="font-size:0.78rem;color:rgba(0,0,0,0.42);margin-bottom:8px;">
+        Showing <?php echo $offset + 1; ?>–<?php echo min($offset + $per_page, $total_items); ?> of <?php echo $total_items; ?> requests
+    </div>
+    <?php endif; ?>
+
     <?php endif; ?>
 
 </div>

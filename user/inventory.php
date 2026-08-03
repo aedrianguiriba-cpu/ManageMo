@@ -112,6 +112,14 @@ $total_pages = ceil($total / ITEMS_PER_PAGE);
 $offset      = ($page - 1) * ITEMS_PER_PAGE;
 $items       = array_slice($grouped_inventory, $offset, ITEMS_PER_PAGE);
 
+// Pagination for the "My Owned Items" tab (separate page param so it doesn't clash with the main tab)
+$page_owned        = max(1, (int)($_GET['page_owned'] ?? 1));
+$owned_total       = count($grouped_owned);
+$owned_total_pages = max(1, (int)ceil($owned_total / ITEMS_PER_PAGE));
+$page_owned        = min($page_owned, $owned_total_pages);
+$owned_offset      = ($page_owned - 1) * ITEMS_PER_PAGE;
+$grouped_owned_page = array_slice($grouped_owned, $owned_offset, ITEMS_PER_PAGE);
+
 // Pre-load borrow records once
 $all_borrows = getBorrowRecords();
 
@@ -684,7 +692,7 @@ foreach ($all_borrows as $br) {
     <div id="tab-owned-items" style="display: <?php echo $current_tab === 'owned' ? 'block' : 'none'; ?>;">
         <?php if (count($grouped_owned) > 0): ?>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
-            <?php foreach ($grouped_owned as $group):
+            <?php foreach ($grouped_owned_page as $group):
                 $unit_count    = count($group['units']);
                 $conditions    = array_unique(array_filter(array_column($group['units'], 'condition')));
                 $cond_label    = count($conditions) === 1 ? ucfirst(reset($conditions)) : 'Mixed';
@@ -734,6 +742,20 @@ foreach ($all_borrows as $br) {
             </div>
             <?php endforeach; ?>
         </div>
+
+        <!-- Pagination -->
+        <?php if ($owned_total_pages > 1): ?>
+        <nav class="mt-3 mb-4">
+            <ul class="pagination justify-content-center">
+                <?php for ($i = 1; $i <= $owned_total_pages; $i++): ?>
+                    <li class="page-item <?php echo $i === $page_owned ? 'active' : ''; ?>">
+                        <a class="page-link" href="inventory.php?tab=owned&page_owned=<?php echo $i; ?>"><?php echo $i; ?></a>
+                    </li>
+                <?php endfor; ?>
+            </ul>
+        </nav>
+        <?php endif; ?>
+
         <?php else: ?>
         <div class="inv-empty">
             <div class="inv-empty-icon"><i class="fas fa-user-circle"></i></div>

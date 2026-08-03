@@ -95,7 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 for ($q = 0; $q < $qty; $q++) {
                     $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
                     $unit_item = $uid ? findById($all_inv, $uid) : null;
-                    // Use inventory QR if linked; generate only for truly custom (no inventory row) items
+                    // Custom item with no catalog match — don't create an inventory record yet;
+                    // it only gets counted in inventory once admin approves the request.
                     $unit_qr   = ($unit_item && !empty($unit_item['qr_code_id']))
                                  ? $unit_item['qr_code_id']
                                  : generateQRCodeId();
@@ -121,23 +122,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($units_to_save as $unit) {
             $req_number = 'REQ-' . str_pad($next_num++, 5, '0', STR_PAD_LEFT);
             if (!$first_req_number) $first_req_number = $req_number;
-            $result = dbCreateRequest(array_merge($shared, [
+            $unit_fields = [
                 'request_number' => $req_number,
                 'inventory_id'   => $unit['inventory_id'],
                 'qr_code_id'     => $unit['qr_code_id'],
-            ]));
+            ];
+            if ($safe_type !== 'service' && empty($unit['inventory_id'])) {
+                // No catalog item to join against — stash the custom name so it still displays before approval
+                $unit_fields['service_description'] = $unit['item_name'];
+            }
+            $result = dbCreateRequest(array_merge($shared, $unit_fields));
             if (!$result['success']) {
                 $errors[] = 'Failed to save ' . htmlspecialchars($unit['item_name']) . ': ' . $result['error'];
                 continue;
             }
-            // Persist the item name (including custom/no-catalog names) so it displays correctly later
-            dbCreateRequestItem([
-                'request_id'   => (int)$result['row']['id'],
-                'inventory_id' => $unit['inventory_id'],
-                'qr_code_id'   => $unit['qr_code_id'],
-                'item_name'    => $unit['item_name'],
-                'quantity'     => 1,
-            ]);
             if (!empty($unit['inventory_id'])) {
                 // Mark the physical unit unavailable immediately so no one else can request it
                 $inv_status = ($safe_type === 'service') ? 'maintenance' : 'requested';
@@ -1008,7 +1006,6 @@ if (!empty($submit_error)): ?>
                                 <?php endforeach; ?>
                             </optgroup>
                             <?php endforeach; ?>
-                            <option value="__custom__">Other (custom)</option>
                         </select>
 
                         <!-- Shop UI -->
@@ -1076,33 +1073,11 @@ if (!empty($submit_error)): ?>
                                     </div>
                                 </div>
                                 <?php endforeach; endforeach; ?>
-                                <!-- Custom item card -->
-                                <div class="bshop-card bshop-card-custom"
-                                     data-value="__custom__" data-item-id="" data-status="available"
-                                     data-category="" data-available="999" data-quantity="999"
-                                     onclick="selectBorrowCard(this)">
-                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
-                                    <div class="bshop-icon bshop-icon-custom"><i class="fas fa-pen"></i></div>
-                                    <div class="bshop-name">Other / Custom</div>
-                                    <div class="bshop-desc">Specify an item not in the list</div>
-                                    <div class="bshop-foot"><div class="bshop-status-pill bshop-pill-custom">Custom</div></div>
-                                </div>
                                 <div id="bshop-empty" class="bshop-empty" style="display:none;">
                                     <i class="fas fa-search"></i><span>No items match</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="rq-field" id="custom_item_wrap" style="display:none;">
-                        <label>Custom Item Name <span class="rq-req">*</span></label>
-                        <div class="rq-input-wrap">
-                            <i class="fas fa-pen rq-input-icon"></i>
-                            <input type="text" class="form-control" id="custom_item_name"
-                                   name="custom_item_name" placeholder="e.g., Portable Bluetooth Speaker"
-                                   oninput="updateSummary()">
-                        </div>
-                        <div class="form-text mt-1" style="font-size:0.73rem;">Be as specific as possible.</div>
                     </div>
 
                     <div class="row g-3 mb-2">
@@ -1593,8 +1568,7 @@ function filterShopItems(btn) {
         var cat = card.getAttribute('data-category') || '';
         var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
         var desc = (card.querySelector('.bshop-desc') ? card.querySelector('.bshop-desc').textContent : '').toLowerCase();
-        var isCustom = card.classList.contains('bshop-card-custom');
-        var catMatch = !activeCat || cat === activeCat || isCustom;
+        var catMatch = !activeCat || cat === activeCat;
         var searchMatch = !search || name.indexOf(search) !== -1 || desc.indexOf(search) !== -1;
         var show = catMatch && searchMatch;
         card.style.display = show ? '' : 'none';
@@ -1605,21 +1579,13 @@ function filterShopItems(btn) {
 }
 
 function handleCatalogChange(select) {
-    var wrap  = document.getElementById('custom_item_wrap');
-    var input = document.getElementById('custom_item_name');
-    if (select.value === '__custom__') {
-        wrap.style.display = 'block'; input.setAttribute('required','required');
-        select.removeAttribute('required');
-    } else {
-        wrap.style.display = 'none'; input.removeAttribute('required'); input.value = '';
-        select.setAttribute('required','required');
-    }
+    select.setAttribute('required','required');
 
     // Cap quantity input to available stock
     var qtyInput = document.getElementById('borrow_quantity');
     var opt = select.options[select.selectedIndex];
     var available = parseInt(opt && opt.getAttribute('data-available')) || 1;
-    if (select.value && select.value !== '__custom__') {
+    if (select.value) {
         qtyInput.max = available;
         qtyInput.title = 'Maximum available: ' + available;
         if (parseInt(qtyInput.value) > available) qtyInput.value = available;
@@ -1644,7 +1610,7 @@ function iacDS(y, m, d) { return y + '-' + iacPad(m+1) + '-' + iacPad(d); }
 
 function renderItemAvailCal(select) {
     var wrap = document.getElementById('iac-wrap');
-    if (!select.value || select.value === '__custom__') {
+    if (!select.value) {
         wrap.style.display = 'none';
         iacCurrentId = null;
         return;
@@ -1866,8 +1832,8 @@ function addToCart() {
     var entry = {};
     if (type === 'borrow') {
         var sel = document.getElementById('borrow_catalog_select');
-        var name = (sel.value && sel.value !== '__custom__') ? sel.value : document.getElementById('custom_item_name').value.trim();
-        if (!name) { showCartError('Please select or enter an item to borrow.'); return; }
+        var name = sel.value;
+        if (!name) { showCartError('Please select an item to borrow.'); return; }
         var rd = document.getElementById('expected_return_date').value;
         if (!rd) { showCartError('Please enter the expected return date.'); return; }
         var qty = parseInt(document.getElementById('borrow_quantity').value) || 1;
@@ -1953,8 +1919,6 @@ function resetStaging(type) {
     if (type === 'borrow') {
         document.getElementById('borrow_catalog_select').value = '';
         document.querySelectorAll('.bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
-        document.getElementById('custom_item_name').value = '';
-        document.getElementById('custom_item_wrap').style.display = 'none';
         document.getElementById('expected_return_date').value = '';
         document.getElementById('borrow_quantity').value = 1;
         document.getElementById('reason').value = '';
@@ -2004,7 +1968,7 @@ function updateSummary() {
         var stagingName = '';
         if (type === 'borrow') {
             var sel = document.getElementById('borrow_catalog_select');
-            stagingName = (sel.value && sel.value !== '__custom__') ? sel.value : document.getElementById('custom_item_name').value;
+            stagingName = sel.value;
         } else if (type === 'item') {
             var sel2 = document.getElementById('item_description');
             stagingName = (sel2.value && sel2.value !== '__custom__') ? sel2.value : document.getElementById('custom_item_req_name').value;

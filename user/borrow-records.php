@@ -95,6 +95,38 @@ $stat_borrow_pending  = count(array_filter($borrow_records, fn($r) => ($r['_from
 $all_mine_item    = array_filter(getRequests(), fn($r) => $r['user_id'] == $user_id && $r['request_type'] === 'item');
 $all_mine_service = array_filter(getRequests(), fn($r) => $r['user_id'] == $user_id && $r['request_type'] === 'service');
 
+/* ── Pagination (per tab, so switching tabs doesn't reset the others) ── */
+$br_per_page = 10;
+
+$br_page       = max(1, (int)($_GET['page'] ?? 1));
+$br_total      = count($borrow_records);
+$br_total_pages = max(1, (int)ceil($br_total / $br_per_page));
+$br_page       = min($br_page, $br_total_pages);
+$borrow_records_page = array_slice($borrow_records, ($br_page - 1) * $br_per_page, $br_per_page);
+
+$it_page        = max(1, (int)($_GET['page'] ?? 1));
+$it_total       = count($item_requests);
+$it_total_pages = max(1, (int)ceil($it_total / $br_per_page));
+$it_page        = min($it_page, $it_total_pages);
+$item_requests_page = array_slice($item_requests, ($it_page - 1) * $br_per_page, $br_per_page);
+
+$sv_page        = max(1, (int)($_GET['page'] ?? 1));
+$sv_total       = count($service_requests);
+$sv_total_pages = max(1, (int)ceil($sv_total / $br_per_page));
+$sv_page        = min($sv_page, $sv_total_pages);
+$service_requests_page = array_slice($service_requests, ($sv_page - 1) * $br_per_page, $br_per_page);
+
+function brRenderPagination(string $tab, int $page, int $totalPages, string $statusFilter): void {
+    if ($totalPages <= 1) return;
+    $qs = $statusFilter ? '&status=' . urlencode($statusFilter) : '';
+    echo '<nav class="mt-3"><ul class="pagination justify-content-center">';
+    for ($i = 1; $i <= $totalPages; $i++) {
+        $active = $i === $page ? 'active' : '';
+        echo '<li class="page-item ' . $active . '"><a class="page-link" href="borrow-records.php?tab=' . $tab . '&page=' . $i . $qs . '">' . $i . '</a></li>';
+    }
+    echo '</ul></nav>';
+}
+
 displayMessage();
 ?>
 
@@ -276,8 +308,8 @@ displayMessage();
                     <th>Expected Return</th><th>Returned On</th><th>Status</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
-                <?php if (count($borrow_records) > 0):
-                    foreach ($borrow_records as $rec):
+                <?php if (count($borrow_records_page) > 0):
+                    foreach ($borrow_records_page as $rec):
                         $days_overdue = 0;
                         if ($rec['status'] === 'active' && !empty($rec['expected_return_date']) && strtotime($rec['expected_return_date']) < time()) {
                             $days_overdue = floor((time() - strtotime($rec['expected_return_date'])) / 86400);
@@ -341,6 +373,7 @@ displayMessage();
             </table>
         </div>
     </div>
+    <?php brRenderPagination('borrow', $br_page, $br_total_pages, $status_filter); ?>
 
     <?php elseif ($active_tab === 'item'): ?>
     <!-- ══ ITEM REQUESTS ══ -->
@@ -391,8 +424,8 @@ displayMessage();
                     <th>Reason</th><th>Submitted</th><th>Status</th>
                 </tr></thead>
                 <tbody>
-                <?php if (count($item_requests) > 0):
-                    foreach ($item_requests as $req):
+                <?php if (count($item_requests_page) > 0):
+                    foreach ($item_requests_page as $req):
                         $smap  = ['pending'=>'br-badge-pending','approved'=>'br-badge-approved','disapproved'=>'br-badge-disapproved'];
                         $simap = ['pending'=>'fa-hourglass-half','approved'=>'fa-check','disapproved'=>'fa-times'];
                         $urg_color = ['low'=>'#15803d','medium'=>'#b45309','high'=>'#b91c1c','critical'=>'#7c0000'];
@@ -427,6 +460,7 @@ displayMessage();
             </table>
         </div>
     </div>
+    <?php brRenderPagination('item', $it_page, $it_total_pages, $status_filter); ?>
 
     <?php else: ?>
     <!-- ══ SERVICE REQUESTS ══ -->
@@ -477,8 +511,8 @@ displayMessage();
                     <th>Description</th><th>Urgency</th><th>Submitted</th><th>Status</th>
                 </tr></thead>
                 <tbody>
-                <?php if (count($service_requests) > 0):
-                    foreach ($service_requests as $req):
+                <?php if (count($service_requests_page) > 0):
+                    foreach ($service_requests_page as $req):
                         $smap  = ['pending'=>'br-badge-pending','approved'=>'br-badge-approved','disapproved'=>'br-badge-disapproved'];
                         $simap = ['pending'=>'fa-hourglass-half','approved'=>'fa-check','disapproved'=>'fa-times'];
                         $urg_color = ['low'=>'#15803d','medium'=>'#b45309','high'=>'#b91c1c','critical'=>'#7c0000'];
@@ -520,6 +554,7 @@ displayMessage();
             </table>
         </div>
     </div>
+    <?php brRenderPagination('service', $sv_page, $sv_total_pages, $status_filter); ?>
 
     <?php endif; ?>
 

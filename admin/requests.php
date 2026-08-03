@@ -25,10 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action_type === 'approve') {
         foreach ($group_reqs as $gr) {
-            // Custom item with no catalog match — create its inventory record now so it's counted in inventory
+            // Custom item with no catalog match — only counted in inventory once approved
             if (empty($gr['inventory_id'])) {
-                $gr_items  = getRequestItems((int)$gr['id']);
-                $item_name = $gr_items[0]['item_name'] ?? ($gr['service_description'] ?? 'Custom Item');
+                $item_name = $gr['service_description'] ?: 'Custom Item';
                 $requester = findById(getUsers(), (int)$gr['user_id']);
                 $new_inv = dbCreateInventory([
                     'qr_code_id' => $gr['qr_code_id'] ?: generateQRCodeId(),
@@ -37,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'campus_id'  => $requester['campus_id'] ?? 1,
                     'quantity'   => 1,
                     'status'     => 'available',
+                    'condition'  => 'good',
                 ]);
                 if ($new_inv) {
                     $gr['inventory_id'] = (int)$new_inv['id'];
@@ -209,6 +209,9 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         $_inv = !empty($_r['inventory_id']) ? findById($inventory_data, (int)$_r['inventory_id']) : null;
         $n = $_inv['item_name']
           ?? _reqFirstItemName($_req_items_map, (int)$_r['id'], $inventory_data);
+        if ($n === 'Unknown Item' && !empty($_r['service_description']) && $_r['request_type'] !== 'service') {
+            $n = $_r['service_description'];
+        }
         if ($n && $n !== 'Unknown Item') $grp_names[] = $n;
     }
     $grp_names     = array_values(array_unique($grp_names));
@@ -1331,7 +1334,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <div id="tableView"><div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-all">
                 <thead><tr>
-                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
+                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($requests) > 0):
@@ -1357,6 +1360,11 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <span style="font-size:0.78rem;color:rgba(0,0,0,0.30);">—</span>
                         <?php endif; ?>
                     </td>
+                    <td data-label="Item">
+                        <div style="font-size:0.85rem;font-weight:600;color:#1a1d23;max-width:220px;" title="<?php echo htmlspecialchars($req['item_name']); ?>">
+                            <?php echo htmlspecialchars(mb_strimwidth($req['item_name'], 0, 40, '…')); ?>
+                        </div>
+                    </td>
                     <td data-label="Type" style="color:rgba(0,0,0,0.55);"><?php echo $type_labels[$req['request_type']] ?? ucfirst($req['request_type']); ?></td>
                     <td data-label="Urgency"><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
                     <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
@@ -1367,7 +1375,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     </td>
                 </tr>
                 <?php endforeach; else: ?>
-                <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div></td></tr>
+                <tr><td colspan="9"><div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div></td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1414,6 +1422,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     <div style="width:36px;height:36px;border-radius:6px;background:<?php echo $col;?>;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;"><?php echo $initials;?></div>
                     <div>
                         <div style="font-weight:700;font-size:.88rem;color:#0f172a;"><?php echo htmlspecialchars($req['full_name']);?></div>
+                        <div style="font-size:.78rem;color:#374151;font-weight:600;margin-top:2px;"><?php echo htmlspecialchars($req['item_name']);?></div>
                         <div style="font-size:.74rem;color:#94a3b8;margin-top:1px;">
                             <code style="background:rgba(139,0,0,.07);color:#8B0000;border-radius:4px;padding:1px 6px;font-size:.71rem;"><?php echo $req['request_number'];?></code>
                             &nbsp;<?php echo $type_labels_t[$req['request_type']]??ucfirst($req['request_type']);?>

@@ -134,11 +134,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'UPDATE', "Updated inventory item: $item_name", 'inventory', $inventory_id);
         redirectWithMessage('inventory.php', 'Item updated successfully!', 'success');
 
-    } elseif ($action === 'delete') {
-        $inventory_id = (int)$_GET['id'];
-        dbDeleteInventory($inventory_id);
-        logActivity($current_user['id'], 'DELETE', "Deleted inventory item #$inventory_id", 'inventory', $inventory_id);
-        redirectWithMessage('inventory.php', 'Item deleted successfully!', 'success');
     }
 }
 
@@ -1249,7 +1244,6 @@ function openGroupModal(group, campus) {
             + '<span class="ai-badge ai-badge-' + sc + '" style="font-size:0.7rem;margin-bottom:8px;">' + unit.status + '</span>'
             + '<div style="display:flex;gap:4px;justify-content:center;margin-top:6px;">'
             + '<a href="inventory.php?action=edit&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit"><i class="fas fa-edit"></i></a>'
-            + '<a href="inventory.php?action=delete&id=' + unit.id + '" class="ai-btn-sm ai-btn-delete delete-btn" title="Delete"><i class="fas fa-trash"></i></a>'
             + '</div>'
             + '</div>';
         grid.appendChild(col);

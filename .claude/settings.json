@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -v)",
+      "Read(//c/xampp/php/**)",
+      "Bash(/c/xampp/php/php.exe scratch_test_request_items.php)",
+      "Bash(/c/xampp/php/php.exe -r ' *)",
+      "Bash(/c/xampp/php/php.exe -l user/requests.php)",
+      "Bash(/c/xampp/php/php.exe -l admin/requests.php)",
+      "Bash(/c/xampp/php/php.exe -l user/my-requests.php)",
+      "Bash(/c/xampp/php/php.exe -l user/inventory.php)",
+      "Bash(/c/xampp/php/php.exe -l user/borrow-records.php)",
+      "Bash(/c/xampp/php/php.exe -l admin/inventory.php)"
+    ]
+  }
+}
