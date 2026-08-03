@@ -25,10 +25,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action_type === 'approve') {
         foreach ($group_reqs as $gr) {
+            // Custom item with no catalog match — create its inventory record now so it's counted in inventory
+            if (empty($gr['inventory_id'])) {
+                $gr_items  = getRequestItems((int)$gr['id']);
+                $item_name = $gr_items[0]['item_name'] ?? ($gr['service_description'] ?? 'Custom Item');
+                $requester = findById(getUsers(), (int)$gr['user_id']);
+                $new_inv = dbCreateInventory([
+                    'qr_code_id' => $gr['qr_code_id'] ?: generateQRCodeId(),
+                    'item_name'  => $item_name,
+                    'category'   => 'Other',
+                    'campus_id'  => $requester['campus_id'] ?? 1,
+                    'quantity'   => 1,
+                    'status'     => 'available',
+                ]);
+                if ($new_inv) {
+                    $gr['inventory_id'] = (int)$new_inv['id'];
+                    dbUpdateRequest((int)$gr['id'], ['inventory_id' => $gr['inventory_id']]);
+                }
+            }
             dbUpdateRequest((int)$gr['id'], ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
             if (!empty($gr['inventory_id'])) {
                 if ($gr['request_type'] === 'borrow')  dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'requested']);
                 if ($gr['request_type'] === 'service') dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'maintenance']);
+                if ($gr['request_type'] === 'item')    dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'requested']);
             }
         }
         logActivity($current_user['id'], 'APPROVE', "Approved group $gid (" . count($group_reqs) . " units)", 'requests', $request_id);

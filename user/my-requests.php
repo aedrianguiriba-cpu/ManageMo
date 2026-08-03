@@ -19,13 +19,20 @@ $all_inventory  = getInventory();
 $all_users      = getUsers();
 $admin_user     = null;
 
+// Map request_id → first request_items row, for custom items with no linked inventory row
+$_all_req_items = getRequestItems();
+$_req_items_map = [];
+foreach ($_all_req_items as $_ri) {
+    $_req_items_map[(int)$_ri['request_id']][] = $_ri;
+}
+
 // Build enriched request list for this user (one row per DB record)
 $raw_requests = [];
 foreach ($all_requests as $req) {
     if ($req['user_id'] != $user_id) continue;
     $item     = !empty($req['inventory_id']) ? findById($all_inventory, (int)$req['inventory_id']) : null;
     $approver = $req['approved_by'] ? findById($all_users, $req['approved_by']) : null;
-    $req['item_name']     = $item['item_name']     ?? null;
+    $req['item_name']     = $item['item_name'] ?? ($_req_items_map[$req['id']][0]['item_name'] ?? null);
     $req['item_category'] = $item['category']      ?? null;
     $req['approver_name'] = $approver['full_name'] ?? null;
     $raw_requests[] = $req;
