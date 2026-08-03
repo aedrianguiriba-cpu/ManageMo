@@ -22,3 +22,5 @@
    * For admin: it should display the overall supply inventory.
    * For users: it should only display the total inventory designated to their department.
 3. Delivery.
+
+hehe
