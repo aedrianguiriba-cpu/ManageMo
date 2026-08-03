@@ -56,7 +56,8 @@ $all_inventory = getInventory();
 $all_campuses  = getAllCampuses();
 
 // Build tab lists (re-index with array_values for clean iteration)
-$evaluate_items  = array_values(array_filter($all_inventory, fn($i) => in_array($i['status'], ['damaged', 'maintenance'])));
+// "Evaluate" includes every item not already condemned/disposed, so admins can condemn any item, not just damaged/maintenance ones.
+$evaluate_items  = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
 $condemned_items = array_values(array_filter($all_inventory, fn($i) => $i['status'] === 'condemned'));
 $disposed_items  = array_values(array_filter($all_inventory, fn($i) => $i['status'] === 'disposed'));
 
@@ -523,7 +524,7 @@ foreach ($all_campuses as $c) {
                 <?php if ($active_tab === 'evaluate'): ?>
                 <i class="fas fa-check-circle"></i>
                 <p>No items pending evaluation</p>
-                <small>Items with <strong>Damaged</strong> or <strong>Maintenance</strong> status will appear here</small>
+                <small>All active inventory items will appear here for condemnation</small>
                 <?php elseif ($active_tab === 'condemned'): ?>
                 <i class="fas fa-ban"></i>
                 <p>No condemned items</p>
