@@ -11,7 +11,8 @@ void main() {
     await tester.pumpWidget(const ManageMoScannerApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('ManageMo Delivery Scanner'), findsOneWidget);
+    expect(find.text('ManageMo'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Log In'), findsOneWidget);
   });
 }

@@ -168,6 +168,25 @@ function getUserOwnedItems(): array {
     });
 }
 
+// ── Notifications ──────────────────────────────────────────────────────────────
+// Not run through _dbCache: unread counts need to stay fresh per-user, and the
+// dataset per user is small, so a direct query is simplest and correct.
+
+function getNotifications(int $user_id, int $limit = 20): array {
+    $rows = supabase()->select('notifications', "user_id=eq.$user_id&order=created_at.desc&limit=$limit");
+    if (!is_array($rows)) return [];
+    return array_map(fn($r) => array_merge($r, [
+        'id'      => (int)$r['id'],
+        'user_id' => (int)$r['user_id'],
+        'is_read' => (bool)$r['is_read'],
+    ]), $rows);
+}
+
+function getUnreadNotificationCount(int $user_id): int {
+    $rows = supabase()->selectCols('notifications', 'id', "user_id=eq.$user_id&is_read=eq.false");
+    return is_array($rows) ? count($rows) : 0;
+}
+
 // ── Generic helper functions (unchanged) ──────────────────────────────────────
 
 function findById(array $data_array, $id): ?array {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/api_client.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'theme.dart';
 
 void main() {
   runApp(const ManageMoScannerApp());
@@ -15,14 +16,7 @@ class ManageMoScannerApp extends StatelessWidget {
     return MaterialApp(
       title: 'ManageMo Delivery Scanner',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF8B0000)),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-        ),
-      ),
+      theme: buildAppTheme(),
       home: const _StartupGate(),
     );
   }
@@ -44,7 +38,12 @@ class _StartupGateState extends State<_StartupGate> {
       future: ApiClient.getSavedUser(),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return Scaffold(
+            backgroundColor: Colors.white,
+            body: Center(
+              child: Image.asset('assets/images/logo.png', width: 180),
+            ),
+          );
         }
         final user = snapshot.data;
         return user != null ? HomeScreen(user: user) : const LoginScreen();

@@ -46,7 +46,18 @@
       "Bash(/c/xampp/php/php.exe -l config/functions.php)",
       "Bash(php -m)",
       "Bash(/c/xampp/php/php.exe -m)",
-      "Bash(/c/xampp/php/php.exe -l config/smtp.php)"
+      "Bash(/c/xampp/php/php.exe -l config/smtp.php)",
+      "Bash(python -c \"import PIL; print\\(PIL.__version__\\)\")",
+      "Bash(pip install *)",
+      "Bash(python -c ' *)",
+      "Bash(unzip -l build/app/outputs/flutter-apk/app-debug.apk)",
+      "Bash(/c/xampp/php/php.exe -l api/notify_delivered.php)",
+      "Bash(curl -s -o /dev/null -w \"Apache status: %{http_code}\\\\n\" http://localhost/ManageMo/)",
+      "Bash(curl -s -X POST http://localhost/ManageMo/api/notify_delivered.php -H \"Content-Type: application/json\" -d '{\"request_id\": 93}')",
+      "Bash(curl -s -X POST http://localhost/ManageMo/api/notify_delivered.php -H \"Content-Type: application/json\" -d '{\"request_id\": 999999}')",
+      "Bash(curl -s -X POST http://localhost/ManageMo/api/notify_delivered.php -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(php -l \"c:/xampp/htdocs/ManageMo/user/requests.php\")",
+      "PowerShell(& \"C:\\\\xampp\\\\php\\\\php.exe\" -l \"c:\\\\xampp\\\\htdocs\\\\ManageMo\\\\user\\\\requests.php\")"
     ]
   }
 }

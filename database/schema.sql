@@ -22,6 +22,19 @@ END $$;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS disapproval_reason      TEXT;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS scheduled_delivery_date DATE;
 
+CREATE TABLE IF NOT EXISTS notifications (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    INT  NOT NULL,
+    title      TEXT NOT NULL,
+    message    TEXT,
+    type       TEXT NOT NULL DEFAULT 'info' CHECK (type IN ('info','success','warning','danger')),
+    link       TEXT,
+    is_read    BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+
 -- ─────────────────────────────────────────────
 -- 1. TABLES
 -- ─────────────────────────────────────────────
@@ -162,6 +175,17 @@ CREATE TABLE IF NOT EXISTS departments (
     created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS notifications (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    INT  NOT NULL,
+    title      TEXT NOT NULL,
+    message    TEXT,
+    type       TEXT NOT NULL DEFAULT 'info' CHECK (type IN ('info','success','warning','danger')),
+    link       TEXT,
+    is_read    BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ─────────────────────────────────────────────
 -- 2. DISABLE ROW LEVEL SECURITY
 --    (auth is handled by PHP session; anon key needs full access)
@@ -174,6 +198,7 @@ ALTER TABLE borrow_records DISABLE ROW LEVEL SECURITY;
 ALTER TABLE user_owned_items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE campuses       DISABLE ROW LEVEL SECURITY;
 ALTER TABLE departments    DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications  DISABLE ROW LEVEL SECURITY;
 
 -- ─────────────────────────────────────────────
 -- 3. SEED DATA

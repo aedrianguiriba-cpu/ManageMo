@@ -62,8 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'APPROVE', "Approved group $gid (" . count($group_reqs) . " units)", 'requests', $request_id);
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         if ($notif_user) {
-            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'approved',
+            $__reqnum = $gid ?? $trigger_req['request_number'];
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, 'approved',
                 ['is_pickup' => ($trigger_req['receiving_method'] ?? '') === 'pickup']);
+            notifyUser((int)$notif_user['id'], 'Request approved', "Your request ($__reqnum) has been approved.", 'success', 'user/my-requests.php');
         }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request approved successfully!', 'success');
 
@@ -86,8 +88,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'DISAPPROVE', "Disapproved group $gid", 'requests', $request_id);
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         if ($notif_user) {
-            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'disapproved',
+            $__reqnum = $gid ?? $trigger_req['request_number'];
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, 'disapproved',
                 ['reason' => $disapproval_reason]);
+            notifyUser((int)$notif_user['id'], 'Request disapproved', "Your request ($__reqnum) was not approved." . ($disapproval_reason ? " Reason: $disapproval_reason" : ''), 'danger', 'user/my-requests.php');
         }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request disapproved.', 'info');
 
@@ -111,9 +115,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notif_user  = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         $recv_method = $trigger_req['receiving_method'] ?? 'delivery';
         if ($notif_user) {
+            $__reqnum = $gid ?? $trigger_req['request_number'];
             $stage = ($recv_method === 'pickup') ? 'pickup_ready' : 'out_for_delivery';
-            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], $stage,
+            $__dateNote = $scheduled_date ? ' Expected ' . ($recv_method === 'pickup' ? 'pickup' : 'delivery') . ': ' . formatDate($scheduled_date, 'M d, Y') . '.' : '';
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, $stage,
                 ['scheduled_date' => $scheduled_date ? formatDate($scheduled_date, 'M d, Y') : null]);
+            notifyUser((int)$notif_user['id'],
+                $recv_method === 'pickup' ? 'Ready for pickup' : 'Out for delivery',
+                "Request ($__reqnum) is " . ($recv_method === 'pickup' ? 'ready for pickup.' : 'out for delivery.') . $__dateNote,
+                'info', 'user/my-requests.php');
         }
         $label = ($recv_method === 'pickup') ? 'Marked as Ready for Pickup.' : 'Marked as Out for Delivery.';
         redirectWithMessage('requests.php?action=view&' . $redirect_param, $label, 'success');
@@ -137,7 +147,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'UPDATE', "Delivered group $gid", 'requests', $request_id);
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         if ($notif_user) {
-            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'delivered');
+            $__reqnum = $gid ?? $trigger_req['request_number'];
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, 'delivered');
+            notifyUser((int)$notif_user['id'], 'Item delivered', "Request ($__reqnum) has been marked as delivered.", 'success', 'user/my-requests.php');
         }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Marked as Delivered.', 'success');
 
@@ -155,7 +167,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         clearDataCache('borrow_records');
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         if ($notif_user) {
-            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'returned');
+            $__reqnum = $gid ?? $trigger_req['request_number'];
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, 'returned');
+            notifyUser((int)$notif_user['id'], 'Return confirmed', "Your return for request ($__reqnum) has been recorded.", 'success', 'user/my-requests.php');
         }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Items returned and request completed.', 'success');
 
@@ -166,7 +180,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         if ($notif_user) {
-            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'completed');
+            $__reqnum = $gid ?? $trigger_req['request_number'];
+            notifyUser((int)$notif_user['id'], 'Request completed', "Request ($__reqnum) has been marked as completed.", 'success', 'user/my-requests.php');
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, 'completed');
         }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request marked as completed.', 'success');
     }

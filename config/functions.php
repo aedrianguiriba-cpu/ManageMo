@@ -303,6 +303,59 @@ function sendDeliveryEmail($to_email, $to_name, $request_number, $stage = 'out_f
     return sendStatusEmail($to_email, $to_name, $request_number, $stage);
 }
 
+// ── In-app notifications ────────────────────────────────────────────────────
+
+function dbCreateNotification(array $data): ?array {
+    $rows = supabase()->insert('notifications', $data);
+    return $rows[0] ?? null;
+}
+
+/** Create a bell notification for one user. Never throws — a notification
+ *  hiccup must never block the action that triggered it. */
+function notifyUser(int $user_id, string $title, string $message = '', string $type = 'info', ?string $link = null): void {
+    try {
+        dbCreateNotification([
+            'user_id' => $user_id,
+            'title'   => $title,
+            'message' => $message,
+            'type'    => in_array($type, ['info', 'success', 'warning', 'danger']) ? $type : 'info',
+            'link'    => $link,
+        ]);
+    } catch (\Throwable $e) {
+        error_log('notifyUser failed: ' . $e->getMessage());
+    }
+}
+
+/** Notify every admin account at once (e.g. "new request submitted"). */
+function notifyAdmins(string $title, string $message = '', string $type = 'info', ?string $link = null): void {
+    foreach (getUsers() as $u) {
+        if ($u['role'] === ROLE_ADMIN && !empty($u['is_active'])) {
+            notifyUser((int)$u['id'], $title, $message, $type, $link);
+        }
+    }
+}
+
+function markNotificationRead(int $id, int $user_id): bool {
+    // Scoped to user_id so one user can't mark another's notification read via a guessed id.
+    $rows = supabase()->update('notifications', "id=eq.$id&user_id=eq.$user_id", ['is_read' => true]);
+    return !empty($rows);
+}
+
+function markAllNotificationsRead(int $user_id): bool {
+    $rows = supabase()->update('notifications', "user_id=eq.$user_id&is_read=eq.false", ['is_read' => true]);
+    return $rows !== [];
+}
+
+// Relative "time ago" label for notification timestamps.
+function timeAgo(string $datetime): string {
+    $diff = time() - strtotime($datetime);
+    if ($diff < 60)    return 'just now';
+    if ($diff < 3600)  return floor($diff / 60) . 'm ago';
+    if ($diff < 86400) return floor($diff / 3600) . 'h ago';
+    if ($diff < 604800) return floor($diff / 86400) . 'd ago';
+    return date('M j', strtotime($datetime));
+}
+
 // Format date
 function formatDate($date, $format = 'M d, Y H:i') {
     return date($format, strtotime($date));

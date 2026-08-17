@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:bcrypt/bcrypt.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'app_config.dart';
 import 'supabase_rest.dart';
 
 /// Thrown for any login/lookup/confirmation failure surfaced to the UI.
@@ -235,6 +238,28 @@ class ApiClient {
       'updated_at': nowIso,
     });
 
+    // Bell notification — same table/shape the web app writes to directly.
+    final reqNumberForNotif = (match['group_id'] as String?)?.isNotEmpty == true
+        ? match['group_id'] as String
+        : match['request_number'] as String;
+    try {
+      await SupabaseRest.insert('notifications', {
+        'user_id': user.id,
+        'title': 'Item delivered',
+        'message': 'Request ($reqNumberForNotif) has been marked as delivered.',
+        'type': 'success',
+        'link': 'user/my-requests.php',
+      });
+    } catch (_) {
+      // Non-fatal — the delivery itself already succeeded above.
+    }
+
+    // Ask the web backend to send the "delivered" email — the only step here
+    // that still needs the PHP/SMTP side, since Dart can't reliably send
+    // real email on its own. Fire-and-forget: never blocks or fails the
+    // delivery confirmation itself if the server is unreachable.
+    unawaited(_notifyServerOfDelivery(id));
+
     final invId = match['inventory_id'];
     String itemName = 'Item';
     if (invId != null) {
@@ -273,6 +298,20 @@ class ApiClient {
       remainingInGroup: remaining,
       totalInGroup: total,
     );
+  }
+
+  Future<void> _notifyServerOfDelivery(int requestId) async {
+    try {
+      await http
+          .post(
+            Uri.parse('$serverBaseUrl/api/notify_delivered.php'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'request_id': requestId}),
+          )
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // Best-effort only — the delivery confirmation itself already succeeded.
+    }
   }
 }
 

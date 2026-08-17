@@ -147,6 +147,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'CREATE', "Submitted $safe_type group $group_id ($total_qty unit(s))", 'requests', 0);
 
         if (empty($errors)) {
+            $__type_labels = ['borrow' => 'Borrow', 'item' => 'Item', 'service' => 'Service'];
+            $__names = array_values(array_unique(array_column($units_to_save, 'item_name')));
+            notifyAdmins(
+                'New ' . ($__type_labels[$safe_type] ?? ucfirst($safe_type)) . ' request',
+                $current_user['full_name'] . ' submitted ' . $total_qty . ' item(s): ' . implode(', ', array_slice($__names, 0, 3)) . (count($__names) > 3 ? '…' : ''),
+                'info',
+                'admin/requests.php?action=view&group_id=' . urlencode($group_id)
+            );
             redirectWithMessage('my-requests.php', count($units_to_save) . ' item(s) submitted successfully (Group: ' . $group_id . ')!', 'success');
         } else {
             $submit_error = 'Some requests failed to save: ' . implode('; ', $errors);
@@ -1662,30 +1670,34 @@ function renderItemAvailCal(select) {
         return true;
     });
 
-    // Hide calendar if no return records at all
-    if (records.length === 0) {
-        wrap.style.display = 'none';
-        return;
-    }
-    var bar     = document.getElementById('iac-status-bar');
+    var bar = document.getElementById('iac-status-bar');
 
     // Sort records by return date ascending
     records = records.slice().sort(function(a, b) { return a.return_date.localeCompare(b.return_date); });
 
-    var retChips = records.map(function(r) {
-        var d = new Date(r.return_date + 'T00:00:00');
-        var lbl = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-        return '<span class="iac-ret-chip">' + lbl + '</span>';
-    }).join('');
-    bar.innerHTML = '<div class="iac-bar-top">'
-                  + '<i class="fas fa-clock"></i>'
-                  + '<span><strong>' + records.length + ' of ' + totalQty + ' units requested or borrowed</strong></span>'
-                  + '</div>'
-                  + '<div class="iac-bar-chips"><span class="iac-bar-chips-label">Expected returns:</span>' + retChips + '</div>';
-    bar.className = 'iac-bar iac-bar-borrowed';
+    if (records.length === 0) {
+        // Nothing borrowed/requested right now — still show the calendar so the
+        // user can see availability at a glance, just with an all-clear banner.
+        bar.innerHTML = '<div class="iac-bar-top">'
+                      + '<i class="fas fa-circle-check"></i>'
+                      + '<span><strong>All ' + totalQty + ' unit(s) currently available</strong></span>'
+                      + '</div>';
+        bar.className = 'iac-bar';
+        iacViewDate = new Date(); iacViewDate.setDate(1);
+    } else {
+        var retChips = records.map(function(r) {
+            var d = new Date(r.return_date + 'T00:00:00');
+            var lbl = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+            return '<span class="iac-ret-chip">' + lbl + '</span>';
+        }).join('');
+        bar.innerHTML = '<div class="iac-bar-top">'
+                      + '<i class="fas fa-clock"></i>'
+                      + '<span><strong>' + records.length + ' of ' + totalQty + ' units requested or borrowed</strong></span>'
+                      + '</div>'
+                      + '<div class="iac-bar-chips"><span class="iac-bar-chips-label">Expected returns:</span>' + retChips + '</div>';
+        bar.className = 'iac-bar iac-bar-borrowed';
 
-    // Navigate to the month of the earliest return (guard against empty records)
-    if (records.length > 0) {
+        // Navigate to the month of the earliest return
         var earliest = new Date(records[0].return_date + 'T00:00:00');
         iacViewDate  = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
     }
