@@ -1,7 +1,7 @@
 {
     "description": "DO NOT DELETE THIS FILE. This file is used to keep track of which files have been synced in the most recent deployment. If you delete this file a resync will need to be done (which can take a while) - read more: https://github.com/SamKirkland/FTP-Deploy-Action",
     "version": "1.0.0",
-    "generatedTime": 1785766924903,
+    "generatedTime": 1786963845338,
     "data": [
         {
             "type": "folder",
@@ -16,8 +16,8 @@
         {
             "type": "file",
             "name": ".ftp-deploy-sync-state.json",
-            "size": 22883,
-            "hash": "92a7e7cb9b3ef38f37a2a69405c8b241f4edcdf5d380bbe1ae2686a29864b025"
+            "size": 23170,
+            "hash": "e3cba27d9e36f716e6ed14207c34067dc2a1ef07c23b6dde917bda2b91c61369"
         },
         {
             "type": "file",
@@ -30,6 +30,18 @@
             "name": "DEMO_ACCOUNTS.txt",
             "size": 2588,
             "hash": "6f41bf1f91682a708e9756799c0de241c4f9275e9e89765da8cde3906ac19e46"
+        },
+        {
+            "type": "file",
+            "name": "ERD_DFD.html",
+            "size": 17756,
+            "hash": "3183e16cd51d5c4f0c45c7bb9453d5c538b8681718cd1302fbccd2b2c9596b8a"
+        },
+        {
+            "type": "file",
+            "name": "ERD_DFD.md",
+            "size": 8363,
+            "hash": "63b53c321f3bd2495162b7c0ebb46e043ff3c4b9054a3ddfaebb778d98464289"
         },
         {
             "type": "file",
@@ -64,8 +76,8 @@
         {
             "type": "file",
             "name": "SYSTEM_DOCUMENTATION.txt",
-            "size": 41710,
-            "hash": "d9e2a21a7ea0ff577daa56508655cda9920420bab62570edd3cc9bef726e55ac"
+            "size": 53015,
+            "hash": "7091412d89c32cc5a1293c1da3f99ac5e4b130cf61d7e0c4b9c5360bffe431a7"
         },
         {
             "type": "file",
@@ -82,6 +94,10 @@
         {
             "type": "folder",
             "name": "admin"
+        },
+        {
+            "type": "folder",
+            "name": "api"
         },
         {
             "type": "folder",
@@ -148,6 +164,10 @@
             "hash": "70b8890122bbd4f59a6880d1461b4112b41fa545e9868ce685ba74a21d3965cf"
         },
         {
+            "type": "folder",
+            "name": "mobile_app"
+        },
+        {
             "type": "file",
             "name": "pathcheck.php",
             "size": 9768,
@@ -159,15 +179,15 @@
         },
         {
             "type": "file",
-            "name": "signup.php",
-            "size": 17061,
-            "hash": "f0e827b23cf7900a27af9fa6ab7b74fc23d18d386ae51365fcf96a95976cd23f"
-        },
-        {
-            "type": "file",
             "name": "seed_users.php",
             "size": 2520,
             "hash": "d20829a593f312d23e01d0c067f2fffaa225a7714e5397992e25740b102f2b89"
+        },
+        {
+            "type": "file",
+            "name": "signup.php",
+            "size": 17061,
+            "hash": "f0e827b23cf7900a27af9fa6ab7b74fc23d18d386ae51365fcf96a95976cd23f"
         },
         {
             "type": "file",
@@ -199,9 +219,15 @@
         },
         {
             "type": "file",
+            "name": ".claude/settings.json",
+            "size": 2393,
+            "hash": "adeec2effed4abd8ae0c7bb43132d65e99a6b5711f6eb2deeb4e7d2624a3bd34"
+        },
+        {
+            "type": "file",
             "name": ".git/FETCH_HEAD",
             "size": 217,
-            "hash": "7090ee01578dc60d692164003413461019b5fb319b321de96e18886b99ed6431"
+            "hash": "14fac06a4bdb6db17584862d30b579c4eb544d55e8070c4687f1ee286aab2f18"
         },
         {
             "type": "file",
@@ -211,15 +237,15 @@
         },
         {
             "type": "file",
-            "name": ".git/config",
-            "size": 872,
-            "hash": "38e858fc84074e102e929623c98bd3ed774194a5946c35f2e14f9dd3f5878288"
-        },
-        {
-            "type": "file",
             "name": ".git/description",
             "size": 73,
             "hash": "85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+        },
+        {
+            "type": "file",
+            "name": ".git/config",
+            "size": 872,
+            "hash": "1a6b1bd07b78bf0265be0e38ebceb6bac0e3989f7ca6375da0583e4baf490a4c"
         },
         {
             "type": "folder",
@@ -228,18 +254,12 @@
         {
             "type": "file",
             "name": ".git/index",
-            "size": 6212,
-            "hash": "0ccfae3f027e8b6d739e40b0572e5e6e555a264ec0701bee966af7d8cea8a560"
+            "size": 17369,
+            "hash": "39e2c0a116dfb72ca3b745120072f32997fd49add939e2e001331fe05ca4f666"
         },
         {
             "type": "folder",
             "name": ".git/info"
-        },
-        {
-            "type": "file",
-            "name": ".claude/settings.json",
-            "size": 566,
-            "hash": "9fd9d9d5513d1a34261a51424f87b9856f9b8824baa39b4b6d375e345e46da9e"
         },
         {
             "type": "folder",
@@ -256,14 +276,6 @@
         {
             "type": "folder",
             "name": ".github/workflows"
-        },
-        {
-            "type": "folder",
-            "name": "assets/pics"
-        },
-        {
-            "type": "folder",
-            "name": "assets/uploads"
         },
         {
             "type": "file",
@@ -297,6 +309,12 @@
         },
         {
             "type": "file",
+            "name": "admin/inventory.php",
+            "size": 81783,
+            "hash": "cb1a3a85ea1ffa1181a2957e6c94a9f6291f29fd4a2c4df093e72bc944310ac5"
+        },
+        {
+            "type": "file",
             "name": "admin/reports.php",
             "size": 32798,
             "hash": "b67a1dfe3321a850ac2a56427fd9ff0a25074f7afbd266dd9bda1ded79050e74"
@@ -309,21 +327,9 @@
         },
         {
             "type": "file",
-            "name": "admin/inventory.php",
-            "size": 81783,
-            "hash": "cb1a3a85ea1ffa1181a2957e6c94a9f6291f29fd4a2c4df093e72bc944310ac5"
-        },
-        {
-            "type": "file",
             "name": "admin/settings.php",
             "size": 28824,
             "hash": "a2c35bff4aeb7e86566dae01851b7053f51ed8b495455d7f19d5f34b2b733dd8"
-        },
-        {
-            "type": "file",
-            "name": "config/constants.php",
-            "size": 3624,
-            "hash": "2ac7e5628255e83fb91e1aaf10134845efffd3e1b8d127d7da1eec0b12b44b40"
         },
         {
             "type": "file",
@@ -333,9 +339,59 @@
         },
         {
             "type": "file",
+            "name": "api/_bootstrap.php",
+            "size": 3176,
+            "hash": "7eeb1a4a44bc22ff3c099d3ba7d2176b6ec0ff43b8968bd7cb2f964d3d465bf6"
+        },
+        {
+            "type": "file",
+            "name": "api/confirm_delivery.php",
+            "size": 2531,
+            "hash": "3aef98b4231b6da16b0616d4fc0ae4c96121759dfd18c46c22a0569814912018"
+        },
+        {
+            "type": "file",
+            "name": "api/login.php",
+            "size": 909,
+            "hash": "2365247aa6d2d3d9a80f13616bc49446b49c5d9dd97c4a24edcc66b06aeaa151"
+        },
+        {
+            "type": "file",
+            "name": "api/me.php",
+            "size": 411,
+            "hash": "185131ae6dddb7faf6d2dd6b209d1bf1526eac9d3c8858d3ad4cec190e1efccf"
+        },
+        {
+            "type": "file",
+            "name": "api/pending_deliveries.php",
+            "size": 1320,
+            "hash": "db3c5643813eb1d1653bbc2dc66207061b654e1a5d0d326ec028d65d7b39a8d5"
+        },
+        {
+            "type": "folder",
+            "name": "assets/pics"
+        },
+        {
+            "type": "file",
+            "name": "config/constants.php",
+            "size": 3624,
+            "hash": "2ac7e5628255e83fb91e1aaf10134845efffd3e1b8d127d7da1eec0b12b44b40"
+        },
+        {
+            "type": "folder",
+            "name": "assets/uploads"
+        },
+        {
+            "type": "file",
             "name": "config/data.php",
             "size": 9935,
             "hash": "42fab52f4508d7e11a7e4ce3be0faef2a3e623b56aa50f1e214474a24c8fff79"
+        },
+        {
+            "type": "file",
+            "name": "config/departments_custom.json",
+            "size": 276,
+            "hash": "c57711f4467a721640d3235ece6d3aee6da4eb206f02686d0084b8a525bef12b"
         },
         {
             "type": "file",
@@ -360,12 +416,6 @@
             "name": "css/style.css",
             "size": 20996,
             "hash": "c042e0735effedb858c424f3d3a71ad32e7657fb95acf9afcc055f27bc282136"
-        },
-        {
-            "type": "file",
-            "name": "config/departments_custom.json",
-            "size": 276,
-            "hash": "c57711f4467a721640d3235ece6d3aee6da4eb206f02686d0084b8a525bef12b"
         },
         {
             "type": "file",
@@ -417,15 +467,67 @@
         },
         {
             "type": "file",
+            "name": "lib/qrcode.php",
+            "size": 1771,
+            "hash": "2780ff104f70ab3ceed0ac445d4f6e412a236b0a99da37f541554bf757621016"
+        },
+        {
+            "type": "file",
             "name": "js/script.js",
             "size": 1299,
             "hash": "792fcabebff40ab5da850cdd6d932f46197ca45046767ce051f6259592b30422"
         },
         {
             "type": "file",
-            "name": "lib/qrcode.php",
-            "size": 1771,
-            "hash": "2780ff104f70ab3ceed0ac445d4f6e412a236b0a99da37f541554bf757621016"
+            "name": "mobile_app/.metadata",
+            "size": 1114,
+            "hash": "fe5e088959f9545148509aa653af8a7fa1f7212be0a7893a49e7c0e3c3b4de69"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/README.md",
+            "size": 638,
+            "hash": "eff74396dd8b3470d00ab13e94fc115e3983e9a9650c3b8150d4247c96cfb77c"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/analysis_options.yaml",
+            "size": 1420,
+            "hash": "e0ea485cfdbc3e12b93efb8679a5ea73ebfe20ea4ca0c473dc594fc2fb274ed5"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/devtools_options.yaml",
+            "size": 184,
+            "hash": "e8ba6877169885107d577db47d3e9eb10b32b7aded5959dfc52cae8022a5de84"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/lib"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/pubspec.yaml",
+            "size": 4073,
+            "hash": "61e2c90a60482d7f01562a8dffc4e877f4df770960702a08eeeafe2356b5ca9e"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/pubspec.lock",
+            "size": 11329,
+            "hash": "b3647d623cf6945d5832d175f7113f7db25985ed3b81a255c6ba4ebbcbca7136"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/test"
         },
         {
             "type": "file",
@@ -435,15 +537,21 @@
         },
         {
             "type": "file",
-            "name": "user/borrow-records.php",
-            "size": 32898,
-            "hash": "4a7853c5b8c94ee28815cb1da561c60262e8753df8bd95a04fca944e909fbd61"
-        },
-        {
-            "type": "file",
             "name": "user/dashboard.php",
             "size": 58702,
             "hash": "0c3c7737036b70b454532cf3bd48d5483f7c3de64b1ca4857ba1648e7f60fb34"
+        },
+        {
+            "type": "file",
+            "name": "user/inventory.php",
+            "size": 35530,
+            "hash": "5524cb266e8a067649dfc3e030dce1ace3234ad950d5d412d7f5e27f79070914"
+        },
+        {
+            "type": "file",
+            "name": "user/borrow-records.php",
+            "size": 32898,
+            "hash": "4a7853c5b8c94ee28815cb1da561c60262e8753df8bd95a04fca944e909fbd61"
         },
         {
             "type": "file",
@@ -456,12 +564,6 @@
             "name": "user/requests.php",
             "size": 100160,
             "hash": "97f224ac1f09a923bb2031c329edc3c4af647712af9688d7a5a48de4281f4e14"
-        },
-        {
-            "type": "file",
-            "name": "user/inventory.php",
-            "size": 35530,
-            "hash": "5524cb266e8a067649dfc3e030dce1ace3234ad950d5d412d7f5e27f79070914"
         },
         {
             "type": "file",
@@ -489,6 +591,12 @@
         },
         {
             "type": "file",
+            "name": ".git/hooks/post-update.sample",
+            "size": 189,
+            "hash": "81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+        },
+        {
+            "type": "file",
             "name": ".git/hooks/pre-applypatch.sample",
             "size": 424,
             "hash": "e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
@@ -498,12 +606,6 @@
             "name": ".git/hooks/pre-commit.sample",
             "size": 1649,
             "hash": "57185b7b9f05239d7ab52db045f5b89eb31348d7b2177eab214f5eb872e1971b"
-        },
-        {
-            "type": "file",
-            "name": ".git/hooks/post-update.sample",
-            "size": 189,
-            "hash": "81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
         },
         {
             "type": "file",
@@ -531,15 +633,15 @@
         },
         {
             "type": "file",
-            "name": ".git/hooks/prepare-commit-msg.sample",
-            "size": 1492,
-            "hash": "e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
-        },
-        {
-            "type": "file",
             "name": ".git/hooks/push-to-checkout.sample",
             "size": 2783,
             "hash": "a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+        },
+        {
+            "type": "file",
+            "name": ".git/hooks/prepare-commit-msg.sample",
+            "size": 1492,
+            "hash": "e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
         },
         {
             "type": "file",
@@ -563,7 +665,7 @@
             "type": "file",
             "name": ".git/logs/HEAD",
             "size": 218,
-            "hash": "e24f901b89df1f6a5c23acac32cde3bc7dd367b1348ffba92250afa99d69df28"
+            "hash": "55ce9d85120104350b9acbb360bf8e91381b22fe8f6a3b982c06408ad7bcda6f"
         },
         {
             "type": "folder",
@@ -613,6 +715,72 @@
         },
         {
             "type": "folder",
+            "name": "mobile_app/android/app"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/build.gradle.kts",
+            "size": 537,
+            "hash": "6a26dba2cb8dfba1e74f540b0d17a89d96c1301d3c3bfda14348bed257fddcba"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/gradle"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/gradle.properties",
+            "size": 138,
+            "hash": "5539cf5f17c53900a72cf0065e450f0a8ba5b929dd2b364724c1296d0285d9dc"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/settings.gradle.kts",
+            "size": 772,
+            "hash": "a9b5756048f668d4ebf355116678fd334cd5f2169b7d4518ad19b8df14d3af36"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Flutter"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner.xcworkspace"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner.xcodeproj"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/RunnerTests"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/lib/screens"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/lib/services"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/main.dart",
+            "size": 1562,
+            "hash": "d35442f30458f6e533da5157dfcbf12d220abc0c1c03c06024d7dfc7ff342a23"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/test/widget_test.dart",
+            "size": 596,
+            "hash": "543d1a24898bf930ba48c92e9621c08f703621253b1359a1a3f5ef02670dc401"
+        },
+        {
+            "type": "folder",
             "name": ".git/logs/refs/heads"
         },
         {
@@ -625,27 +793,27 @@
         },
         {
             "type": "file",
-            "name": ".git/objects/pack/pack-2ff0acc8a8335ef7ffc2c96e513eaf0805ea60c5.idx",
-            "size": 22996,
-            "hash": "0ae3c9639f9d5b41db55ba2d69d92b523f3e87f9e7c669b73a25872171558eed"
+            "name": ".git/objects/pack/pack-21036580bf5baaf9d3ceb748e06ca2c228252f8e.pack",
+            "size": 1170616,
+            "hash": "d3c6193fc0805a8dae3e6410def1f371072a6b3c400f02c7ee6c74421ffccf76"
         },
         {
             "type": "file",
-            "name": ".git/objects/pack/pack-2ff0acc8a8335ef7ffc2c96e513eaf0805ea60c5.pack",
-            "size": 1082976,
-            "hash": "493a7396c5d7d28940b476bd2a1505e13bec1b2568563eb72f2815a9b46ca694"
+            "name": ".git/objects/pack/pack-21036580bf5baaf9d3ceb748e06ca2c228252f8e.idx",
+            "size": 26440,
+            "hash": "4dd5c68efeccb6d85d5cbee0e8994d74368c58496475f2ffe23440ecc00953d0"
         },
         {
             "type": "file",
-            "name": ".git/objects/pack/pack-2ff0acc8a8335ef7ffc2c96e513eaf0805ea60c5.rev",
-            "size": 3184,
-            "hash": "201b1d0b87edf4eaa6212fea5d6562ed770abfc6b4b9b8787a24e8e0863803f9"
+            "name": ".git/objects/pack/pack-21036580bf5baaf9d3ceb748e06ca2c228252f8e.rev",
+            "size": 3676,
+            "hash": "f485749b99926022f7e459674ed0ebef2668a83f7dd51b7fbd0d11433c4f196d"
         },
         {
             "type": "file",
             "name": ".git/refs/heads/main",
             "size": 41,
-            "hash": "a210c052e5cdbc91767a23639f86c730283d61379f5cb457f821dcf2156985de"
+            "hash": "acd2c2ec22ba1b525ee00a2781123b138b436895c5a58fe133caa974d0ac36a5"
         },
         {
             "type": "folder",
@@ -659,9 +827,139 @@
         },
         {
             "type": "file",
+            "name": "mobile_app/android/app/build.gradle.kts",
+            "size": 1406,
+            "hash": "588d90799d036daddb3ae750a802ec3a0362ee152f5af2d3babf30ef4e24d1df"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/gradle/wrapper"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Flutter/AppFrameworkInfo.plist",
+            "size": 720,
+            "hash": "da12038f9b2688a8a26160fea2609fa8fcb11421448c109f09c0f573efe7698d"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Flutter/Debug.xcconfig",
+            "size": 30,
+            "hash": "a82d7765b37116ee4821d2cd1d65942febf8032353757ffb0826eabde785b4a6"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Flutter/Release.xcconfig",
+            "size": 30,
+            "hash": "a82d7765b37116ee4821d2cd1d65942febf8032353757ffb0826eabde785b4a6"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/AppDelegate.swift",
+            "size": 539,
+            "hash": "451c6d9ba0a2b3ff43092ea349c60fa79a91f1158b915eb29dbdd357cb95d7b8"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner/Base.lproj"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner/Assets.xcassets"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Info.plist",
+            "size": 2353,
+            "hash": "6539b767e0a707a7534fdd5aa770e713396ac937ee6342ba5481c81c226b09a6"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/SceneDelegate.swift",
+            "size": 76,
+            "hash": "add68b905971dedfcc0d0b5b7118030de5925ba8c081ad9815463699e3a444ad"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Runner-Bridging-Header.h",
+            "size": 38,
+            "hash": "1a8d11d01d1cc92c650c9c9ed35299240052d4683a15a719a2315ef44185e074"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcworkspace/contents.xcworkspacedata",
+            "size": 152,
+            "hash": "46c3c9702ff7c5584e11c954d943cfb6e07fb26e3fbd072ddbc0f388aa352de1"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner.xcworkspace/xcshareddata"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcodeproj/project.pbxproj",
+            "size": 24150,
+            "hash": "4ebbdc4eecfe88f19ed18eaa47128e9708dc6165c34896c916712441f160b835"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner.xcodeproj/project.xcworkspace"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner.xcodeproj/xcshareddata"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/RunnerTests/RunnerTests.swift",
+            "size": 285,
+            "hash": "5e8f4908dacea6f29b2a790e4d38bf5fded69096063f9a27a2f21584d62b30c0"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/screens/home_screen.dart",
+            "size": 8583,
+            "hash": "9a784094ef972afefbc390b5ec7fa396b260d59dd6f5cf5422895d7eb92f7fdb"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/screens/login_screen.dart",
+            "size": 6047,
+            "hash": "70be8cebf78597593b029a77ef50529a51a6d4cad6f8e8c0b9091d1fab3e7e3e"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/screens/scanner_screen.dart",
+            "size": 6409,
+            "hash": "554f8ba1b2f07096c43da37119ea31c38def80eba2212b99d592a7aeadaf662e"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/services/api_client.dart",
+            "size": 10789,
+            "hash": "14bdfe50e86ce5da68eb855cf871a5231528e79a27615554a3c164ef0ea9edf6"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/services/supabase_rest.dart",
+            "size": 2269,
+            "hash": "db0460f5b89bf8b6e945bf90b898fc2c94500d9f6aa20d479b7553b866f2d90d"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/services/supabase_config.dart",
+            "size": 947,
+            "hash": "8007e6bb3a04a452b6fcf1e0ff652536dc94312bf5b9f7a22acb622dce2a4046"
+        },
+        {
+            "type": "file",
             "name": ".git/logs/refs/heads/main",
             "size": 227,
-            "hash": "e98163525d40f01dc6b10bd364d1c5a802d1a5d11c08c8aca328698453ccf79c"
+            "hash": "ff1a5e68b7f8fa443de7c6076dc0e651748c5937b5fd2d8bdf291deb2ea75a67"
         },
         {
             "type": "folder",
@@ -669,21 +967,15 @@
         },
         {
             "type": "file",
-            "name": ".git/objects/info/commit-graphs/graph-c5df03bd2744caac9279e472aa03bef6963e3f18.graph",
-            "size": 12092,
-            "hash": "90dbbb66ca6a786604c5a9258701f0465ec40635e9aef8d1596b486590fa0e43"
-        },
-        {
-            "type": "file",
             "name": ".git/objects/info/commit-graphs/commit-graph-chain",
             "size": 41,
-            "hash": "0f614fa837e96d0417841bccffeca47dee4516112153a1c2154547eac5977e16"
+            "hash": "d7d1c7ab666d390dc8d3b94ede757921859bc8b23bf8bc55d22288611fd92069"
         },
         {
             "type": "file",
-            "name": ".git/refs/remotes/origin/main",
-            "size": 41,
-            "hash": "a210c052e5cdbc91767a23639f86c730283d61379f5cb457f821dcf2156985de"
+            "name": ".git/objects/info/commit-graphs/graph-7ff7d7b07bfb28f12260cf6ac15c178f7f816e8b.graph",
+            "size": 12212,
+            "hash": "25cdd9eaaa9aee1d7076a2cc794277aaedc3b0dd7812c699b77ab8f7727d97dd"
         },
         {
             "type": "file",
@@ -693,15 +985,363 @@
         },
         {
             "type": "file",
+            "name": ".git/refs/remotes/origin/main",
+            "size": 41,
+            "hash": "acd2c2ec22ba1b525ee00a2781123b138b436895c5a58fe133caa974d0ac36a5"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/debug"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/profile"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/gradle/wrapper/gradle-wrapper.properties",
+            "size": 201,
+            "hash": "297c9e63b6fa6e7e8b221900fa1787c1a0e38869d8957da66389fd0f6b00f78e"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Base.lproj/LaunchScreen.storyboard",
+            "size": 2377,
+            "hash": "857e61203b3deafb05766d8fcda898b86a7cb6f3d5e385ecc9926c4d698215e9"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Base.lproj/Main.storyboard",
+            "size": 1605,
+            "hash": "fd367b6c43006d61b730f674970dd48b9f662c8f2264e52ffc1558102a2c9f2d"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+            "size": 238,
+            "hash": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings",
+            "size": 226,
+            "hash": "11b247bc6796892d67c9a821d18604db4dd6a880981b34f38460b9866e6b247f"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+            "size": 135,
+            "hash": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios/Runner.xcodeproj/xcshareddata/xcschemes"
+        },
+        {
+            "type": "file",
             "name": ".git/logs/refs/remotes/origin/changes-1",
             "size": 312,
-            "hash": "0967ba252c84b9f7f55a966382538cf0c295fa7250a881fb6f8de74a01f9ec58"
+            "hash": "646eabaea39026c5a44d2be3afbeac21e0e4b160c1f2799d9330d7cea482c42f"
         },
         {
             "type": "file",
             "name": ".git/logs/refs/remotes/origin/main",
             "size": 312,
-            "hash": "0d621f94a0f9e29b0b6dc6d2078ba6c0039f706fcb8e04fdef92264436d9b387"
+            "hash": "4a87194f767b640b30ae0f3b036e00638c563ed388bfd765c9fb07e03881aaa3"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/debug/AndroidManifest.xml",
+            "size": 378,
+            "hash": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/AndroidManifest.xml",
+            "size": 2511,
+            "hash": "a4c873c8ec8810d528fd9bac9a0170386a992a0575a5b48901d93162cb7cfc0b"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/kotlin"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/profile/AndroidManifest.xml",
+            "size": 378,
+            "hash": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json",
+            "size": 2519,
+            "hash": "3b1e214f466ffedff74baa5598ad5c4421130eea6bc8d57b8fe23435e8280ae4"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png",
+            "size": 10932,
+            "hash": "7770183009e914112de7d8ef1d235a6a30c5834424858e0d2f8253f6b8d31926"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png",
+            "size": 295,
+            "hash": "cab10a0d391ec5bc09ef50ce49e8ad401cee7ef03707ec0923a222c5c2b3d212"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png",
+            "size": 406,
+            "hash": "b9ad02cf6576a04d1b6806ac02a2431481b448dd0c2e505ce25842d1f7c4730b"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png",
+            "size": 450,
+            "hash": "c6e6d3b215ae744a9c391f4c4d44157eff5e739d6ad6c39f9bfa5df66dddd267"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png",
+            "size": 282,
+            "hash": "5dee24dc104ac76dc162e42ae0beb163d426bf365562ee28ba7b3ad368559a60"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png",
+            "size": 462,
+            "hash": "a9b21eb6f4271385655a8771f76e29eef8c1107d7879cbcfc567e6619d1f716a"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png",
+            "size": 704,
+            "hash": "e677d701ffe4af7bc2935098d6b3984cc9ab7ace573e6900955a5535b12410cf"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png",
+            "size": 586,
+            "hash": "7c61c42fc7b657d9cf314d32a4ec458f0647c3aaf360be1b9377857266ec2499"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png",
+            "size": 406,
+            "hash": "b9ad02cf6576a04d1b6806ac02a2431481b448dd0c2e505ce25842d1f7c4730b"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png",
+            "size": 862,
+            "hash": "19be171481dc71a0b2803ebcd01dd8b0c5fd5778dee34c0a3cabc948c225f24e"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png",
+            "size": 862,
+            "hash": "19be171481dc71a0b2803ebcd01dd8b0c5fd5778dee34c0a3cabc948c225f24e"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png",
+            "size": 1674,
+            "hash": "4209a49e44a92ec40a327d3455eb1b1c153ee83d75de1c2be0a12ab18b2ff9de"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png",
+            "size": 762,
+            "hash": "836c918cb613249eba0483a6b02fa3df3c1c0a89a315ee4d3b88509b83c7ab73"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png",
+            "size": 1226,
+            "hash": "41c7d42f6e61f8fe7f30b1ffa2256aecbc9682be06d18c4a3062043e1a2e547c"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png",
+            "size": 1418,
+            "hash": "5d7e5bdf01b93802bc973345b3a78c038907147625035952a08a115a563b7f81"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset/Contents.json",
+            "size": 391,
+            "hash": "ccc7950fd5f5b82067c85f667940a9d59189151460761ece8098ca78daa19469"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png",
+            "size": 68,
+            "hash": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png",
+            "size": 68,
+            "hash": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png",
+            "size": 68,
+            "hash": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md",
+            "size": 336,
+            "hash": "a985b626c4f7546a8ba392d135e9226c3547c8e2b46895f5f2bdf40d7b14ef9f"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+            "size": 238,
+            "hash": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings",
+            "size": 226,
+            "hash": "11b247bc6796892d67c9a821d18604db4dd6a880981b34f38460b9866e6b247f"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme",
+            "size": 3833,
+            "hash": "2dd28b879e66081e28a3324cf2bee7ab2f70be9a3e50e08926b7366dadff7d6e"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/kotlin/com"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/drawable-v21"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/drawable"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/mipmap-mdpi"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/mipmap-hdpi"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xhdpi"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xxhdpi"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xxxhdpi"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/values"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/values-night"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/kotlin/com/managemo"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/drawable-v21/launch_background.xml",
+            "size": 438,
+            "hash": "7ca6d5cec2169c5a98661a119db23a6f3399c8fef2256ff04f3a642831282478"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/drawable/launch_background.xml",
+            "size": 434,
+            "hash": "94433756fe10005ddd6fc55cc5c0b1e9f3c10b66a08ceac795ece6713d34e28a"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+            "size": 442,
+            "hash": "c7c0c0189145e4e32a401c61c9bdc615754b0264e7afae24e834bb81049eaf81"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+            "size": 544,
+            "hash": "6a7c8f0d703e3682108f9662f813302236240d3f8f638bb391e32bfb96055fef"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+            "size": 721,
+            "hash": "e14aa40904929bf313fded22cf7e7ffcbf1d1aac4263b5ef1be8bfce650397aa"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+            "size": 1031,
+            "hash": "4d470bf22d5c17d84edc5f82516d1ba8a1c09559cd761cefb792f86d9f52b540"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+            "size": 1443,
+            "hash": "3c34e1f298d0c9ea3455d46db6b7759c8211a49e9ec6e44b635fc5c87dfb4180"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/values/styles.xml",
+            "size": 996,
+            "hash": "937d7c82f539c72eb94fd3a3773f29b3d3fef1997213c92cb632298cedf4bda9"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/values-night/styles.xml",
+            "size": 995,
+            "hash": "8c5bad5152f217e837519f9c15211d19f39bd45f5f67faf6dd81cb4b299e518f"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/kotlin/com/managemo/managemo_scanner"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/kotlin/com/managemo/managemo_scanner/MainActivity.kt",
+            "size": 131,
+            "hash": "8653681bbc86c76cc33797d3c50976a7235e14d189c4f4f89972a8331a2e9964"
         }
     ]
 }
