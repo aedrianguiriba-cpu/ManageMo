@@ -184,40 +184,50 @@ function logActivity($user_id, $action, $description, $table = null, $record_id 
 function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $extra = []) {
     $messages = [
         'approved' => [
-            'subject' => 'Your Request Has Been Approved',
-            'body'    => "Great news — your request ($request_number) has been APPROVED.\n"
-                       . "We'll notify you again once it's out for delivery" . (!empty($extra['is_pickup']) ? ' / ready for pickup' : '') . ".",
+            'subject'  => 'Your Request Has Been Approved',
+            'headline' => 'Your request has been approved',
+            'color'    => '#15803d', 'bg' => '#dcfce7', 'icon' => '✓',
+            'detail'   => "We'll notify you again once it's "
+                        . (!empty($extra['is_pickup']) ? 'ready for pickup' : 'out for delivery') . '.',
         ],
         'disapproved' => [
-            'subject' => 'Your Request Was Not Approved',
-            'body'    => "Your request ($request_number) was NOT APPROVED."
-                       . (!empty($extra['reason']) ? "\n\nReason given: " . $extra['reason'] : '')
-                       . "\n\nIf you have questions, please contact the property custodian's office.",
+            'subject'  => 'Your Request Was Not Approved',
+            'headline' => 'Your request was not approved',
+            'color'    => '#b91c1c', 'bg' => '#fee2e2', 'icon' => '✕',
+            'detail'   => (!empty($extra['reason']) ? 'Reason given: ' . $extra['reason'] . ' ' : '')
+                        . 'If you have questions, please contact the property custodian\'s office.',
         ],
         'out_for_delivery' => [
-            'subject' => 'Your Request is Out for Delivery',
-            'body'    => "Your request ($request_number) has been dispatched and is now OUT FOR DELIVERY."
-                       . (!empty($extra['scheduled_date']) ? "\nExpected delivery date: " . $extra['scheduled_date'] : '')
-                       . "\n\nPlease be available to receive the item(s) at your registered location.",
+            'subject'  => 'Your Request is Out for Delivery',
+            'headline' => 'Your item is out for delivery',
+            'color'    => '#1d4ed8', 'bg' => '#dbeafe', 'icon' => '🚚',
+            'detail'   => (!empty($extra['scheduled_date']) ? 'Expected delivery date: ' . $extra['scheduled_date'] . '. ' : '')
+                        . 'Please be available to receive the item(s) at your registered location.',
         ],
         'pickup_ready' => [
-            'subject' => 'Your Request is Ready for Pickup',
-            'body'    => "Your request ($request_number) is now READY FOR PICKUP."
-                       . (!empty($extra['scheduled_date']) ? "\nExpected pickup date: " . $extra['scheduled_date'] : '')
-                       . "\n\nPlease visit the property office to claim your item(s).",
+            'subject'  => 'Your Request is Ready for Pickup',
+            'headline' => 'Your item is ready for pickup',
+            'color'    => '#1d4ed8', 'bg' => '#dbeafe', 'icon' => '📦',
+            'detail'   => (!empty($extra['scheduled_date']) ? 'Expected pickup date: ' . $extra['scheduled_date'] . '. ' : '')
+                        . 'Please visit the property office to claim your item(s).',
         ],
         'delivered' => [
-            'subject' => 'Your Item Has Been Delivered',
-            'body'    => "Your request ($request_number) has been marked as DELIVERED.\n"
-                       . "Please check with the admin office if you have any concerns about the item(s) received.",
+            'subject'  => 'Your Item Has Been Delivered',
+            'headline' => 'Your item has been delivered',
+            'color'    => '#15803d', 'bg' => '#dcfce7', 'icon' => '📬',
+            'detail'   => 'Please check with the admin office if you have any concerns about the item(s) received.',
         ],
         'returned' => [
-            'subject' => 'Item Return Confirmed',
-            'body'    => "We've recorded the item(s) for request ($request_number) as RETURNED. Thank you!",
+            'subject'  => 'Item Return Confirmed',
+            'headline' => 'Thanks for returning your item(s)',
+            'color'    => '#15803d', 'bg' => '#dcfce7', 'icon' => '↩',
+            'detail'   => "We've recorded the item(s) for this request as returned.",
         ],
         'completed' => [
-            'subject' => 'Your Request Has Been Completed',
-            'body'    => "Your request ($request_number) has been marked as COMPLETED.",
+            'subject'  => 'Your Request Has Been Completed',
+            'headline' => 'Your request has been completed',
+            'color'    => '#15803d', 'bg' => '#dcfce7', 'icon' => '✓',
+            'detail'   => 'This request has now been fully processed. Thank you.',
         ],
     ];
 
@@ -226,16 +236,66 @@ function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $ex
     $mailer = SmtpMailer::fromEnv();
     if (!$mailer) return false; // SMTP not configured — fail silently, don't break the caller
 
-    $subject = '[ManageMo] ' . $messages[$stage]['subject'] . ' – ' . $request_number;
-    $body    = "Dear $to_name,\n\n" . $messages[$stage]['body']
+    $m       = $messages[$stage];
+    $subject = '[ManageMo] ' . $m['subject'] . ' – ' . $request_number;
+    $text    = "Dear $to_name,\n\n" . $m['headline'] . " ($request_number).\n" . strip_tags($m['detail'])
              . "\n\n– ManageMo System, Pampanga State University";
+    $html    = buildStatusEmailHtml($to_name, $request_number, $m);
 
     try {
-        return $mailer->send($to_email, $to_name, $subject, $body);
+        return $mailer->sendHtml($to_email, $to_name, $subject, $html, $text);
     } catch (\Throwable $e) {
         error_log('sendStatusEmail failed: ' . $e->getMessage());
         return false;
     }
+}
+
+// Renders the branded HTML shell used by sendStatusEmail(). Inline CSS only —
+// email clients strip <style> blocks and external stylesheets.
+function buildStatusEmailHtml($to_name, $request_number, array $m) {
+    $safeName   = htmlspecialchars($to_name);
+    $safeReqNum = htmlspecialchars($request_number);
+    $safeHead   = htmlspecialchars($m['headline']);
+    $safeDetail = htmlspecialchars($m['detail']);
+    $color      = $m['color'];
+    $bg         = $m['bg'];
+    $icon       = $m['icon'];
+
+    return <<<HTML
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
+  <tr>
+    <td style="background:#8B0000;padding:22px 28px;">
+      <span style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:0.3px;">ManageMo</span>
+      <div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:2px;">Pampanga State University</div>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:32px 28px 8px;">
+      <div style="display:inline-block;width:52px;height:52px;line-height:52px;text-align:center;border-radius:50%;background:{$bg};color:{$color};font-size:24px;margin-bottom:18px;">{$icon}</div>
+      <div style="font-size:20px;font-weight:800;color:#1a1d23;margin-bottom:6px;">Dear {$safeName},</div>
+      <div style="font-size:17px;font-weight:700;color:{$color};margin-bottom:14px;">{$safeHead}</div>
+      <div style="display:inline-block;font-family:monospace;font-size:13px;font-weight:700;color:#8B0000;background:rgba(139,0,0,0.08);border-radius:6px;padding:4px 10px;margin-bottom:16px;">{$safeReqNum}</div>
+      <p style="font-size:14.5px;line-height:1.6;color:#374151;margin:0 0 8px;">{$safeDetail}</p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:20px 28px 28px;">
+      <div style="border-top:1px solid #e5e7eb;padding-top:16px;font-size:12px;color:#9ca3af;line-height:1.6;">
+        This is an automated message from the ManageMo inventory system. Please do not reply directly to this email — for questions, contact the property custodian's office.
+      </div>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+HTML;
 }
 
 // Kept for any old call sites — delegates to sendStatusEmail.

@@ -57,6 +57,31 @@ class SmtpMailer {
      * the actual status-change action.
      */
     public function send(string $toEmail, string $toName, string $subject, string $body): bool {
+        return $this->sendRaw($toEmail, $toName, $subject, $this->buildPlainPart($body));
+    }
+
+    /**
+     * Send an HTML email with a plain-text fallback (multipart/alternative),
+     * so clients that can't render HTML still get a readable message.
+     */
+    public function sendHtml(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody): bool {
+        $boundary = 'mm_' . bin2hex(random_bytes(12));
+        $parts = "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n\r\n"
+               . "--$boundary\r\n" . $this->buildPlainPart($textBody) . "\r\n"
+               . "--$boundary\r\n" . $this->buildHtmlPart($htmlBody) . "\r\n"
+               . "--$boundary--";
+        return $this->sendRaw($toEmail, $toName, $subject, $parts);
+    }
+
+    private function buildPlainPart(string $body): string {
+        return "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n" . $body;
+    }
+
+    private function buildHtmlPart(string $body): string {
+        return "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n" . $body;
+    }
+
+    private function sendRaw(string $toEmail, string $toName, string $subject, string $mimeBody): bool {
         $this->connect();
         try {
             $this->hello();
@@ -77,14 +102,12 @@ class SmtpMailer {
                 'To: ' . $this->encodeHeader($toName) . " <{$toEmail}>",
                 'Subject: ' . $this->encodeHeader($subject),
                 'MIME-Version: 1.0',
-                'Content-Type: text/plain; charset=UTF-8',
-                'Content-Transfer-Encoding: 8bit',
                 'Date: ' . date('r'),
                 'X-Mailer: ManageMo',
             ];
             // Dot-stuff any line that starts with a lone "." per RFC 5321
-            $escapedBody = preg_replace('/^\./m', '..', $body);
-            $payload = implode("\r\n", $headers) . "\r\n\r\n" . $escapedBody . "\r\n.";
+            $escapedBody = preg_replace('/^\./m', '..', $mimeBody);
+            $payload = implode("\r\n", $headers) . "\r\n" . $escapedBody . "\r\n.";
             $this->command($payload, 250);
             $this->command("QUIT", 221);
             return true;
