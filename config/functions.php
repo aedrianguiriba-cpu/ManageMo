@@ -1,6 +1,7 @@
 <?php
 require_once 'data.php';
 require_once 'constants.php';
+require_once 'smtp.php';
 
 // Session management
 function startSession() {
@@ -177,26 +178,69 @@ function logActivity($user_id, $action, $description, $table = null, $record_id 
     return true;
 }
 
-// Send delivery notification email to the user
-function sendDeliveryEmail($to_email, $to_name, $request_number, $stage = 'out_for_delivery') {
-    if ($stage === 'out_for_delivery') {
-        $subject = '[ManageMo] Your Request is Out for Delivery – ' . $request_number;
-        $body    = "Dear " . $to_name . ",\n\n"
-                 . "Your request (" . $request_number . ") has been dispatched and is now OUT FOR DELIVERY.\n"
-                 . "Please be available to receive the item(s) at your registered location.\n\n"
-                 . "If you have any questions, please contact the property custodian.\n\n"
-                 . "– ManageMo System, Pampanga State University";
-    } elseif ($stage === 'pickup_ready') {
-        $subject = '[ManageMo] Your Request is Ready for Pickup – ' . $request_number;
-        $body    = "Dear " . $to_name . ",\n\n"
-                 . "Your request (" . $request_number . ") is now READY FOR PICKUP.\n"
-                 . "Please visit the property office to claim your item(s).\n\n"
-                 . "– ManageMo System, Pampanga State University";
-    } else {
+// Send a status-change notification email to the requester via real SMTP.
+// Returns true/false for success; never throws — a mail hiccup must never
+// block the actual status-change action it's attached to.
+function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $extra = []) {
+    $messages = [
+        'approved' => [
+            'subject' => 'Your Request Has Been Approved',
+            'body'    => "Great news — your request ($request_number) has been APPROVED.\n"
+                       . "We'll notify you again once it's out for delivery" . (!empty($extra['is_pickup']) ? ' / ready for pickup' : '') . ".",
+        ],
+        'disapproved' => [
+            'subject' => 'Your Request Was Not Approved',
+            'body'    => "Your request ($request_number) was NOT APPROVED."
+                       . (!empty($extra['reason']) ? "\n\nReason given: " . $extra['reason'] : '')
+                       . "\n\nIf you have questions, please contact the property custodian's office.",
+        ],
+        'out_for_delivery' => [
+            'subject' => 'Your Request is Out for Delivery',
+            'body'    => "Your request ($request_number) has been dispatched and is now OUT FOR DELIVERY."
+                       . (!empty($extra['scheduled_date']) ? "\nExpected delivery date: " . $extra['scheduled_date'] : '')
+                       . "\n\nPlease be available to receive the item(s) at your registered location.",
+        ],
+        'pickup_ready' => [
+            'subject' => 'Your Request is Ready for Pickup',
+            'body'    => "Your request ($request_number) is now READY FOR PICKUP."
+                       . (!empty($extra['scheduled_date']) ? "\nExpected pickup date: " . $extra['scheduled_date'] : '')
+                       . "\n\nPlease visit the property office to claim your item(s).",
+        ],
+        'delivered' => [
+            'subject' => 'Your Item Has Been Delivered',
+            'body'    => "Your request ($request_number) has been marked as DELIVERED.\n"
+                       . "Please check with the admin office if you have any concerns about the item(s) received.",
+        ],
+        'returned' => [
+            'subject' => 'Item Return Confirmed',
+            'body'    => "We've recorded the item(s) for request ($request_number) as RETURNED. Thank you!",
+        ],
+        'completed' => [
+            'subject' => 'Your Request Has Been Completed',
+            'body'    => "Your request ($request_number) has been marked as COMPLETED.",
+        ],
+    ];
+
+    if (!isset($messages[$stage])) return false;
+
+    $mailer = SmtpMailer::fromEnv();
+    if (!$mailer) return false; // SMTP not configured — fail silently, don't break the caller
+
+    $subject = '[ManageMo] ' . $messages[$stage]['subject'] . ' – ' . $request_number;
+    $body    = "Dear $to_name,\n\n" . $messages[$stage]['body']
+             . "\n\n– ManageMo System, Pampanga State University";
+
+    try {
+        return $mailer->send($to_email, $to_name, $subject, $body);
+    } catch (\Throwable $e) {
+        error_log('sendStatusEmail failed: ' . $e->getMessage());
         return false;
     }
-    $headers = "From: no-reply@psu.edu.ph\r\nX-Mailer: ManageMo";
-    return mail($to_email, $subject, $body, $headers);
+}
+
+// Kept for any old call sites — delegates to sendStatusEmail.
+function sendDeliveryEmail($to_email, $to_name, $request_number, $stage = 'out_for_delivery') {
+    return sendStatusEmail($to_email, $to_name, $request_number, $stage);
 }
 
 // Format date
@@ -285,6 +329,12 @@ function dbUpdateUser(int $id, array $data): bool {
     $rows = supabase()->updateById('users', $id, $data);
     clearDataCache('users');
     return !empty($rows);
+}
+
+function dbDeleteUser(int $id): bool {
+    $rows = supabase()->deleteById('users', $id);
+    clearDataCache('users');
+    return $rows !== [];
 }
 
 function dbCreateRequestItem(array $data): ?array {

@@ -23,6 +23,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         : ($trigger_req ? [$trigger_req] : []);
     $redirect_param = $gid ? 'group_id=' . urlencode($gid) : 'id=' . $request_id;
 
+    // Per-unit selection: if the admin unchecked specific units, only act on the ones still checked.
+    // No selection posted (e.g. actions with no unit checkboxes) = act on the whole group, as before.
+    $selected_unit_ids = isset($_POST['unit_ids']) && is_array($_POST['unit_ids'])
+        ? array_map('intval', $_POST['unit_ids'])
+        : null;
+    if ($selected_unit_ids !== null) {
+        $group_reqs = array_values(array_filter($group_reqs, fn($gr) => in_array((int)$gr['id'], $selected_unit_ids)));
+    }
+
     if ($action_type === 'approve') {
         foreach ($group_reqs as $gr) {
             // Custom item with no catalog match — only counted in inventory once approved
@@ -51,11 +60,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         logActivity($current_user['id'], 'APPROVE', "Approved group $gid (" . count($group_reqs) . " units)", 'requests', $request_id);
+        $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
+        if ($notif_user) {
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'approved',
+                ['is_pickup' => ($trigger_req['receiving_method'] ?? '') === 'pickup']);
+        }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request approved successfully!', 'success');
 
     } elseif ($action_type === 'disapprove') {
+        $disapproval_reason = sanitizeInput($_POST['disapproval_reason'] ?? '');
         foreach ($group_reqs as $gr) {
-            dbUpdateRequest((int)$gr['id'], ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+            dbUpdateRequest((int)$gr['id'], [
+                'status'             => 'disapproved',
+                'approved_by'        => $current_user['id'],
+                'approved_at'        => date('Y-m-d H:i:s'),
+                'disapproval_reason' => $disapproval_reason ?: null,
+            ]);
             if (!empty($gr['inventory_id'])) {
                 $inv = findById(getInventory(), (int)$gr['inventory_id']);
                 if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
@@ -64,6 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         logActivity($current_user['id'], 'DISAPPROVE', "Disapproved group $gid", 'requests', $request_id);
+        $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
+        if ($notif_user) {
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'disapproved',
+                ['reason' => $disapproval_reason]);
+        }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request disapproved.', 'info');
 
     } elseif ($action_type === 'change_receiving_method') {
@@ -76,14 +101,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
     } elseif ($action_type === 'mark_out_for_delivery') {
+        $scheduled_date = sanitizeInput($_POST['scheduled_delivery_date'] ?? '');
         foreach ($group_reqs as $gr) {
-            dbUpdateRequest((int)$gr['id'], ['delivery_status' => 'out_for_delivery']);
+            dbUpdateRequest((int)$gr['id'], [
+                'delivery_status'         => 'out_for_delivery',
+                'scheduled_delivery_date' => $scheduled_date ?: null,
+            ]);
         }
         $notif_user  = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         $recv_method = $trigger_req['receiving_method'] ?? 'delivery';
         if ($notif_user) {
             $stage = ($recv_method === 'pickup') ? 'pickup_ready' : 'out_for_delivery';
-            sendDeliveryEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], $stage);
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], $stage,
+                ['scheduled_date' => $scheduled_date ? formatDate($scheduled_date, 'M d, Y') : null]);
         }
         $label = ($recv_method === 'pickup') ? 'Marked as Ready for Pickup.' : 'Marked as Out for Delivery.';
         redirectWithMessage('requests.php?action=view&' . $redirect_param, $label, 'success');
@@ -105,6 +135,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         logActivity($current_user['id'], 'UPDATE', "Delivered group $gid", 'requests', $request_id);
+        $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
+        if ($notif_user) {
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'delivered');
+        }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Marked as Delivered.', 'success');
 
     } elseif ($action_type === 'mark_returned') {
@@ -119,12 +153,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
         }
         clearDataCache('borrow_records');
+        $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
+        if ($notif_user) {
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'returned');
+        }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Items returned and request completed.', 'success');
 
     } elseif ($action_type === 'mark_completed') {
         foreach ($group_reqs as $gr) {
             if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);
             dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
+        }
+        $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
+        if ($notif_user) {
+            sendStatusEmail($notif_user['email'], $notif_user['full_name'], $gid ?? $trigger_req['request_number'], 'completed');
         }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request marked as completed.', 'success');
     }
@@ -619,12 +661,17 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 $_gr_qr = $leg_ri['qr_code_id'] ?? null;
             }
             if (!$_gr_qr) continue;
+            $_gr_colleges = getMainCampusColleges();
             $sticker_units[] = [
-                'qr'        => $_gr_qr,
-                'item_name' => $_gr_inv['item_name'] ?? ($_gr['service_description'] ?? 'N/A'),
-                'condition' => $_gr_inv['condition'] ?? 'N/A',
-                'location'  => $_gr_inv['location']  ?? 'N/A',
-                'req_num'   => $_gr['request_number'] ?? '',
+                'qr'          => $_gr_qr,
+                'item_name'   => $_gr_inv['item_name'] ?? ($_gr['service_description'] ?? 'N/A'),
+                'condition'   => $_gr_inv['condition'] ?? 'N/A',
+                'location'    => $_gr_inv['location']  ?? 'N/A',
+                'req_num'     => $_gr['request_number'] ?? '',
+                'model'       => $_gr_inv['model'] ?? '',
+                'serial'      => $_gr_inv['serial_number'] ?? '',
+                'college'     => !empty($_gr_inv['college_id']) ? ($_gr_colleges[$_gr_inv['college_id']] ?? $_gr_inv['college_id']) : '',
+                'acquired_at' => !empty($_gr_inv['purchase_date']) ? formatDate($_gr_inv['purchase_date']) : '',
             ];
         }
         // Fallback: try legacy request_items
@@ -633,12 +680,17 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 $ri_qr = $ri['qr_code_id'] ?? null;
                 if (!$ri_qr) continue;
                 $ri_inv = !empty($ri['inventory_id']) ? findById(getInventory(), (int)$ri['inventory_id']) : null;
+                $ri_colleges = getMainCampusColleges();
                 $sticker_units[] = [
-                    'qr'        => $ri_qr,
-                    'item_name' => $ri['item_name'] ?? ($ri_inv['item_name'] ?? 'N/A'),
-                    'condition' => $ri_inv['condition'] ?? 'N/A',
-                    'location'  => $ri_inv['location']  ?? 'N/A',
-                    'req_num'   => $request['request_number'] ?? '',
+                    'qr'          => $ri_qr,
+                    'item_name'   => $ri['item_name'] ?? ($ri_inv['item_name'] ?? 'N/A'),
+                    'condition'   => $ri_inv['condition'] ?? 'N/A',
+                    'location'    => $ri_inv['location']  ?? 'N/A',
+                    'req_num'     => $request['request_number'] ?? '',
+                    'model'       => $ri_inv['model'] ?? '',
+                    'serial'      => $ri_inv['serial_number'] ?? '',
+                    'college'     => !empty($ri_inv['college_id']) ? ($ri_colleges[$ri_inv['college_id']] ?? $ri_inv['college_id']) : '',
+                    'acquired_at' => !empty($ri_inv['purchase_date']) ? formatDate($ri_inv['purchase_date']) : '',
                 ];
             }
         }
@@ -677,6 +729,11 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         ?>
 
         <!-- Header row -->
+        <div class="mb-3">
+            <a href="requests.php<?php echo $type_filter ? '?tab=' . urlencode($type_filter) : ''; ?>" class="btn ar-btn-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Back to List
+            </a>
+        </div>
         <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2 ar-mob-header">
             <div>
                 <div style="font-size:1.1rem;font-weight:800;color:#1a1d23;">Request <?php echo htmlspecialchars($request['request_number']); ?></div>
@@ -856,10 +913,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             foreach ($group_view_reqs as $_du) {
                 $_du_inv = !empty($_du['inventory_id']) ? findById(getInventory(), (int)$_du['inventory_id']) : null;
                 $detail_units[] = [
+                    'id'           => $_du['id'],
                     'item_name'    => $_du_inv['item_name'] ?? ($_du['service_description'] ?? 'N/A'),
                     'qr_code_id'   => $_du['qr_code_id'] ?? ($_du_inv['qr_code_id'] ?? null),
                     'inventory_id' => $_du['inventory_id'] ?? null,
                     'req_num'      => $_du['request_number'] ?? '',
+                    'status'       => $_du['status'] ?? 'pending',
                 ];
             }
         }
@@ -875,26 +934,48 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 ], $leg_items);
             }
         }
-        if (!empty($detail_units)):
+        $__pending = ($request['status'] === 'pending');
+        if ($__pending): ?>
+        <form method="POST" action="" id="approvalForm">
+        <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
+        <?php endif; ?>
+
+        <?php if (!empty($detail_units)):
         ?>
         <div class="ar-card mb-3">
             <div class="ar-section-label"><?php echo ucfirst($request['request_type']); ?> Units <span style="font-weight:400;color:#bbb;">(<?php echo count($detail_units); ?> unit<?php echo count($detail_units) !== 1 ? 's' : ''; ?>)</span></div>
             <?php if ($request['request_type'] === 'borrow' && !empty($request['expected_return_date'])): ?>
             <p style="font-size:.85rem;color:#555;margin-bottom:12px;"><strong>Expected Return:</strong> <?php echo formatDate($request['expected_return_date']); ?></p>
             <?php endif; ?>
+            <?php if ($__pending): ?>
+            <p style="font-size:.78rem;color:rgba(0,0,0,0.42);margin-bottom:10px;">
+                <i class="fas fa-info-circle me-1"></i>All units are selected by default — uncheck any unit you want to approve/disapprove separately (e.g. one is out of stock).
+            </p>
+            <?php endif; ?>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
             <table style="width:100%;border-collapse:collapse;font-size:.83rem;min-width:380px;">
                 <thead>
                     <tr style="background:#f7f7f7;">
+                        <?php if ($__pending): ?>
+                        <th style="padding:7px 10px;border-bottom:1px solid #e5e7eb;">
+                            <input type="checkbox" id="unitSelectAll" checked onclick="document.querySelectorAll('.unit-check').forEach(c=>c.checked=this.checked)">
+                        </th>
+                        <?php endif; ?>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">#</th>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Item</th>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">QR Code</th>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Inventory ID</th>
+                        <?php if (!$__pending): ?>
+                        <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Status</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($detail_units as $di_idx => $di): ?>
                     <tr style="border-bottom:1px solid #f0f0f0;">
+                        <?php if ($__pending): ?>
+                        <td style="padding:8px 10px;"><input type="checkbox" class="unit-check" name="unit_ids[]" value="<?php echo (int)$di['id']; ?>" checked></td>
+                        <?php endif; ?>
                         <td style="padding:8px 10px;color:#999;font-size:.75rem;"><?php echo $di_idx + 1; ?></td>
                         <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?></td>
                         <td style="padding:8px 10px;">
@@ -905,6 +986,9 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                             <?php endif; ?>
                         </td>
                         <td style="padding:8px 10px;color:#777;font-size:.77rem;"><?php echo $di['inventory_id'] ? '#' . $di['inventory_id'] : '—'; ?></td>
+                        <?php if (!$__pending): ?>
+                        <td style="padding:8px 10px;"><span class="ar-badge ar-badge-<?php echo $status_colors[$di['status']] ?? 'secondary'; ?>" style="font-size:.72rem;"><?php echo ucfirst($di['status']); ?></span></td>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -930,28 +1014,44 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             <div class="ar-desc-box"><?php echo nl2br(htmlspecialchars($request['service_description'] ?? $request['reason_for_request'] ?? 'No description provided')); ?></div>
         </div>
 
-        <?php if ($request['status'] === 'pending'): ?>
+        <?php if ($request['status'] === 'disapproved' && !empty($request['disapproval_reason'])): ?>
+        <div class="ar-card mb-3" style="background:rgba(239,68,68,0.06);border-color:rgba(239,68,68,0.2);">
+            <div class="ar-section-label" style="color:#b91c1c;"><i class="fas fa-times-circle me-1"></i>Disapproval Reason</div>
+            <div class="ar-desc-box" style="background:transparent;"><?php echo nl2br(htmlspecialchars($request['disapproval_reason'])); ?></div>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($request['scheduled_delivery_date']) && $request['delivery_status'] === 'out_for_delivery'): ?>
+        <div class="ar-card mb-3" style="background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.2);">
+            <div class="ar-section-label" style="color:#1d4ed8;"><i class="fas fa-truck me-1"></i>Expected Delivery Date</div>
+            <div class="ar-desc-box" style="background:transparent;"><?php echo formatDate($request['scheduled_delivery_date']); ?></div>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($__pending): ?>
         <div class="ar-card">
             <div class="ar-section-label">Action</div>
-            <div class="ar-action-tabs" id="actionTabs">
-                <button class="ar-tab-btn active" onclick="switchTab('approve-tab',this)">Approve</button>
-                <button class="ar-tab-btn" onclick="switchTab('disapprove-tab',this)">Disapprove</button>
+            <div class="mb-3">
+                <label class="form-label" style="font-size:.82rem;font-weight:700;color:#555;">Reason <span style="font-weight:400;color:#999;">(required if disapproving — e.g. "unavailable", "out of stock")</span></label>
+                <textarea name="disapproval_reason" id="disapprovalReason" class="form-control" rows="2" placeholder="Why is this being disapproved?"></textarea>
             </div>
-            <div class="ar-tab-pane active" id="approve-tab">
-                <form method="POST" action="">
-                    <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
-                    <input type="hidden" name="action" value="approve">
-                    <button type="submit" class="btn ar-btn-success"><i class="fas fa-check me-1"></i> Approve Request</button>
-                </form>
-            </div>
-            <div class="ar-tab-pane" id="disapprove-tab">
-                <form method="POST" action="">
-                    <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
-                    <input type="hidden" name="action" value="disapprove">
-                    <button type="submit" class="btn ar-btn-danger"><i class="fas fa-times me-1"></i> Disapprove Request</button>
-                </form>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button type="submit" name="action" value="approve" class="btn ar-btn-success"><i class="fas fa-check me-1"></i> Approve Selected</button>
+                <button type="submit" name="action" value="disapprove" class="btn ar-btn-danger" onclick="return confirmDisapprove()"><i class="fas fa-times me-1"></i> Disapprove Selected</button>
             </div>
         </div>
+        </form>
+        <script>
+        function confirmDisapprove() {
+            var reason = document.getElementById('disapprovalReason').value.trim();
+            if (!reason) {
+                alert('Please enter a reason for disapproving.');
+                document.getElementById('disapprovalReason').focus();
+                return false;
+            }
+            return confirm('Disapprove the selected unit(s)?');
+        }
+        </script>
         <?php endif; ?>
 
         <?php
@@ -965,16 +1065,19 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         ?>
         <div class="ar-card mb-3">
             <div class="ar-section-label">Delivery Actions</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-                <form method="POST" action="requests.php?action=view&id=<?php echo $request['id']; ?>">
-                    <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
-                    <input type="hidden" name="action" value="mark_out_for_delivery">
-                    <button type="submit" class="btn ar-btn-primary" style="display:inline-flex;align-items:center;gap:7px;">
-                        <i class="fas <?php echo $step4_icon; ?>"></i> Proceed to <?php echo $step4_label; ?>
-                        <span style="font-size:0.72rem;opacity:0.80;font-weight:500;">&amp; Email User</span>
-                    </button>
-                </form>
-            </div>
+            <form method="POST" action="requests.php?action=view&id=<?php echo $request['id']; ?>">
+                <input type="hidden" name="request_id" value="<?php echo $request['id']; ?>">
+                <input type="hidden" name="action" value="mark_out_for_delivery">
+                <div class="mb-3" style="max-width:260px;">
+                    <label class="form-label" style="font-size:.82rem;font-weight:700;color:#555;">Expected Delivery Date <span style="font-weight:400;color:#999;">(optional)</span></label>
+                    <input type="date" name="scheduled_delivery_date" class="form-control" value="<?php echo htmlspecialchars($request['scheduled_delivery_date'] ?? ''); ?>">
+                    <div style="font-size:.72rem;color:rgba(0,0,0,0.40);margin-top:4px;">The requester will see this date instead of an open-ended "out for delivery" status.</div>
+                </div>
+                <button type="submit" class="btn ar-btn-primary" style="display:inline-flex;align-items:center;gap:7px;">
+                    <i class="fas <?php echo $step4_icon; ?>"></i> Proceed to <?php echo $step4_label; ?>
+                    <span style="font-size:0.72rem;opacity:0.80;font-weight:500;">&amp; Email User</span>
+                </button>
+            </form>
             <div style="margin-top:10px;font-size:0.76rem;color:rgba(0,0,0,0.40);">
                 <i class="fas fa-envelope me-1"></i>An email notification will be automatically sent to <strong><?php echo htmlspecialchars($request['email']); ?></strong> when you proceed.
             </div>
@@ -1065,17 +1168,28 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             var qr       = unit ? unit.qr        : <?php echo json_encode($request['qr_code_id']); ?>;
             var loc      = unit ? unit.location   : <?php echo json_encode($request['item_location']); ?>;
             var cond     = unit ? unit.condition  : <?php echo json_encode($request['item_condition']); ?>;
+            var model    = unit ? unit.model    : '';
+            var serial   = unit ? unit.serial   : '';
+            var college  = unit ? unit.college  : '';
+            var acquired = unit ? unit.acquired_at : '';
             var itemName = (unit && unit.item_name) ? unit.item_name : _sd.item;
+            // The QR still encodes only the plain qr_code_id — that's the scannable lookup
+            // key used by delivery confirmation (web + mobile). The extra asset details are
+            // printed as human-readable text on the label, not packed into the QR itself.
             var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(qr);
             var unitLabel = totalUnits > 1 ? ' (Unit ' + unitNum + ' of ' + totalUnits + ')' : '';
+            var loc_college = college ? (_esc(loc) + ' &middot; ' + _esc(college)) : _esc(loc);
             return '<div class="ar-sticker">'
                 + '<div class="ar-sticker-top">' + _sd.short + ' &mdash; Asset Label<span>' + _sd.institution + '</span></div>'
                 + '<div class="ar-sticker-qr"><img src="' + qrUrl + '" alt="QR" loading="eager" width="90" height="90"></div>'
                 + '<div class="ar-sticker-body">'
                 +   '<div class="ar-sticker-name">' + _esc(itemName) + _esc(unitLabel) + '</div>'
-                +   '<div class="ar-sticker-row"><strong>Location:</strong><span>' + _esc(loc) + '</span></div>'
+                +   '<div class="ar-sticker-row"><strong>Location:</strong><span>' + loc_college + '</span></div>'
                 +   '<div class="ar-sticker-row"><strong>Category:</strong><span>' + _esc(_sd.category) + '</span></div>'
                 +   '<div class="ar-sticker-row"><strong>Condition:</strong><span>' + _esc(cond) + '</span></div>'
+                +   (model ? '<div class="ar-sticker-row"><strong>Model:</strong><span>' + _esc(model) + '</span></div>' : '')
+                +   (serial ? '<div class="ar-sticker-row"><strong>Serial No.:</strong><span>' + _esc(serial) + '</span></div>' : '')
+                +   (acquired ? '<div class="ar-sticker-row"><strong>Acquired:</strong><span>' + _esc(acquired) + '</span></div>' : '')
                 +   '<div class="ar-sticker-row"><strong>Issued To:</strong><span>' + _esc(_sd.requester) + '</span></div>'
                 +   '<div class="ar-sticker-code">' + _esc(qr) + '</div>'
                 + '</div>'

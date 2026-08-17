@@ -205,6 +205,9 @@ foreach (getRequests() as $req) {
 $item_avail_json = json_encode($item_avail_data);
 
 $borrowable = array_values(array_filter($all_inventory, function($item) {
+    // "Request / Acquire Only" items (e.g. consumables, allocate-then-issue stock) are
+    // deliberately excluded from the Borrow catalog — they're not meant to be lent out.
+    if (($item['acquisition_mode'] ?? 'borrow') === 'request') return false;
     return in_array($item['status'], ['available', 'borrowed', 'requested']);
 }));
 usort($borrowable, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
@@ -775,6 +778,7 @@ if (!empty($submit_error)): ?>
 }
 .bshop-avail-ok   { background: #dcfce7; color: #15803d; }
 .bshop-avail-none { background: #fee2e2; color: #991b1b; }
+.bshop-card.bshop-disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 
 .bshop-icon {
     width: 34px; height: 34px;
@@ -1157,24 +1161,33 @@ if (!empty($submit_error)): ?>
                                     foreach ($groups as $ci):
                                         $meta      = $catMeta[$category] ?? $defaultMeta;
                                         $firstUnit = $ci['units'][0];
-                                        $totalUnits = count($ci['units']);
+                                        $avail_units_ir = array_values(array_filter($ci['units'], fn($u) => $u['status'] === 'available'));
+                                        $availableCount = count($avail_units_ir);
                                         $desc = $ci['description'] ?: ($firstUnit['description'] ?? '');
                                 ?>
-                                <div class="bshop-card"
+                                <div class="bshop-card<?php echo $availableCount === 0 ? ' bshop-disabled' : ''; ?>"
                                      data-value="<?php echo htmlspecialchars($ci['item_name']); ?>"
                                      data-category="<?php echo htmlspecialchars($category); ?>"
                                      data-desc="<?php echo htmlspecialchars($desc); ?>"
-                                     data-total="<?php echo $totalUnits; ?>"
-                                     data-first-unit-id="<?php echo $firstUnit['id']; ?>"
+                                     data-total="<?php echo $availableCount; ?>"
+                                     data-first-unit-id="<?php echo ($avail_units_ir[0] ?? $firstUnit)['id']; ?>"
                                      data-group-id="<?php echo htmlspecialchars($ci['group_id'] ?? ''); ?>"
-                                     data-unit-ids="<?php echo htmlspecialchars(json_encode(array_column($ci['units'], 'id'))); ?>"
-                                     onclick="selectItemReqCard(this)">
+                                     data-unit-ids="<?php echo htmlspecialchars(json_encode(array_column($avail_units_ir, 'id'))); ?>"
+                                     onclick="<?php echo $availableCount === 0 ? '' : 'selectItemReqCard(this)'; ?>">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
-                                    <div class="bshop-avail-badge bshop-avail-ok"><?php echo $totalUnits; ?> unit<?php echo $totalUnits > 1 ? 's' : ''; ?></div>
+                                    <div class="bshop-avail-badge <?php echo $availableCount > 0 ? 'bshop-avail-ok' : 'bshop-avail-none'; ?>">
+                                        <?php echo $availableCount > 0 ? $availableCount . ' available' : 'None available'; ?>
+                                    </div>
                                     <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
                                         <i class="fas <?php echo $meta['icon']; ?>"></i>
                                     </div>
                                     <div class="bshop-name"><?php echo htmlspecialchars($ci['item_name']); ?></div>
+                                    <?php $__acq = $firstUnit['acquisition_mode'] ?? 'borrow'; ?>
+                                    <span style="font-size:0.65rem;font-weight:700;padding:1px 7px;border-radius:10px;display:inline-block;margin-bottom:4px;
+                                                 background:<?php echo $__acq === 'request' ? 'rgba(34,197,94,0.10)' : 'rgba(59,130,246,0.10)'; ?>;
+                                                 color:<?php echo $__acq === 'request' ? '#15803d' : '#1d4ed8'; ?>;">
+                                        <?php echo $__acq === 'request' ? 'Acquire / Keep' : 'Also Borrowable'; ?>
+                                    </span>
                                     <div class="bshop-desc"><?php echo htmlspecialchars($desc); ?></div>
                                     <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($firstUnit['location'] ?? ''); ?></div>
                                     <div class="bshop-foot">
@@ -1247,6 +1260,29 @@ if (!empty($submit_error)): ?>
                     <div class="rq-field">
                         <label>Item Requiring Service <span class="rq-req">*</span></label>
 
+                        <?php
+                        // NOTE: $svc_by_cat must be computed BEFORE the hidden <select> below —
+                        // it used to be built after the <select> rendered, so the <select> always
+                        // ended up with no real <option> elements, and JS could never successfully
+                        // set its value (a <select>'s value only takes if a matching <option>
+                        // exists). That silently broke "Add to List" for every service request.
+                        $svcStatusMeta = [
+                            'available'   => ['label'=>'Available',   'cls'=>'bshop-pill-avail',    'badge'=>'bshop-avail-ok'],
+                            'borrowed'    => ['label'=>'Borrowed',    'cls'=>'bshop-pill-borrowed',  'badge'=>'bshop-avail-none'],
+                            'maintenance' => ['label'=>'Maintenance', 'cls'=>'bshop-pill-maint',    'badge'=>'bshop-avail-maint'],
+                            'damaged'     => ['label'=>'Damaged',     'cls'=>'bshop-pill-damaged',  'badge'=>'bshop-avail-none'],
+                            'requested'   => ['label'=>'Requested',   'cls'=>'bshop-pill-borrowed', 'badge'=>'bshop-avail-none'],
+                        ];
+                        // Group inventory items by category for filter — exclude condemned/disposed items,
+                        // since a retired item can no longer need service.
+                        $serviceable_items = array_values(array_filter($inventory_items, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
+                        $svc_by_cat = [];
+                        foreach (groupInventoryItems($serviceable_items) as $group) {
+                            $c = $group['category'] ?? 'Other';
+                            $svc_by_cat[$c][] = $group;
+                        }
+                        ?>
+
                         <!-- Hidden select (used by addToCart for item name + id) -->
                         <select id="item_id" name="item_id" style="display:none;" required>
                             <option value="">— Select an item —</option>
@@ -1258,21 +1294,6 @@ if (!empty($submit_error)): ?>
                         </select>
 
                         <!-- Shop grid -->
-                        <?php
-                        $svcStatusMeta = [
-                            'available'   => ['label'=>'Available',   'cls'=>'bshop-pill-avail',    'badge'=>'bshop-avail-ok'],
-                            'borrowed'    => ['label'=>'Borrowed',    'cls'=>'bshop-pill-borrowed',  'badge'=>'bshop-avail-none'],
-                            'maintenance' => ['label'=>'Maintenance', 'cls'=>'bshop-pill-maint',    'badge'=>'bshop-avail-maint'],
-                            'damaged'     => ['label'=>'Damaged',     'cls'=>'bshop-pill-damaged',  'badge'=>'bshop-avail-none'],
-                            'requested'   => ['label'=>'Requested',   'cls'=>'bshop-pill-borrowed', 'badge'=>'bshop-avail-none'],
-                        ];
-                        // Group inventory items by category for filter
-                        $svc_by_cat = [];
-                        foreach (groupInventoryItems($inventory_items) as $group) {
-                            $c = $group['category'] ?? 'Other';
-                            $svc_by_cat[$c][] = $group;
-                        }
-                        ?>
                         <div class="bshop-wrap">
                             <div class="bshop-controls">
                                 <div class="bshop-search-wrap">

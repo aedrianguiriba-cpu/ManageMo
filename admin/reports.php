@@ -55,6 +55,47 @@ function reqUserName($all_users, $uid) {
     return 'Unknown';
 }
 
+// --- CSV export (uses the same filtered dataset the on-screen report shows) ---
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    $filename = "managemo_{$report_type}_report_" . date('Y-m-d') . '.csv';
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    $out = fopen('php://output', 'w');
+    fprintf($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens ₱/special chars correctly
+
+    if ($report_type === 'inventory') {
+        fputcsv($out, ['QR Code', 'Item Name', 'Category', 'Campus', 'Location', 'Quantity', 'Condition', 'Status', 'Cost', 'Purchase Date']);
+        foreach ($inv_data as $i) {
+            fputcsv($out, [
+                $i['qr_code_id'], $i['item_name'], $i['category'], campusName($campuses, $i['campus_id']),
+                $i['location'], $i['quantity'], $i['condition'], $i['status'],
+                number_format((float)($i['cost'] ?? 0), 2), $i['purchase_date'] ?? '',
+            ]);
+        }
+    } elseif ($report_type === 'requests') {
+        fputcsv($out, ['Request #', 'Requester', 'Type', 'Item/Description', 'Quantity', 'Urgency', 'Status', 'Date', 'Return Date']);
+        foreach ($req_data as $r) {
+            $inv = !empty($r['inventory_id']) ? findById($all_inventory, (int)$r['inventory_id']) : null;
+            fputcsv($out, [
+                $r['request_number'], reqUserName($all_users, $r['user_id']), ucfirst($r['request_type']),
+                $inv['item_name'] ?? ($r['service_description'] ?? '—'), $r['quantity_requested'] ?? 1,
+                ucfirst($r['urgency']), ucfirst($r['status']), substr($r['created_at'], 0, 10), $r['expected_return_date'] ?? '',
+            ]);
+        }
+    } else { // users
+        fputcsv($out, ['Full Name', 'Email', 'Phone', 'Role', 'Campus', 'Department', 'Status', 'Joined']);
+        foreach ($usr_data as $u) {
+            fputcsv($out, [
+                $u['full_name'], $u['email'], $u['phone'] ?? '', ucfirst($u['role']),
+                campusName($campuses, $u['campus_id']), $all_depts[$u['college_id'] ?? ''] ?? ($u['college_id'] ?? ''),
+                $u['is_active'] ? 'Active' : 'Inactive', substr($u['created_at'], 0, 10),
+            ]);
+        }
+    }
+    fclose($out);
+    exit;
+}
+
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
@@ -302,6 +343,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <button type="button" class="rp-btn rp-btn-print" onclick="window.print()">
                         <i class="fas fa-print"></i> Print Report
                     </button>
+                    <a class="rp-btn" style="background:#15803d;color:#fff !important;"
+                       href="?<?php echo http_build_query(array_merge($_GET, ['export' => 'csv'])); ?>">
+                        <i class="fas fa-file-csv"></i> Export CSV
+                    </a>
                 </form>
             </div>
         </div><!-- /.rp-no-print -->

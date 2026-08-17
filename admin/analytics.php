@@ -159,6 +159,33 @@ foreach (array_slice($request_counts,0,10,true) as $inv_id => $cnt) {
 $category_counts = [];
 foreach ($filtered_inventory as $inv) $category_counts[$inv['category']] = ($category_counts[$inv['category']] ?? 0) + 1;
 arsort($category_counts);
+
+// Per-campus breakdown (always uses the full, unfiltered inventory — this IS the campus comparison view)
+$campus_breakdown = [];
+foreach ($campuses as $c) {
+    $c_items = filterByColumn($all_inventory, 'campus_id', (int)$c['id']);
+    $campus_breakdown[] = [
+        'name'        => $c['name'],
+        'total'       => count($c_items),
+        'available'   => count(filterByColumn($c_items, 'status', 'available')),
+        'borrowed'    => count(filterByColumn($c_items, 'status', 'borrowed')),
+        'maintenance' => count(filterByColumn($c_items, 'status', 'maintenance')),
+        'value'       => array_sum(array_column($c_items, 'cost')),
+    ];
+}
+
+// Per-college/office breakdown — only meaningful on Main Campus (college_id is only set there)
+$college_breakdown = [];
+foreach (getMainCampusColleges() as $abbr => $fullname) {
+    $co_items = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $abbr));
+    if (empty($co_items)) continue;
+    $college_breakdown[] = [
+        'name'  => $fullname,
+        'total' => count($co_items),
+        'value' => array_sum(array_column($co_items, 'cost')),
+    ];
+}
+usort($college_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
 ?>
 
 <!-- Stat cards -->
@@ -294,6 +321,54 @@ arsort($category_counts);
                 </tr>
                 <?php endforeach; else: ?>
                 <tr><td colspan="2" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No data available</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Per-Campus / Per-College Breakdown -->
+<div class="row g-3 mt-1">
+    <div class="col-md-6">
+        <div class="an-card">
+            <div class="an-card-title">
+                <div class="an-card-icon"><i class="fas fa-map-marker-alt"></i></div>
+                Inventory by Campus <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
+            </div>
+            <table class="an-mini-table">
+                <thead><tr><th>Campus</th><th style="text-align:right;">Total</th><th style="text-align:right;">Available</th><th style="text-align:right;">Borrowed</th><th style="text-align:right;">Value</th></tr></thead>
+                <tbody>
+                <?php foreach ($campus_breakdown as $cb): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($cb['name']); ?></td>
+                    <td style="text-align:right;"><span class="an-badge an-badge-primary"><?php echo $cb['total']; ?></span></td>
+                    <td style="text-align:right;color:#15803d;"><?php echo $cb['available']; ?></td>
+                    <td style="text-align:right;color:#b45309;"><?php echo $cb['borrowed']; ?></td>
+                    <td style="text-align:right;">&#8369;<?php echo number_format($cb['value'], 2); ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="an-card">
+            <div class="an-card-title">
+                <div class="an-card-icon"><i class="fas fa-building-columns"></i></div>
+                Inventory by College / Office <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(Main Campus)</span>
+            </div>
+            <table class="an-mini-table">
+                <thead><tr><th>College / Office</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
+                <tbody>
+                <?php if (!empty($college_breakdown)): foreach ($college_breakdown as $co): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($co['name']); ?></td>
+                    <td style="text-align:right;"><span class="an-badge an-badge-info"><?php echo $co['total']; ?></span></td>
+                    <td style="text-align:right;">&#8369;<?php echo number_format($co['value'], 2); ?></td>
+                </tr>
+                <?php endforeach; else: ?>
+                <tr><td colspan="3" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No items tagged with a college/office yet — set this when adding/editing an item.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>

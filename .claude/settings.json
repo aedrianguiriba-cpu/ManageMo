@@ -32,7 +32,21 @@
       "Bash(mv \"c:/xampp/htdocs/ManageMo/scratch_erd_dfd.html\" \"/c/Users/guiri/AppData/Local/Temp/claude/c--xampp-htdocs-ManageMo/a4c55193-a9e6-4e7c-a77a-5aa98fbd2664/scratchpad/erd-dfd.html\")",
       "Read(//c/Users/guiri/AppData/Local/Temp/claude/c--xampp-htdocs-ManageMo/a4c55193-a9e6-4e7c-a77a-5aa98fbd2664/scratchpad/**)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}, %{size_download} bytes\\\\n\" http://localhost/ManageMo/ERD_DFD.html)",
-      "Bash(grep -c '^```' \"c:/xampp/htdocs/ManageMo/ERD_DFD.md\")"
+      "Bash(grep -c '^```' \"c:/xampp/htdocs/ManageMo/ERD_DFD.md\")",
+      "Bash(node --check /tmp/req_scripts.js)",
+      "Bash(node --check .tmp_check/rendered.js)",
+      "Bash(rm -rf .tmp_check)",
+      "Bash(/c/xampp/php/php.exe -l admin/condemnation.php)",
+      "Bash(/c/xampp/php/php.exe -l admin/analytics.php)",
+      "Bash(/c/xampp/php/php.exe -l admin/reports.php)",
+      "Bash(mkdir -p \"c:/xampp/htdocs/ManageMo/.tmp_check\")",
+      "Bash(/c/xampp/php/php.exe -d display_errors=1 -r ' *)",
+      "Bash(/c/xampp/php/php.exe -d display_errors=1 .tmp_check/render_test.php)",
+      "Bash(/c/xampp/php/php.exe -l admin/users.php)",
+      "Bash(/c/xampp/php/php.exe -l config/functions.php)",
+      "Bash(php -m)",
+      "Bash(/c/xampp/php/php.exe -m)",
+      "Bash(/c/xampp/php/php.exe -l config/smtp.php)"
     ]
   }
 }

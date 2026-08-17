@@ -220,19 +220,34 @@ displayMessage();
     cursor:pointer; transition:background 0.15s; white-space:nowrap;
 }
 .br-print-btn:hover { background:rgba(0,0,0,0.12); }
+.br-print-header { display:none; }
 @media print {
     .sidebar, .sidebar-overlay, .sidebar-toggle-btn, .topbar { display:none !important; }
-    .br-tabs, .br-stats, .br-filter, .alert, .br-print-btn { display:none !important; }
+    .br-tabs, .br-filter, .alert, .br-print-btn { display:none !important; }
     body, .main-wrapper, .container-fluid { background:#fff !important; padding:0 !important; margin:0 !important; }
+    /* Show the print-only header, and keep the summary counts visible instead of hiding them */
+    .br-print-header { display:block !important; margin-bottom:16px; }
+    .br-stats { margin-bottom:16px !important; }
+    .br-stat-card { box-shadow:none !important; border:1px solid #999 !important; background:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .br-stat-val, .br-stat-lbl { color:#000 !important; }
     .br-table-card { box-shadow:none !important; border:1px solid #ccc !important; border-radius:4px !important; }
     .br-table-card thead th { background:#f3f4f6 !important; color:#000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .br-table-card tbody td { color:#000 !important; border-color:#dee2e6 !important; }
-    .br-badge { background:#eee !important; color:#000 !important; border-color:#999 !important; }
+    .br-badge { background:#eee !important; color:#000 !important; border-color:#999 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .br-item-name, .br-date, .br-notes, .br-qr-chip, .br-desc-cell { color:#000 !important; }
 }
 </style>
 
 <div class="container-fluid mt-4 pb-4">
+
+    <!-- Print-only header (hidden on screen, shown via @media print) -->
+    <div class="br-print-header">
+        <div style="font-size:1.2rem;font-weight:800;">My Records — <?php echo ucfirst($active_tab === 'item' ? 'Item Requests' : ($active_tab === 'service' ? 'Service Requests' : 'Borrow Records')); ?></div>
+        <div style="font-size:0.85rem;color:#555;margin-top:2px;">
+            <?php echo htmlspecialchars($current_user['full_name']); ?> &bull; Generated <?php echo date('F j, Y g:i A'); ?>
+            <?php if ($status_filter): ?> &bull; Filtered by status: <?php echo ucfirst($status_filter); ?><?php endif; ?>
+        </div>
+    </div>
 
     <!-- Tabs -->
     <div class="br-tabs mb-4">

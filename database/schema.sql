@@ -1,6 +1,27 @@
 -- ManageMo PostgreSQL Schema for Supabase
 -- Run this in the Supabase SQL Editor (Dashboard → SQL Editor → New Query)
 
+-- ═════════════════════════════════════════════════════════════════════════
+-- ⚠ REQUIRED MIGRATION — run this block now against the LIVE database.
+-- The CREATE TABLE statements below already include these columns for a
+-- fresh install, but the live DB was created before they existed, so they
+-- must be added explicitly. Safe to re-run (IF NOT EXISTS on every line).
+-- ═════════════════════════════════════════════════════════════════════════
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS condemned_by        INT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS condemned_condition TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS disposed_by         INT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS acquisition_mode    TEXT NOT NULL DEFAULT 'borrow';
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS model               TEXT;
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS serial_number       TEXT;
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_acquisition_mode_check') THEN
+        ALTER TABLE inventory ADD CONSTRAINT inventory_acquisition_mode_check CHECK (acquisition_mode IN ('borrow','request'));
+    END IF;
+END $$;
+
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS disapproval_reason      TEXT;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS scheduled_delivery_date DATE;
+
 -- ─────────────────────────────────────────────
 -- 1. TABLES
 -- ─────────────────────────────────────────────
@@ -36,9 +57,15 @@ CREATE TABLE IF NOT EXISTS inventory (
     condition            TEXT CHECK (condition IN ('excellent','good','fair','poor')),
     condemnation_reason  TEXT,
     condemned_at         TIMESTAMPTZ,
+    condemned_by         INT,
+    condemned_condition  TEXT,
     disposal_notes       TEXT,
     disposed_at          TIMESTAMPTZ,
+    disposed_by          INT,
     group_id             TEXT,
+    acquisition_mode     TEXT NOT NULL DEFAULT 'borrow' CHECK (acquisition_mode IN ('borrow','request')),
+    model                TEXT,
+    serial_number        TEXT,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -65,6 +92,8 @@ CREATE TABLE IF NOT EXISTS requests (
     delivery_status      TEXT CHECK (delivery_status IN ('out_for_delivery','delivered')),
     approved_by          INT,
     approved_at          TIMESTAMPTZ,
+    disapproval_reason        TEXT,
+    scheduled_delivery_date   DATE,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

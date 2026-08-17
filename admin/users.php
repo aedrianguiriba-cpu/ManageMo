@@ -66,6 +66,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             logActivity($current_user['id'], 'UPDATE', "User #$uid $label", 'users', $uid);
             redirectWithMessage('users.php', 'User ' . $label . '.', 'success');
         }
+
+    } elseif ($post_action === 'edit_user') {
+        $uid        = (int)($_POST['user_id'] ?? 0);
+        $target     = findById(getUsers(), $uid);
+        $full_name  = sanitizeInput($_POST['full_name'] ?? '');
+        $email      = sanitizeInput($_POST['email'] ?? '');
+        $phone      = sanitizeInput($_POST['phone'] ?? '');
+        $role       = sanitizeInput($_POST['role'] ?? 'user');
+        $campus_id  = (int)($_POST['campus_id'] ?? 1);
+        $college_id = sanitizeInput($_POST['college_id'] ?? '');
+        $password   = $_POST['password'] ?? '';
+        $confirm    = $_POST['confirm_password'] ?? '';
+
+        $errors = [];
+        if (!$target) $errors[] = 'User not found.';
+        if (!$full_name) $errors[] = 'Full name is required.';
+        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email is required.';
+        foreach (getUsers() as $u) {
+            if ($u['id'] != $uid && strtolower($u['email']) === strtolower($email)) {
+                $errors[] = 'Email already in use by another account.';
+                break;
+            }
+        }
+        if ($password !== '' || $confirm !== '') {
+            if (strlen($password) < 6) $errors[] = 'New password must be at least 6 characters.';
+            if ($password !== $confirm) $errors[] = 'Passwords do not match.';
+        }
+        // Prevent an admin from demoting/locking themselves out by accident
+        if ($target && $uid === $current_user['id'] && $role !== 'admin') {
+            $errors[] = 'You cannot remove your own admin role.';
+        }
+
+        if (empty($errors)) {
+            $update = [
+                'full_name'  => $full_name,
+                'email'      => $email,
+                'phone'      => $phone,
+                'role'       => in_array($role, ['admin', 'user']) ? $role : 'user',
+                'campus_id'  => $campus_id,
+                'college_id' => $college_id ?: null,
+            ];
+            if ($password !== '') $update['password'] = hashPassword($password);
+            dbUpdateUser($uid, $update);
+            logActivity($current_user['id'], 'UPDATE', "Updated user account: $email", 'users', $uid);
+            redirectWithMessage('users.php', 'User updated successfully!', 'success');
+        } else {
+            startSession();
+            $_SESSION['user_form_errors'] = $errors;
+            $_SESSION['user_form_data']   = $_POST;
+            redirectWithMessage('users.php?action=edit&id=' . $uid, implode(' ', $errors), 'danger');
+        }
+
+    } elseif ($post_action === 'delete_user') {
+        $uid    = (int)($_POST['user_id'] ?? 0);
+        $target = findById(getUsers(), $uid);
+        if (!$target) {
+            redirectWithMessage('users.php', 'User not found.', 'danger');
+        }
+        if ($uid === $current_user['id']) {
+            redirectWithMessage('users.php', 'You cannot delete your own account.', 'danger');
+        }
+        // Full delete: also remove this user's requests/borrow records/owned items so
+        // nothing is left pointing at a now-deleted account (no "Unknown User" rows).
+        $db = supabase();
+        $del_requests    = $db->delete('requests', 'user_id=eq.' . $uid);
+        $del_borrows     = $db->delete('borrow_records', 'user_id=eq.' . $uid);
+        $del_owned_items = $db->delete('user_owned_items', 'user_id=eq.' . $uid);
+        clearDataCache('requests', 'borrow_records', 'user_owned_items');
+        dbDeleteUser($uid);
+        $cascade_note = sprintf(
+            ' (also removed %d request(s), %d borrow record(s), %d owned item(s))',
+            count($del_requests), count($del_borrows), count($del_owned_items)
+        );
+        logActivity($current_user['id'], 'DELETE', "Deleted user account: {$target['email']}$cascade_note", 'users', $uid);
+        redirectWithMessage('users.php', 'User and all associated records deleted.', 'success');
     }
 }
 
@@ -337,6 +412,138 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     </div>
     <?php unset($_SESSION['user_form_errors'], $_SESSION['user_form_data']); ?>
 
+<?php elseif ($action === 'edit'):
+    $edit_id   = (int)($_GET['id'] ?? 0);
+    $edit_user = findById($all_users, $edit_id);
+    if (!$edit_user) { die('<div class="alert alert-danger">User not found</div>'); }
+    $fd = $_SESSION['user_form_data'] ?? $edit_user; // repopulate from failed submit, else the DB row
+?>
+    <!-- Edit User Form -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="users.php" class="um-btn um-btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+        <div>
+            <div style="font-size:1.05rem;font-weight:800;color:#1a1d23;">Edit User</div>
+            <div style="font-size:0.78rem;color:rgba(0,0,0,0.42);"><?php echo htmlspecialchars($edit_user['email']); ?></div>
+        </div>
+    </div>
+    <div class="row g-4">
+    <div class="col-lg-8">
+    <div class="um-form-card">
+        <div class="um-form-section"><i class="fas fa-id-card"></i> Personal Information</div>
+        <form method="POST" action="users.php">
+            <input type="hidden" name="action" value="edit_user">
+            <input type="hidden" name="user_id" value="<?php echo $edit_user['id']; ?>">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="um-form-label">Full Name <span class="um-form-req">*</span></label>
+                    <input type="text" class="form-control" name="full_name" required
+                        value="<?php echo htmlspecialchars($fd['full_name'] ?? ''); ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="um-form-label">Email Address <span class="um-form-req">*</span></label>
+                    <input type="email" class="form-control" name="email" required
+                        value="<?php echo htmlspecialchars($fd['email'] ?? ''); ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="um-form-label">Phone Number</label>
+                    <input type="text" class="form-control" name="phone" placeholder="e.g. 09171234567"
+                        value="<?php echo htmlspecialchars($fd['phone'] ?? ''); ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="um-form-label">Role <span class="um-form-req">*</span></label>
+                    <select class="form-select" name="role" id="roleSelect" onchange="toggleCollegeField()"
+                            <?php echo $edit_user['id'] === $current_user['id'] ? 'disabled' : ''; ?>>
+                        <option value="user"  <?php echo (($fd['role'] ?? 'user') === 'user')  ? 'selected' : ''; ?>>Faculty / Staff</option>
+                        <option value="admin" <?php echo (($fd['role'] ?? '') === 'admin') ? 'selected' : ''; ?>>Administrator</option>
+                    </select>
+                    <?php if ($edit_user['id'] === $current_user['id']): ?>
+                    <input type="hidden" name="role" value="admin">
+                    <div class="form-text">You can't change your own role.</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="um-form-section mt-4"><i class="fas fa-building"></i> Campus &amp; Department</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="um-form-label">Campus <span class="um-form-req">*</span></label>
+                    <select class="form-select" name="campus_id" id="campusSelect" onchange="toggleCollegeField()">
+                        <?php foreach ($campuses as $c): ?>
+                        <option value="<?php echo $c['id']; ?>"
+                            <?php echo ((int)($fd['campus_id'] ?? 1) === $c['id']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($c['name']); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6" id="collegeFieldWrap">
+                    <label class="um-form-label">Department / Office</label>
+                    <select class="form-select" name="college_id">
+                        <option value="">— None —</option>
+                        <optgroup label="Colleges">
+                            <?php foreach ($colleges as $code => $name): ?>
+                            <option value="<?php echo htmlspecialchars($code); ?>"
+                                <?php echo (($fd['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($name); ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                        <optgroup label="Offices">
+                            <?php foreach ($offices as $code => $name): ?>
+                            <option value="<?php echo htmlspecialchars($code); ?>"
+                                <?php echo (($fd['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($name); ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <div class="um-form-section mt-4"><i class="fas fa-lock"></i> Account Security</div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="um-form-label">New Password <span style="font-weight:400;color:#999;">(leave blank to keep current)</span></label>
+                    <input type="password" class="form-control" name="password" minlength="6" placeholder="Min. 6 characters">
+                </div>
+                <div class="col-md-6">
+                    <label class="um-form-label">Confirm New Password</label>
+                    <input type="password" class="form-control" name="confirm_password" minlength="6">
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="um-btn um-btn-primary" style="padding:10px 24px;font-size:0.87rem;">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+                <a href="users.php" class="um-btn um-btn-secondary" style="padding:10px 20px;font-size:0.87rem;">Cancel</a>
+            </div>
+        </form>
+    </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="um-tip-card">
+            <div style="font-size:0.78rem;font-weight:800;color:#8B0000;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;">
+                <i class="fas fa-lightbulb me-1"></i> Guidelines
+            </div>
+            <div class="um-tip-item">
+                <div class="um-tip-dot"><i class="fas fa-key"></i></div>
+                <div>Only fill the password fields if you want to <strong>reset</strong> this user's password.</div>
+            </div>
+            <div class="um-tip-item">
+                <div class="um-tip-dot"><i class="fas fa-user-shield"></i></div>
+                <div><strong>Admin</strong> accounts have full system access. Assign with care.</div>
+            </div>
+            <div class="um-tip-item">
+                <div class="um-tip-dot"><i class="fas fa-building"></i></div>
+                <div>Department only applies to <strong>Main Campus</strong> users.</div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <?php unset($_SESSION['user_form_errors'], $_SESSION['user_form_data']); ?>
+
 <?php else: ?>
     <?php
     $count_total  = count($all_users);
@@ -344,6 +551,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     $count_admin  = count(array_filter($all_users, fn($u) => $u['role'] === 'admin'));
     $avatar_colors = ['#8B0000','#1d4ed8','#15803d','#b45309','#7c3aed','#0e7490'];
     $all_depts = array_merge($colleges, $offices);
+
+    // Precompute per-user history counts, so the delete modal can tell the admin up
+    // front exactly what else will be deleted along with the account.
+    $history_counts = [];
+    foreach (getRequests() as $r)        { $history_counts[$r['user_id']]['requests']    = ($history_counts[$r['user_id']]['requests']    ?? 0) + 1; }
+    foreach (getBorrowRecords() as $b)   { $history_counts[$b['user_id']]['borrows']      = ($history_counts[$b['user_id']]['borrows']      ?? 0) + 1; }
+    foreach (getUserOwnedItems() as $o)  { $history_counts[$o['user_id']]['owned_items']  = ($history_counts[$o['user_id']]['owned_items']  ?? 0) + 1; }
     ?>
 
     <!-- Stats -->
@@ -422,21 +636,87 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <?php endif; ?>
         </div>
 
-        <!-- Footer: joined + action -->
+        <!-- Footer: joined + actions -->
         <div class="um-card-footer">
             <div class="um-card-joined"><i class="fas fa-calendar-alt" style="margin-right:4px;opacity:0.5;"></i>Joined <?php echo date('M d, Y', strtotime($u['created_at'])); ?></div>
-            <?php if (!$is_me): ?>
-            <form method="POST" action="users.php">
-                <input type="hidden" name="action" value="toggle_status">
-                <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
-                <button type="submit" class="um-btn um-btn-sm <?php echo $u['is_active'] ? 'um-btn-toggle-on' : 'um-btn-toggle-off'; ?>">
-                    <i class="fas <?php echo $u['is_active'] ? 'fa-user-slash' : 'fa-user-check'; ?>"></i>
-                    <?php echo $u['is_active'] ? 'Deactivate' : 'Activate'; ?>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <a href="users.php?action=edit&id=<?php echo $u['id']; ?>" class="um-btn um-btn-sm um-btn-secondary">
+                    <i class="fas fa-pen"></i> Edit
+                </a>
+                <?php if (!$is_me): ?>
+                <form method="POST" action="users.php" style="display:inline;">
+                    <input type="hidden" name="action" value="toggle_status">
+                    <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
+                    <button type="submit" class="um-btn um-btn-sm <?php echo $u['is_active'] ? 'um-btn-toggle-on' : 'um-btn-toggle-off'; ?>">
+                        <i class="fas <?php echo $u['is_active'] ? 'fa-user-slash' : 'fa-user-check'; ?>"></i>
+                        <?php echo $u['is_active'] ? 'Deactivate' : 'Activate'; ?>
+                    </button>
+                </form>
+                <button type="button" class="um-btn um-btn-sm" style="background:rgba(239,68,68,0.09);color:#dc2626;border:1px solid rgba(239,68,68,0.18);"
+                        data-bs-toggle="modal" data-bs-target="#deleteModal-<?php echo $u['id']; ?>">
+                    <i class="fas fa-trash"></i> Delete
                 </button>
-            </form>
-            <?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
+
+    <?php if (!$is_me):
+        $__hc = $history_counts[$u['id']] ?? [];
+        $__n_req = $__hc['requests'] ?? 0;
+        $__n_brw = $__hc['borrows'] ?? 0;
+        $__n_own = $__hc['owned_items'] ?? 0;
+        $__has_history = ($__n_req + $__n_brw + $__n_own) > 0;
+    ?>
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal-<?php echo $u['id']; ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-trash me-2" style="color:#dc2626;"></i>Delete Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:#f7f7f7;border-radius:8px;">
+                        <div class="um-avatar" style="background:<?php echo $col; ?>;width:38px;height:38px;font-size:0.9rem;"><?php echo $initials; ?></div>
+                        <div>
+                            <div style="font-weight:700;font-size:0.88rem;color:#1a1d23;"><?php echo htmlspecialchars($u['full_name']); ?></div>
+                            <div style="font-size:0.78rem;color:rgba(0,0,0,0.45);"><?php echo htmlspecialchars($u['email']); ?></div>
+                        </div>
+                    </div>
+                    <?php if ($__has_history): ?>
+                    <div style="display:flex;gap:10px;padding:12px 14px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;color:#b91c1c;font-size:0.85rem;">
+                        <i class="fas fa-triangle-exclamation" style="margin-top:2px;flex-shrink:0;"></i>
+                        <div>
+                            This account has history. Deleting it will <strong>also permanently delete</strong>:
+                            <ul style="margin:8px 0 0;padding-left:18px;">
+                                <?php if ($__n_req): ?><li><?php echo $__n_req; ?> request(s)</li><?php endif; ?>
+                                <?php if ($__n_brw): ?><li><?php echo $__n_brw; ?> borrow record(s)</li><?php endif; ?>
+                                <?php if ($__n_own): ?><li><?php echo $__n_own; ?> owned item record(s)</li><?php endif; ?>
+                            </ul>
+                            This cannot be undone. If you just want to block access and keep the history, use <strong>Deactivate</strong> from the card instead.
+                        </div>
+                    </div>
+                    <?php else: ?>
+                    <p style="font-size:0.88rem;color:#374151;margin:0;">
+                        This will <strong>permanently delete</strong> this account. This action cannot be undone.
+                    </p>
+                    <?php endif; ?>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="um-btn um-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="users.php" style="display:inline;">
+                        <input type="hidden" name="action" value="delete_user">
+                        <input type="hidden" name="user_id" value="<?php echo $u['id']; ?>">
+                        <button type="submit" class="um-btn" style="background:#dc2626;color:#fff;padding:8px 16px;">
+                            <i class="fas fa-trash me-1"></i> <?php echo $__has_history ? 'Delete Everything' : 'Delete Permanently'; ?>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php endforeach; ?>
     </div>
 <?php endif; ?>

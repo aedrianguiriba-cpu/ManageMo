@@ -456,6 +456,10 @@ displayMessage();
                 <span class="mrt-urgency <?php echo $uc['class']; ?>">
                     <i class="fas <?php echo $uc['icon']; ?>"></i> <?php echo $uc['label']; ?> Priority
                 </span>
+                <button type="button" class="btn btn-sm" style="background:#f7f7f7;border:1px solid #e5e7eb;font-weight:700;font-size:0.78rem;color:#374151;"
+                        data-bs-toggle="modal" data-bs-target="#viewModal-<?php echo (int)$req['id']; ?>">
+                    <i class="fas fa-eye me-1"></i> View
+                </button>
             </div>
         </div>
 
@@ -587,10 +591,24 @@ displayMessage();
             </div>
             <?php endif; ?>
 
+            <?php if (!empty($req['scheduled_delivery_date']) && $delivery_status === 'out_for_delivery'): ?>
+            <div class="mrt-detail-group">
+                <div class="mrt-detail-label"><i class="fas fa-calendar-day me-1"></i>Expected Delivery</div>
+                <div class="mrt-detail-val" style="color:#1d4ed8;font-weight:700;"><?php echo date('F j, Y', strtotime($req['scheduled_delivery_date'])); ?></div>
+            </div>
+            <?php endif; ?>
+
             <?php if ($reason): ?>
             <div class="mrt-detail-group" style="flex-basis:100%;">
                 <div class="mrt-detail-label"><i class="fas fa-comment me-1"></i>Reason / Description</div>
                 <div class="mrt-detail-val"><?php echo htmlspecialchars($reason); ?></div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($status === 'disapproved' && !empty($req['disapproval_reason'])): ?>
+            <div class="mrt-detail-group" style="flex-basis:100%;">
+                <div class="mrt-detail-label" style="color:#b91c1c;"><i class="fas fa-times-circle me-1"></i>Reason for Disapproval</div>
+                <div class="mrt-detail-val" style="color:#b91c1c;"><?php echo htmlspecialchars($req['disapproval_reason']); ?></div>
             </div>
             <?php endif; ?>
         </div>
@@ -616,6 +634,61 @@ displayMessage();
         <?php endif; ?>
         <?php endif; ?>
 
+    </div>
+
+    <!-- View Details Modal -->
+    <div class="modal fade" id="viewModal-<?php echo (int)$req['id']; ?>" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        Request <?php echo htmlspecialchars($req['request_number']); ?>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="mrt-type-badge <?php echo $tc['class']; ?>">
+                            <i class="fas <?php echo $tc['icon']; ?>"></i> <?php echo $tc['label']; ?>
+                        </span>
+                        <span class="mrt-urgency <?php echo $uc['class']; ?>">
+                            <i class="fas <?php echo $uc['icon']; ?>"></i> <?php echo $uc['label']; ?> Priority
+                        </span>
+                        <span style="font-size:0.78rem;color:rgba(0,0,0,0.5);align-self:center;">
+                            Submitted <?php echo date('M j, Y g:i A', strtotime($req['created_at'])); ?>
+                        </span>
+                    </div>
+                    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.4);margin-bottom:8px;">
+                        Items in this request (<?php echo $req['unit_count']; ?>)
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:6px;">
+                        <?php foreach ($req['group_rows'] as $gr_idx => $gr): ?>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#f7f7f7;border-radius:8px;">
+                            <div>
+                                <div style="font-weight:700;font-size:0.87rem;color:#1a1d23;">
+                                    <?php echo ($gr_idx + 1) . '. ' . htmlspecialchars($gr['item_name'] ?? 'Item'); ?>
+                                </div>
+                                <?php if (!empty($gr['qr_code_id'])): ?>
+                                <div style="font-family:monospace;font-size:0.70rem;color:rgba(139,0,0,0.65);margin-top:2px;">
+                                    <?php echo htmlspecialchars($gr['qr_code_id']); ?>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                            <span class="mrt-urgency" style="background:rgba(0,0,0,0.06);color:#374151;">
+                                <?php echo htmlspecialchars(ucfirst($gr['status'] ?? $status)); ?>
+                            </span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php if ($reason): ?>
+                    <div style="margin-top:16px;">
+                        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.4);margin-bottom:4px;">Reason / Description</div>
+                        <div style="font-size:0.85rem;color:#374151;"><?php echo htmlspecialchars($reason); ?></div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
     </div>
     <?php endforeach; ?>
 

@@ -13,10 +13,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action_type === 'condemn' && $item_id > 0) {
         $condemn_reason = sanitizeInput($_POST['condemn_reason'] ?? '');
+        // Snapshot the item's condition at the moment of condemnation — this is the
+        // inspector's own record, distinct from the live inventory.condition field
+        // (which could theoretically be edited later).
+        $item_at_condemn = findById(getInventory(), $item_id);
         dbUpdateInventory($item_id, [
             'status'                => 'condemned',
             'condemnation_reason'   => $condemn_reason,
             'condemned_at'          => date('Y-m-d H:i:s'),
+            'condemned_by'          => $current_user['id'],
+            'condemned_condition'   => $item_at_condemn['condition'] ?? null,
         ]);
         logActivity($current_user['id'], 'CONDEMN', "Condemned inventory item #$item_id", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=condemned', 'Item condemned successfully.', 'success');
@@ -27,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'status'        => 'disposed',
             'disposal_notes'=> $dispose_notes,
             'disposed_at'   => date('Y-m-d H:i:s'),
+            'disposed_by'   => $current_user['id'],
         ]);
         logActivity($current_user['id'], 'DISPOSE', "Disposed inventory item #$item_id", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=disposed', 'Item marked as disposed.', 'success');
@@ -36,8 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'status'              => 'damaged',
             'condemnation_reason' => null,
             'condemned_at'        => null,
+            'condemned_by'        => null,
+            'condemned_condition' => null,
             'disposal_notes'      => null,
             'disposed_at'         => null,
+            'disposed_by'         => null,
         ]);
         logActivity($current_user['id'], 'RESTORE', "Restored inventory item #$item_id from condemnation", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=evaluate', 'Item restored to evaluation list.', 'info');
@@ -54,6 +64,7 @@ displayMessage();
 // Load data
 $all_inventory = getInventory();
 $all_campuses  = getAllCampuses();
+$all_users     = getUsers();
 
 // Build tab lists (re-index with array_values for clean iteration)
 // "Evaluate" includes every item not already condemned/disposed, so admins can condemn any item, not just damaged/maintenance ones.
@@ -418,6 +429,9 @@ foreach ($all_campuses as $c) {
                     <th>Purchase Date</th>
                     <th>Cost</th>
                     <th>Status</th>
+                    <?php if ($active_tab === 'condemned' || $active_tab === 'disposed'): ?>
+                    <th><?php echo $active_tab === 'condemned' ? 'Condemnation Record' : 'Disposal Record'; ?></th>
+                    <?php endif; ?>
                     <?php if ($active_tab !== 'disposed'): ?>
                     <th>Actions</th>
                     <?php endif; ?>
@@ -491,6 +505,26 @@ foreach ($all_campuses as $c) {
                         </div>
                         <?php endif; ?>
                     </td>
+                    <?php if ($active_tab === 'condemned'):
+                        $condemner = !empty($row['condemned_by']) ? findById($all_users, (int)$row['condemned_by']) : null;
+                    ?>
+                    <td style="max-width:220px;">
+                        <div style="font-size:0.80rem;color:#374151;"><?php echo $row['condemnation_reason'] ? htmlspecialchars($row['condemnation_reason']) : '<span style="color:#bbb;">No reason recorded</span>'; ?></div>
+                        <div style="font-size:0.70rem;color:#aaa;margin-top:3px;">
+                            <?php if (!empty($row['condemned_condition'])): ?>Condition at inspection: <strong><?php echo htmlspecialchars(ucfirst($row['condemned_condition'])); ?></strong><br><?php endif; ?>
+                            <?php echo $condemner ? 'By ' . htmlspecialchars($condemner['full_name']) : ''; ?>
+                        </div>
+                    </td>
+                    <?php elseif ($active_tab === 'disposed'):
+                        $disposer = !empty($row['disposed_by']) ? findById($all_users, (int)$row['disposed_by']) : null;
+                    ?>
+                    <td style="max-width:220px;">
+                        <div style="font-size:0.80rem;color:#374151;"><?php echo $row['disposal_notes'] ? htmlspecialchars($row['disposal_notes']) : '<span style="color:#bbb;">No notes recorded</span>'; ?></div>
+                        <div style="font-size:0.70rem;color:#aaa;margin-top:3px;">
+                            <?php echo $disposer ? 'By ' . htmlspecialchars($disposer['full_name']) : ''; ?>
+                        </div>
+                    </td>
+                    <?php endif; ?>
                     <?php if ($active_tab === 'evaluate'): ?>
                     <td>
                         <button type="button" class="cd-btn-condemn"
@@ -633,6 +667,13 @@ document.addEventListener('keydown', function(e) {
         closeModal('disposeModal');
     }
 });
+<?php if (!empty($_GET['condemn'])):
+    $__condemn_item = findById($all_inventory, (int)$_GET['condemn']);
+    if ($__condemn_item):
+?>
+// Deep-linked from Inventory's "Condemn" quick action
+openCondemnModal(<?php echo (int)$__condemn_item['id']; ?>, <?php echo json_encode($__condemn_item['item_name']); ?>);
+<?php endif; endif; ?>
 </script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>

@@ -15,18 +15,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'add') {
         $item_name    = sanitizeInput($_POST['item_name']);
         $qty          = max(1, (int)$_POST['quantity']);
+        $acq_mode     = sanitizeInput($_POST['acquisition_mode'] ?? 'borrow');
         $base_data    = [
-            'item_name'     => $item_name,
-            'category'      => sanitizeInput($_POST['category']),
-            'description'   => sanitizeInput($_POST['description']),
-            'campus_id'     => (int)$_POST['campus_id'],
-            'quantity'      => 1,
-            'location'      => sanitizeInput($_POST['location']),
-            'purchase_date' => sanitizeInput($_POST['purchase_date']) ?: null,
-            'cost'          => is_numeric($_POST['cost'] ?? '') ? (float)$_POST['cost'] : null,
-            'condition'     => sanitizeInput($_POST['condition']),
-            'status'        => 'available',
-            'group_id'      => generateGroupId(),
+            'item_name'        => $item_name,
+            'category'         => sanitizeInput($_POST['category']),
+            'description'      => sanitizeInput($_POST['description']),
+            'campus_id'        => (int)$_POST['campus_id'],
+            'college_id'       => sanitizeInput($_POST['college_id'] ?? '') ?: null,
+            'quantity'         => 1,
+            'location'         => sanitizeInput($_POST['location']),
+            'purchase_date'    => sanitizeInput($_POST['purchase_date']) ?: null,
+            'cost'             => is_numeric($_POST['cost'] ?? '') ? (float)$_POST['cost'] : null,
+            'condition'        => sanitizeInput($_POST['condition']),
+            'status'           => 'available',
+            'group_id'         => generateGroupId(),
+            'acquisition_mode' => in_array($acq_mode, ['borrow', 'request']) ? $acq_mode : 'borrow',
+            'model'            => sanitizeInput($_POST['model'] ?? '') ?: null,
+            'serial_number'    => sanitizeInput($_POST['serial_number'] ?? '') ?: null,
         ];
         $first_id = null;
         for ($u = 0; $u < $qty; $u++) {
@@ -67,6 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $item_name = sanitizeInput($_POST['item_name']);
         $user_id   = (int)$_POST['user_id'];
         $qty       = max(1, (int)($_POST['quantity'] ?? 1));
+        // Guard against user_id being missing/tampered/0 — without this, the row silently
+        // saves with no real owner and later renders as "Unknown User".
+        if (!$user_id || !findById(getUsers(), $user_id)) {
+            redirectWithMessage('inventory.php?action=add_owned&tab=owned', 'Please select a valid user before saving.', 'danger');
+        }
         $base_owned = [
             'user_id'       => $user_id,
             'item_name'     => $item_name,
@@ -121,15 +131,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'edit') {
         $inventory_id = (int)$_GET['id'];
         $item_name    = sanitizeInput($_POST['item_name']);
+        $acq_mode     = sanitizeInput($_POST['acquisition_mode'] ?? 'borrow');
         dbUpdateInventory($inventory_id, [
-            'item_name'   => $item_name,
-            'category'    => sanitizeInput($_POST['category']),
-            'description' => sanitizeInput($_POST['description']),
-            'campus_id'   => (int)$_POST['campus_id'],
-            'quantity'    => max(0, (int)$_POST['quantity']),
-            'location'    => sanitizeInput($_POST['location']),
-            'condition'   => sanitizeInput($_POST['condition']),
-            'status'      => sanitizeInput($_POST['status']),
+            'item_name'        => $item_name,
+            'category'         => sanitizeInput($_POST['category']),
+            'description'      => sanitizeInput($_POST['description']),
+            'campus_id'        => (int)$_POST['campus_id'],
+            'college_id'       => sanitizeInput($_POST['college_id'] ?? '') ?: null,
+            'quantity'         => max(0, (int)$_POST['quantity']),
+            'location'         => sanitizeInput($_POST['location']),
+            'condition'        => sanitizeInput($_POST['condition']),
+            'status'           => sanitizeInput($_POST['status']),
+            'acquisition_mode' => in_array($acq_mode, ['borrow', 'request']) ? $acq_mode : 'borrow',
+            'model'            => sanitizeInput($_POST['model'] ?? '') ?: null,
+            'serial_number'    => sanitizeInput($_POST['serial_number'] ?? '') ?: null,
         ]);
         logActivity($current_user['id'], 'UPDATE', "Updated inventory item: $item_name", 'inventory', $inventory_id);
         redirectWithMessage('inventory.php', 'Item updated successfully!', 'success');
@@ -327,6 +342,34 @@ displayMessage();
                     <label class="form-label">Purchase Date</label>
                     <input type="date" class="form-control" name="purchase_date">
                 </div>
+                <div class="col-md-6">
+                    <label class="form-label">College / Office <span style="font-weight:400;color:#999;">(Main Campus only)</span></label>
+                    <select class="form-select" name="college_id">
+                        <option value="">— None / Not applicable —</option>
+                        <?php foreach (getMainCampusColleges() as $abbr => $fullname): ?>
+                        <option value="<?php echo htmlspecialchars($abbr); ?>"><?php echo htmlspecialchars($fullname); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text">Needed for the "By Campus" breakdown to categorize this item correctly.</div>
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Acquisition Mode *</label>
+                    <select class="form-select" name="acquisition_mode" required>
+                        <option value="borrow" selected>Borrowable</option>
+                        <option value="request">Request / Acquire Only</option>
+                    </select>
+                    <div class="form-text">Borrowable items appear in the Borrow catalog; request-only items are removed from it.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Model</label>
+                    <input type="text" class="form-control" name="model" placeholder="e.g. Dell Inspiron 15">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Serial Number</label>
+                    <input type="text" class="form-control" name="serial_number" placeholder="Manufacturer serial no.">
+                </div>
             </div>
             <div class="mb-4">
                 <label class="form-label">Description</label>
@@ -403,6 +446,34 @@ displayMessage();
                 <div class="col-md-6">
                     <label class="form-label">Cost</label>
                     <input type="number" class="form-control" name="cost" value="<?php echo $item['cost']; ?>" step="0.01">
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">College / Office <span style="font-weight:400;color:#999;">(Main Campus only)</span></label>
+                    <select class="form-select" name="college_id">
+                        <option value="">— None / Not applicable —</option>
+                        <?php foreach (getMainCampusColleges() as $abbr => $fullname): ?>
+                        <option value="<?php echo htmlspecialchars($abbr); ?>" <?php echo ($item['college_id'] ?? '') === $abbr ? 'selected' : ''; ?>><?php echo htmlspecialchars($fullname); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Acquisition Mode *</label>
+                    <select class="form-select" name="acquisition_mode" required>
+                        <option value="borrow"  <?php echo ($item['acquisition_mode'] ?? 'borrow') === 'borrow'  ? 'selected' : ''; ?>>Borrowable</option>
+                        <option value="request" <?php echo ($item['acquisition_mode'] ?? 'borrow') === 'request' ? 'selected' : ''; ?>>Request / Acquire Only</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Model</label>
+                    <input type="text" class="form-control" name="model" value="<?php echo htmlspecialchars($item['model'] ?? ''); ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Serial Number</label>
+                    <input type="text" class="form-control" name="serial_number" value="<?php echo htmlspecialchars($item['serial_number'] ?? ''); ?>">
                 </div>
             </div>
             <div class="mb-3">
@@ -511,12 +582,21 @@ displayMessage();
         <div class="ai-card-title">Add User-Owned Item</div>
         <div class="ai-card-sub">Record items owned by users from past years for tracking purposes</div>
         <hr class="ai-divider mt-0">
-        <!-- User-to-campus map for auto-fill -->
+        <!-- User-to-campus/college map for auto-fill -->
         <script>
         var userCampusMap = <?php
             $map = [];
             foreach ($users as $u) $map[$u['id']] = $u['campus_id'];
             echo json_encode($map);
+        ?>;
+        var userCollegeMap = <?php
+            $colleges = getMainCampusColleges();
+            $cmap = [];
+            foreach ($users as $u) {
+                $cid = $u['college_id'] ?? '';
+                $cmap[$u['id']] = $cid ? ($colleges[$cid] ?? $cid) : '';
+            }
+            echo json_encode($cmap);
         ?>;
         </script>
         <form method="POST" action="?action=add_owned">
@@ -576,6 +656,12 @@ displayMessage();
                     </select>
                 </div>
                 <div class="col-md-6">
+                    <label class="form-label">College / Office</label>
+                    <input type="text" class="form-control" id="ownedCollegeDisplay" readonly placeholder="Auto-filled from selected user">
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
                     <label class="form-label">Condition *</label>
                     <select class="form-select" name="condition" required>
                         <option value="excellent">Excellent</option>
@@ -617,6 +703,7 @@ displayMessage();
         } else {
             document.getElementById('ownedCampusId').value = '';
         }
+        document.getElementById('ownedCollegeDisplay').value = userCollegeMap[userId] || '—';
     }
     </script>
 
@@ -1244,6 +1331,9 @@ function openGroupModal(group, campus) {
             + '<span class="ai-badge ai-badge-' + sc + '" style="font-size:0.7rem;margin-bottom:8px;">' + unit.status + '</span>'
             + '<div style="display:flex;gap:4px;justify-content:center;margin-top:6px;">'
             + '<a href="inventory.php?action=edit&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit"><i class="fas fa-edit"></i></a>'
+            + (unit.status !== 'condemned' && unit.status !== 'disposed'
+                ? '<a href="condemnation.php?tab=evaluate&condemn=' + unit.id + '" class="ai-btn-sm" style="background:rgba(139,0,0,0.10);color:#8B0000;" title="Condemn this unit"><i class="fas fa-ban"></i></a>'
+                : '')
             + '</div>'
             + '</div>';
         grid.appendChild(col);
