@@ -2,22 +2,35 @@
                      MANAGEMO — SYSTEM DOCUMENTATION
               Inventory & Asset Management System
               Pampanga State University (PSU)
-              Version 1.0.0
+              Version 2.0.0
 ================================================================================
 
 OVERVIEW
 --------
 ManageMo is a web-based inventory and asset management system built for
-Pampanga State University (PSU). It runs on PHP (no framework, no database)
-using hardcoded/mock data arrays. The UI uses Bootstrap 5.3 and Font Awesome 6.4.
+Pampanga State University (PSU), plus a companion Flutter mobile app for
+confirming deliveries by QR code.
+
+The web app runs on PHP (no framework) using Bootstrap 5.3 and Font Awesome 6.4.
 All pages are server-rendered PHP. Session-based authentication (BCrypt passwords).
 
-No external database is required — all data lives in:
-  config/data.php                — live data functions (getUsers, getInventory, etc.)
-  config/mock_data.php           — MockData class with the same data (legacy/reference)
-  config/functions.php           — all business logic helpers
-  config/constants.php           — app-wide constants (roles, statuses, urgency levels)
-  config/departments_custom.json — user-added colleges, offices, and campuses (persisted)
+Persistence is a REAL Supabase (hosted Postgres + PostgREST) database — this is
+NOT a hardcoded/mock-data system. All reads/writes (requests, inventory, users,
+borrow records, condemnation, etc.) go through the REST API and are durable
+across requests. Data access lives in:
+  config/data.php                — data-layer functions (getUsers, getInventory,
+                                    getRequests, ...) backed by Supabase REST calls,
+                                    with a short-lived in-process cache (60s TTL)
+  config/supabase.php             — thin PostgREST HTTP client (select/insert/
+                                     update/delete) + .env loader
+  config/mock_data.php            — legacy MockData class kept for reference only;
+                                     NOT called anywhere in the current codebase
+  config/functions.php            — business logic helpers (auth, QR generation,
+                                     email, dbCreate*/dbUpdate*/dbDelete* wrappers)
+  config/constants.php            — app-wide constants (roles, statuses, urgency)
+  config/departments_custom.json  — user-added colleges, offices, and campuses
+  .env                             — SUPABASE_URL, SUPABASE_KEY (service_role),
+                                     API_TOKEN_SECRET (used by api/*.php)
 
 ================================================================================
 DIRECTORY STRUCTURE
@@ -32,10 +45,12 @@ ManageMo/
 │
 ├── config/
 │   ├── constants.php           App constants (roles, request/borrow statuses, etc.)
-│   ├── data.php                Data layer — all getXxx() functions returning PHP arrays
-│   ├── functions.php           Business logic (auth, formatting, QR generation, email)
-│   ├── mock_data.php           MockData class (mirrors data.php; used as reference)
-│   └── departments_custom.json Persisted user-added colleges, offices, and campuses
+│   ├── data.php                Data layer — all getXxx() functions, Supabase-backed
+│   ├── supabase.php             PostgREST HTTP client + .env loader
+│   ├── functions.php            Business logic (auth, formatting, QR gen, email,
+│   │                            dbCreate*/dbUpdate*/dbDelete* persistence helpers)
+│   ├── mock_data.php            Legacy MockData class — unused, kept for reference
+│   └── departments_custom.json  Persisted user-added colleges, offices, campuses
 │
 ├── includes/
 │   ├── header.php              HTML <head>, Bootstrap/FA CDN links (cache-busted style.css)
@@ -45,15 +60,16 @@ ManageMo/
 │
 ├── user/                       Pages accessible to Role: user
 │   ├── dashboard.php           User home — KPI cards, request summary, recent activity
-│   ├── inventory.php           Browse all inventory items (read-only)
+│   ├── inventory.php           Browse campus inventory + "My Owned Items" tab (paginated)
 │   ├── requests.php            Submit new request (borrow / item / service)
-│   ├── my-requests.php         View all submitted requests
-│   ├── borrow-records.php      My Records — 3-tab page (Borrow/Item/Service)
-│   └── settings.php            Profile/account settings
+│   ├── my-requests.php         View all submitted requests, grouped by unit (paginated)
+│   ├── borrow-records.php      My Records — 3-tab page (Borrow/Item/Service), each paginated
+│   └── settings.php            Profile/account settings (persisted via dbUpdateUser)
 │
 ├── admin/                      Pages accessible to Role: admin
 │   ├── dashboard.php           Admin home — KPI cards, charts, campus summary
-│   ├── inventory.php           Full inventory CRUD (all campuses)
+│   ├── inventory.php           Inventory management (all campuses) — add/edit only,
+│   │                           delete has been removed (see Module 2)
 │   ├── inventory-campus.php    Campus overview + Manage Departments modal
 │   ├── campus-detail.php       Single campus detail view
 │   ├── requests.php            Review & approve/disapprove requests
@@ -61,7 +77,32 @@ ManageMo/
 │   ├── reports.php             Printable reports
 │   ├── condemnation.php        Condemnation & Disposal lifecycle management
 │   ├── users.php               User management
-│   └── settings.php            System/admin settings
+│   └── settings.php            System/admin settings (persisted via dbUpdateUser)
+│
+├── api/                        JSON REST API for the Flutter mobile app (see Module 13)
+│   ├── _bootstrap.php           Shared helpers: stateless signed-token auth, JSON I/O
+│   ├── login.php                POST — verify email/password, issue a session token
+│   ├── me.php                   GET  — resolve a token back to its user
+│   ├── pending_deliveries.php    GET  — this user's out_for_delivery requests
+│   └── confirm_delivery.php     POST — confirm one unit's delivery by qr_code_id
+│   NOTE: the current mobile app does NOT call these — it talks to Supabase
+│   directly instead (see Module 13's security note). These endpoints are kept
+│   for any future client that should NOT hold the Supabase service_role key.
+│
+├── mobile_app/                 Flutter delivery-confirmation app (see Module 13)
+│   ├── lib/
+│   │   ├── main.dart            App entry — restores saved session or shows login
+│   │   ├── screens/
+│   │   │   ├── login_screen.dart     Email/password login (same accounts as web app)
+│   │   │   ├── home_screen.dart      2 tabs: "Pending Scan" / "Completed"
+│   │   │   └── scanner_screen.dart   Live QR scan, per-unit delivery confirmation
+│   │   └── services/
+│   │       ├── supabase_config.dart  Hardcoded Supabase URL + service_role key
+│   │       ├── supabase_rest.dart    Thin PostgREST wrapper (mirrors config/supabase.php)
+│   │       └── api_client.dart       Login (bcrypt check), pending/completed lists,
+│   │                                 confirmDelivery() — mirrors admin "Mark Delivered"
+│   ├── android/, ios/            Camera permission wired in AndroidManifest.xml / Info.plist
+│   └── test/widget_test.dart     Smoke test — app boots to login screen
 │
 ├── assets/
 │   ├── pics/                   Logo and UI images (logo.png, storagebg.jpg)
@@ -70,13 +111,13 @@ ManageMo/
 │
 ├── css/
 │   └── style.css               Global stylesheet — sidebar, topbar, cards, forms
-│                               Design tokens: --primary #8B0000, --border #e5e7eb
+│                                Design tokens: --primary #8B0000, --border #e5e7eb
 │
 ├── js/
 │   └── script.js               Global JS (sidebar toggle, misc utilities)
 │
 └── lib/
-    └── qrcode.php              QR code image generator library
+    └── qrcode.php               QR code image generator library
 
 ================================================================================
 MODULE DOCUMENTATION
@@ -103,54 +144,82 @@ Role system:
   requireAdmin() / requireUser() guard every page and redirect if role mismatch.
 
 Security:
-  - Passwords hashed with BCrypt (PASSWORD_BCRYPT).
+  - Passwords hashed with BCrypt (PASSWORD_BCRYPT / $2y$ hashes).
   - All user-supplied values passed through sanitizeInput() (htmlspecialchars + trim).
+  - The mobile app verifies the SAME bcrypt hash client-side with Dart's `bcrypt`
+    package — confirmed cross-compatible with PHP's password_hash() output.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 2: INVENTORY  (user/inventory.php, admin/inventory.php, admin/inventory-campus.php)
 ────────────────────────────────────────────────────────────────────────────────
-Data source: getInventory() → array of items.
+Data source: getInventory() → array of items (live Supabase `inventory` table).
 Each item has:
   id, qr_code_id, item_name, category, description,
   campus_id, college_id (Main Campus only), quantity, status, location,
-  purchase_date, cost, condition, created_at
+  purchase_date, cost, condition, condemnation_reason, condemned_at,
+  disposal_notes, disposed_at, group_id, created_at
 
 Item statuses: available | borrowed | maintenance | damaged | requested | condemned | disposed
 
 QR Code system:
-  - Every item has a base qr_code_id (e.g. 'QR-A1B2C3D4E5').
-  - getItemUnitQRCodes($item) generates per-unit IDs:
-      quantity=3 → ['QR-A1B2C3D4E5-U01', 'QR-A1B2C3D4E5-U02', 'QR-A1B2C3D4E5-U03']
+  - Every inventory row has its own qr_code_id (e.g. 'QR-A1B2C3D4E5...'), one
+    physical unit per row (adding N units = N inventory rows, not one row with
+    quantity=N and per-unit suffixes).
   - lib/qrcode.php generates the actual QR image for each code.
   - QR images are stored in assets/qrcodes/.
 
-User view:  read-only browse, filter by campus/category/status.
-Admin view: full CRUD — add, edit, delete items; update status; generate QR codes.
+User view:  read-only browse (Available/Borrowed tabs) + "My Owned Items" tab,
+            both paginated (ITEMS_PER_PAGE=15 groups per page).
+Admin view: add items, add units to an existing item, edit item details/status,
+            view a per-item detail modal with each unit's QR code.
+            Deletion has been REMOVED — there is no way to delete an inventory
+            item from the admin UI or its POST handler anymore. To retire an
+            item, use the Condemnation & Disposal flow (Module 9) instead.
 Campus view (admin/inventory-campus.php):
   - Grid of all campus cards with per-campus stats.
   - Main Campus card shows Colleges and Offices breakdowns.
-  - "Manage Departments" button opens a tabbed modal (see Module 11).
+  - "Manage Departments" button opens a tabbed modal (see Module 12).
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 3: REQUEST SUBMISSION  (user/requests.php)
 ────────────────────────────────────────────────────────────────────────────────
 Three request types (selected via type cards at the top):
-  a) Borrow   — borrow an existing inventory item temporarily
-  b) Item     — request procurement of a new item
+  a) Borrow   — borrow an existing inventory item temporarily (catalog-only —
+                see "Custom items" below)
+  b) Item     — request procurement of a new item (catalog OR custom name)
   c) Service  — request maintenance/repair/service on an existing item
 
 Form fields (vary by type):
-  Borrow:  item (shop grid), quantity, expected return date, urgency, reason
-  Item:    item (shop grid), description, quantity, urgency, reason
+  Borrow:  item (shop grid, catalog only), quantity, expected return date,
+           urgency, reason
+  Item:    item (shop grid, catalog OR "Other/Custom" with a free-text name),
+           description, quantity, urgency, reason
   Service: item (shop grid), service type, description, urgency
 
 Page layout: two-column (.rq-layout) — form card (left) + request summary
 sidebar (right, 300px). Collapses to single column at ≤900px.
 
-Note: Approval letter upload has been removed. Requests are submitted directly.
+Custom items ("Item" request type only):
+  - The Borrow flow's "Other (custom)" option has been removed — users can only
+    borrow items that already exist in the catalog.
+  - For an Item request with no catalog match, NO inventory row is created at
+    submission time. The custom name is stashed in the request's
+    service_description column so it still displays correctly everywhere
+    (my-requests.php, admin/requests.php list + detail views) while pending.
+  - An inventory row for the custom item is created ONLY when an admin approves
+    the request (admin/requests.php's approve handler) — category defaults to
+    "Other", campus = the requester's campus, condition defaults to "good"
+    (a missing condition previously broke the admin item-detail modal's JS).
+    The new inventory_id is then written back onto the request row so it's
+    "counted" in inventory going forward.
+  - Disapproved/still-pending custom item requests never get an inventory row.
 
 Server-side:
-  - Request stored (mock: session flash message shown on redirect).
+  - Each unit of a submitted request becomes its own row in `requests` (one
+    row = one physical unit), sharing a `group_id` across the whole submission
+    so multi-unit requests can be tracked/approved/delivered together.
+  - dbCreateRequest() / dbUpdateRequest() / dbUpdateInventory() persist directly
+    to Supabase — nothing here is session-mocked.
 
 ────────────────────────────────
 SHOP-STYLE ITEM SELECTION GRIDS
@@ -171,12 +240,13 @@ Grid 1 — Borrow (#bshop-grid, $borrow_catalog):
     - Availability badge: "Available (qty)" green or "X borrowed" amber
     - Expected return date pills (one per active borrow record, sorted asc)
     - Unit price + status pill in footer
+  Catalog-only — no "Other/Custom" card (removed).
   selectBorrowCard() / filterShopItems() handle selection & filtering.
   data-item-id, data-status, data-quantity, data-available on each card.
   Category filter: filterShopItems(btn) toggles .bshop-cat.active.
 
 Grid 2 — Item Request (#ishop-grid, $catalog_by_category):
-  Available-only items. Cards show name, description chip, category, location.
+  Available-only items, PLUS an "Other / Custom" card (see "Custom items" above).
   selectItemReqCard() / filterItemShop() handle selection & filtering.
 
 Grid 3 — Service (#sshop-grid, $inventory_items):
@@ -241,22 +311,38 @@ ITEM AVAILABILITY CALENDAR
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 4: REQUEST MANAGEMENT / APPROVAL  (admin/requests.php)
 ────────────────────────────────────────────────────────────────────────────────
-Data source: getRequests() → array of all requests.
-Each request has:
-  id, request_number, user_id, request_type (borrow/item/service),
-  inventory_id (nullable for item requests), service_description,
-  urgency (low/medium/high/critical), status, reason_for_request,
-  approval_notes, approved_by, approved_at, expected_return_date,
-  created_at, updated_at
+Data source: getRequests() → array of all requests (live Supabase `requests` table).
+Each request row has:
+  id, request_number, user_id, group_id, qr_code_id, request_type (borrow/item/
+  service), inventory_id (nullable — see Module 3's "Custom items"),
+  service_description, urgency (low/medium/high/critical), receiving_method,
+  reason_for_request, expected_return_date, quantity_requested, status,
+  delivery_status, approved_by, approved_at, created_at, updated_at
 
 Request lifecycle:
-  pending → approved / disapproved → (for approved item requests) → delivered
+  pending → approved / disapproved → (approved) → out_for_delivery → delivered
+                                                                    → (borrow) returned
 
-Admin actions:
-  - Filter by type, status, urgency, campus.
-  - Approve with optional notes → status = 'approved'.
-  - Disapprove with reason → status = 'disapproved'.
-  - Mark as delivered (triggers delivery email via sendDeliveryEmail()).
+Admin actions (grouped — one action applies to every unit sharing a group_id):
+  - Filter by type, status, urgency, campus; table view or tracker (stepper) view.
+  - Approve → status='approved'. If the request has no inventory_id (a custom
+    item — see Module 3), an inventory row is created for it HERE and linked
+    back onto the request before the status change is applied.
+  - Disapprove with reason → status='disapproved'; releases any reserved
+    inventory unit back to 'available'.
+  - Mark Out for Delivery → delivery_status='out_for_delivery' (+ email).
+  - Mark Delivered → delivery_status='delivered', status='delivered'; for borrow
+    requests, flips the inventory unit to 'borrowed' and creates a borrow_record.
+    (The mobile app's QR scan performs this same update per-unit instead of the
+    admin doing it manually — see Module 13.)
+
+Item name display:
+  - The item/service name is resolved from the linked inventory row, falling
+    back to service_description (covers custom items and legacy rows with no
+    request_items match) before finally falling back to "N/A"/"Unknown Item".
+  - Shown in: the dedicated Item/Service tab tables, the "All" tab's table view
+    (added "Item" column), and the tracker card view (added under the
+    requester's name).
 
 Email notifications:
   sendDeliveryEmail($email, $name, $request_number, $stage)
@@ -268,23 +354,37 @@ MODULE 5: MY RECORDS  (user/borrow-records.php)
 ────────────────────────────────────────────────────────────────────────────────
 Three tabs via ?tab=borrow|item|service (default: borrow).
 Status filter per tab via ?status= (hidden input preserves tab on form submit).
+Each tab is paginated independently at 10 rows/page (shared `page` query param —
+safe because only one tab's table is ever rendered per request).
 
 Tab 1 — Borrow Records:
-  Source: getBorrowRecords() filtered by user_id.
-  Each record merged with inventory item (item_name, qr_code_id).
-  Columns: Item, QR Code, Borrowed, Expected Return, Returned On, Status, Notes.
-  Status badges: active (blue) | returned (green) | overdue (red).
+  Source: getBorrowRecords() filtered by user_id, plus any borrow requests not
+  yet delivered (shown as "in progress" rows with no borrow_records entry yet).
+  Columns: Item, Borrowed, Expected Return, Returned On, Status, Notes.
+  Status badges: active (blue) | returned (green) | overdue (red) | pending (amber).
   Overdue detection: active record where expected_return_date < now().
 
 Tab 2 — Item Requests:
   Source: getRequests() filtered by user_id + request_type='item'.
-  Columns: Request #, Item/Description, Urgency, Reason, Submitted, Status, Admin Notes.
+  Columns: Request #, Item/Description, Urgency, Reason, Submitted, Status.
 
 Tab 3 — Service Requests:
   Source: getRequests() filtered by user_id + request_type='service'.
   Columns: Request #, Item, Service Type, Description, Urgency, Submitted, Status.
 
-Print: window.print() — @media print hides sidebar/topbar/tabs/filters.
+Print: window.print() — @media print hides sidebar/topbar/tabs/filters/pagination.
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 5b: MY REQUESTS  (user/my-requests.php)
+────────────────────────────────────────────────────────────────────────────────
+One card per submitted request group (multi-unit requests collapse into a single
+card with a stepper showing Submitted → Under Review → Approved/Disapproved →
+Out for Delivery → Delivered). Filterable by status and type via the stat
+cards / type pills at the top.
+
+Paginated at 5 cards per page, with prev/next + numbered page links and a
+"Showing X–Y of Z requests" counter. Filters (status/type) are preserved across
+page links; the empty state still offers a "Clear filters" link.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 6: ADMIN DASHBOARD  (admin/dashboard.php)
@@ -376,70 +476,54 @@ Each record has:
 Overdue logic: status='active' AND expected_return_date < today.
 Return process: admin sets actual_return_date → status = 'returned' →
                 inventory item status reverts to 'available'.
+Delivery confirmation (creates the borrow_record in the first place):
+  either the admin's "Mark Delivered" action, or the requester scanning the
+  unit's QR code in the mobile app (Module 13) — both run the same logic.
 
 Multi-unit borrows:
-  A single inventory item (e.g. qty=5) may have multiple simultaneous active borrow
-  records — one per borrowed unit. The borrowed count = number of active records
-  for that inventory_id. Available count = item quantity − borrowed count.
-
-Sample borrow data (config/data.php, IDs 5–18, campus_id=1):
-  IDs 5–12:  Single-unit borrows across 8 items (Jun–Jul 2026 return dates)
-  IDs 13–18: Multi-unit borrows demonstrating multiple records per item:
-    Wooden Chair (qty 5)          — 3 active records → returns Jun 24, Jun 27, Jul 3
-    Accounting Calculator (qty 10) — 3 active records → returns Jun 28, Jul 1, Jul 5
-    Food Service Cart (qty 3)      — 2 active records → returns Jun 30, Jul 4
-    CAD Workstation (qty 2)        — 2 active records → returns Jun 26, Jul 10
+  A single item (e.g. one item_name with 5 inventory rows) may have multiple
+  simultaneous active borrow records — one per borrowed unit. The borrowed
+  count = number of active records for that item's inventory rows. Available
+  count = total units − borrowed count.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 9: CONDEMNATION & DISPOSAL  (admin/condemnation.php)
 ────────────────────────────────────────────────────────────────────────────────
-Admin-only page for managing the end-of-life lifecycle of damaged and
-maintenance-flagged items.
+Admin-only page for managing the end-of-life lifecycle of inventory items.
+All mutations here are REAL, persisted writes to the `inventory` table via
+dbUpdateInventory() — there is no session-override/mock layer.
 
 Three tabs (via ?tab=evaluate|condemned|disposed, default: evaluate):
-  Tab 1 — For Evaluation: items with status = 'damaged' or 'maintenance'
-  Tab 2 — Condemned:      items that have been condemned (session override applied)
-  Tab 3 — Disposed:       items that have been disposed (session override applied)
+  Tab 1 — For Evaluation: EVERY inventory item not already condemned or
+          disposed (any status/condition) — so an admin can condemn any
+          specific item, not just ones already flagged damaged/maintenance.
+  Tab 2 — Condemned:      items with status = 'condemned'
+  Tab 3 — Disposed:       items with status = 'disposed'
 
 KPI cards (top of page):
-  For Evaluation  — amber  — count of damaged/maintenance items
+  For Evaluation  — amber  — count of items available to condemn
   Condemned       — maroon — count of condemned items
   Disposed        — grey   — count of disposed items
-  Est. Value at Risk — red — sum of cost for all evaluate+condemned items
+  Est. Value at Risk — red — sum of cost for all evaluate-tab items
 
 Filter bar (below tab nav, submits via GET):
   - Campus dropdown (all campuses)
   - Category dropdown
-  - Search text input (filters item name + description)
+  - Search text input (filters item name + QR code + category)
   Filters persist across tab switches via hidden <input name="tab">.
 
-Session overrides (mock mode):
-  Mutations are stored in $_SESSION['condemnation_overrides'][$item_id]:
-    condemn: { status:'condemned', reason:string, condemned_at:timestamp }
-    dispose:  { status:'disposed',  disposal_notes:string, disposed_at:timestamp }
-  Restore:  unsets the override → item reverts to its original inventory status.
-
-Actions per item:
-  Evaluate tab: "Condemn" button → opens condemn modal (required reason textarea)
-  Condemned tab: "Dispose" button → opens dispose modal (optional notes)
-                 "Restore" button → POST action=restore → redirects to evaluate tab
-  Disposed tab:  "Restore" button → POST action=restore → redirects to evaluate tab
-
-POST handling (self-posting to condemnation.php):
-  action=condemn  → sets session override { status:'condemned', reason, condemned_at }
-  action=dispose  → merges disposal_notes + disposed_at into existing override
-  action=restore  → unsets $_SESSION['condemnation_overrides'][$item_id]
-  All POST actions redirect to GET to prevent form resubmission.
+Actions per item (POST, self-posting to condemnation.php):
+  action=condemn  → status='condemned', condemnation_reason, condemned_at (required reason)
+  action=dispose   → status='disposed', disposal_notes (optional), disposed_at
+  action=restore   → status='damaged', clears condemnation/disposal fields —
+                     returns the item to the evaluation list
+  All POST actions redirect via redirectWithMessage() to prevent form resubmission.
 
 CSS namespace: all classes prefixed with .cd-*
   .cd-kpi-row, .cd-kpi-card, .cd-kpi-icon, .cd-kpi-val, .cd-kpi-lbl
   .cd-tab-nav, .cd-tab-link, .cd-tab-pane
   .cd-filter-card, .cd-filter-label
   .cd-table-card, .cd-table
-
-Note: Condemnation status is not persisted to config/data.php — session overrides
-      reset when the session expires. This is consistent with the app's mock-mode
-      design where all mutations are ephemeral.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 10: ANALYTICS  (admin/analytics.php)
@@ -498,22 +582,71 @@ Persistence:
   merge defaults with custom JSON entries automatically.
 
 ────────────────────────────────────────────────────────────────────────────────
-MODULE 13: QR DELIVERY SCANNER  [PLANNED — MOBILE APP FEATURE]
+MODULE 13: QR DELIVERY SCANNER  (mobile_app/ — Flutter app, IMPLEMENTED)
 ────────────────────────────────────────────────────────────────────────────────
-NOTE: QR code scanning is NOT implemented in this web application.
-      It is reserved for a dedicated companion mobile app.
+A companion Flutter app that lets a user scan the QR code on a delivered item
+to confirm receipt, instead of an admin manually clicking "Mark Delivered".
 
-Planned Mobile App Flow:
-  1. User opens the ManageMo mobile app and logs in.
-  2. App fetches the user's approved requests from the ManageMo API.
-  3. User selects the request they are receiving.
-  4. App activates camera to scan QR codes on delivered units.
-  5. Each scanned code matched against expected per-unit QR codes.
-  6. When all units confirmed → request status updated to 'delivered'.
+Architecture (IMPORTANT — read before extending this app):
+  The app talks DIRECTLY to Supabase's PostgREST API using the SAME
+  SUPABASE_KEY as the web app's .env — which is the service_role key. This
+  key bypasses Row Level Security entirely and grants full read/write access
+  to every table in the database.
 
-QR Code Format:
-  - Base: qr_code_id, e.g. 'QR-A1B2C3D4E5'
-  - Per-unit: 'QR-A1B2C3D4E5-U01', 'QR-A1B2C3D4E5-U02', ...
+  This was a deliberate, explicitly-confirmed tradeoff (the user chose this
+  over a safer anon-key + Postgres-RPC design, and over routing through the
+  api/*.php backend) — see mobile_app/lib/services/supabase_config.dart for
+  the in-code warning. Practical consequence: anyone who installs/decompiles
+  this app can extract the key and get full database access. If this app is
+  ever distributed beyond a trusted/internal audience, this should be revisited
+  — either move back to the api/*.php endpoints (key stays server-side only)
+  or swap to a restricted anon key + RLS policies / SECURITY DEFINER RPCs.
+
+  The api/*.php endpoints (Module "API" in the directory tree) already implement
+  the safer alternative (stateless signed tokens, password check + all writes
+  happen server-side) but are currently unused by the shipped app.
+
+Login:
+  - Same accounts as the web app (users.email / users.password).
+  - App fetches the `users` row by email via PostgREST, then verifies the
+    password with the `bcrypt` Dart package against the stored $2y$ bcrypt
+    hash — confirmed byte-for-byte compatible with PHP's password_hash().
+  - No password ever leaves the device in plaintext; only the fetched hash is
+    compared locally. Session = the logged-in user's profile cached in
+    SharedPreferences (there is no separate token — the embedded API key
+    itself is what actually grants backend access).
+
+Home screen — two tabs:
+  - "Pending Scan": this user's requests with delivery_status='out_for_delivery',
+    grouped by group_id (one card per request, showing item name(s) + unit count).
+    Tapping a card opens the scanner SCOPED to that item (no generic scan button —
+    the user must pick the item first).
+  - "Completed": this user's delivery_status='delivered' requests, most recent first.
+  Pull-to-refresh reloads both tabs.
+
+Scanning flow (per-unit confirmation):
+  - Only QR codes belonging to the SELECTED item's request/group are accepted;
+    scanning an unrelated QR is rejected ("This QR code belongs to a different
+    item...") rather than silently confirming the wrong thing.
+  - Multi-unit requests are confirmed ONE QR AT A TIME — scanning one unit's
+    QR does NOT auto-confirm the whole group. The scanner stays open between
+    scans, shows a running "confirmed X of Y" progress banner, and prompts for
+    the next unit's QR.
+  - When the last unit of the selected item is confirmed, the scanner
+    auto-closes (after a short delay) with a summary; the user can also tap
+    "Done" at any time to leave early.
+  - Confirming a unit mirrors admin/requests.php's "Mark Delivered" action:
+    sets delivery_status/status='delivered' on that request row, and — for
+    borrow-type requests — flips the inventory unit to 'borrowed' and inserts
+    a borrow_records row.
+
+QR Code format: whatever qr_code_id was generated for that inventory row /
+request unit (see Module 2) — matched via an exact `qr_code_id=eq.` lookup,
+no special per-unit suffix parsing needed.
+
+Build/verify notes: `flutter analyze`, `flutter test`, and `flutter build apk`
+all pass. Requires the CAMERA permission (wired into AndroidManifest.xml /
+Info.plist's NSCameraUsageDescription).
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 14: USER MANAGEMENT  (admin/users.php)
@@ -527,7 +660,7 @@ MODULE 15: SETTINGS  (user/settings.php, admin/settings.php)
 ────────────────────────────────────────────────────────────────────────────────
 User settings: update full_name, phone, password (with current password verify).
 Admin settings: system name, email, campus configuration.
-Changes are session-persisted (mock mode — no persistent write).
+Both persist via dbUpdateUser() — real Supabase writes, not session-mocked.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 16: MOBILE RESPONSIVENESS  (css/style.css + per-page <style> blocks)
@@ -606,7 +739,7 @@ Users ──────────────────── college_id  �
 Inventory ──────────────── campus_id   →  Campuses
 Inventory ──────────────── college_id  →  Main Campus Colleges (Main Campus only)
 Requests ───────────────── user_id     →  Users
-Requests ───────────────── inventory_id → Inventory (nullable for item requests)
+Requests ───────────────── inventory_id → Inventory (nullable — see Module 3)
 Requests ───────────────── approved_by  → Users (admin)
 BorrowRecords ──────────── user_id     →  Users
 BorrowRecords ──────────── inventory_id → Inventory
@@ -627,10 +760,15 @@ REQUEST STATUS FLOW
        │ approved │          │ disapproved │ (terminal)
        └────┬─────┘          └─────────────┘
             │
-            │ Items dispatched / QR scan (mobile app)
+            │ Marked out for delivery
             ▼
+     ┌──────────────────┐
+     │ out_for_delivery  │
+     └────────┬──────────┘
+              │ Admin's "Mark Delivered" OR user scans QR in mobile app
+              ▼
        ┌───────────┐
-       │ delivered │ (terminal for item requests)
+       │ delivered │ (terminal for item/service requests)
        └───────────┘
             │ (for borrow requests only)
             ▼
@@ -698,30 +836,45 @@ Design rules:
   - Flat icons only — no icon wrapper backgrounds
   - Login page: split-panel, left = image + maroon gradient overlay, right = white form
   - Cache-busted style.css via ?v=filemtime() in header.php
+  - The Flutter app reuses the same maroon (#8B0000) as its primary accent, with
+    green (#15803D) for "confirmed/completed" states, for visual consistency
+    with the web app.
 
 ================================================================================
 TECH STACK
 ================================================================================
 
-  Backend:    PHP 7.4+ (no framework, no ORM)
-  Data:       Hardcoded PHP arrays + JSON file persistence
-  Auth:       PHP sessions + BCrypt (password_hash / password_verify)
-  Frontend:   Bootstrap 5.3, Font Awesome 6.4
-  Charts:     Chart.js 4.4 (CDN) — line, doughnut chart types
-  QR Writer:  lib/qrcode.php (PHP QR Code generator)
-  QR Reader:  [MOBILE APP — planned] ZXing / mobile_scanner
-  Server:     Apache (XAMPP) — http://localhost/ManageMo/
+  Backend:      PHP 7.4+ (no framework, no ORM)
+  Database:     Supabase (hosted Postgres, accessed via PostgREST REST API)
+  Auth:         PHP sessions + BCrypt (password_hash / password_verify)
+  Frontend:     Bootstrap 5.3, Font Awesome 6.4
+  Charts:       Chart.js 4.4 (CDN) — line, doughnut chart types
+  QR Writer:    lib/qrcode.php (PHP QR Code generator)
+  Mobile App:   Flutter 3.x / Dart — packages: mobile_scanner (camera QR reading),
+                http, shared_preferences, bcrypt (client-side hash verification)
+  API (unused by the app, available for future clients):
+                api/*.php — stateless HMAC-signed token auth, JSON over HTTPS
+  Server:       Apache (XAMPP locally) — http://localhost/ManageMo/
 
 ================================================================================
-KNOWN LIMITATIONS (MOCK MODE)
+KNOWN LIMITATIONS / OPERATIONAL NOTES
 ================================================================================
 
-  - All data mutations (approve, submit, deliver, etc.) are NOT persisted
-    between page loads except for department/campus additions which write to
-    config/departments_custom.json.
-  - Session flash messages confirm actions visually, but underlying PHP arrays
-    reset on each request.
-  - Email delivery requires a working PHP mail() / SMTP configuration.
-  - QR scanner requires HTTPS or localhost for camera access (browser security).
+  - Inventory items cannot be deleted from the admin UI by design (Module 2) —
+    use Condemnation & Disposal to retire an item instead.
+  - Custom item requests submitted BEFORE the service_description fallback was
+    added have no recoverable name (it was never persisted anywhere) and will
+    still show "N/A"/"Custom Request". New submissions do not have this issue.
+  - Email delivery (approval/out-for-delivery notices) requires a working PHP
+    mail() / SMTP configuration — not verified/configured in this environment.
+  - QR scanning in the mobile app requires camera permission and a physical/
+    emulated camera; the emulator's virtual camera can scan codes shown on
+    another screen or via its "extended controls" camera image injection.
+  - SECURITY: the Flutter app embeds the Supabase service_role key directly
+    (see Module 13) — this is a known, explicitly-accepted risk for the
+    current trusted/internal deployment, not an oversight. Revisit before any
+    wider distribution of the app.
+  - config/mock_data.php is legacy/dead code — no longer referenced anywhere;
+    kept only as a historical reference for the original data shape.
 
 ================================================================================

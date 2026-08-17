@@ -10,7 +10,29 @@
       "Bash(/c/xampp/php/php.exe -l user/my-requests.php)",
       "Bash(/c/xampp/php/php.exe -l user/inventory.php)",
       "Bash(/c/xampp/php/php.exe -l user/borrow-records.php)",
-      "Bash(/c/xampp/php/php.exe -l admin/inventory.php)"
+      "Bash(/c/xampp/php/php.exe -l admin/inventory.php)",
+      "Bash(/c/xampp/php/php.exe -r 'echo bin2hex\\(random_bytes\\(32\\)\\);')",
+      "Bash(curl -s -X POST http://localhost/ManageMo/api/login.php -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s -X GET http://localhost/ManageMo/api/login.php)",
+      "Bash(curl -s -X POST http://localhost/ManageMo/api/confirm_delivery.php -H \"Content-Type: application/json\" -d '{\"qr_code_id\":\"QR-TEST\"}')",
+      "Bash(curl -s http://localhost/ManageMo/api/pending_deliveries.php)",
+      "Bash(/c/xampp/php/php.exe -d display_errors=0 -r ' *)",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost/ManageMo/api/pending_deliveries.php -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(rm -f /tmp/token.txt)",
+      "Bash(flutter create *)",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter test *)",
+      "Bash(flutter doctor *)",
+      "Bash(flutter build *)",
+      "Bash(grep -o '\"[a-zA-Z0-9._-]*\\\\.[a-zA-Z]\\\\{2,\\\\}\"' \"c:/xampp/htdocs/ManageMo/.ftp-deploy-sync-state.json\")",
+      "Bash(/c/xampp/php/php.exe -r 'echo password_hash\\(\"TestPass123!\", PASSWORD_BCRYPT\\);')",
+      "Bash(mkdir -p \"/c/Users/guiri/AppData/Local/Temp/claude/c--xampp-htdocs-ManageMo/a4c55193-a9e6-4e7c-a77a-5aa98fbd2664/scratchpad\")",
+      "Bash(mv \"c:/xampp/htdocs/ManageMo/scratch_erd_dfd.html\" \"/c/Users/guiri/AppData/Local/Temp/claude/c--xampp-htdocs-ManageMo/a4c55193-a9e6-4e7c-a77a-5aa98fbd2664/scratchpad/erd-dfd.html\")",
+      "Read(//c/Users/guiri/AppData/Local/Temp/claude/c--xampp-htdocs-ManageMo/a4c55193-a9e6-4e7c-a77a-5aa98fbd2664/scratchpad/**)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}, %{size_download} bytes\\\\n\" http://localhost/ManageMo/ERD_DFD.html)",
+      "Bash(grep -c '^```' \"c:/xampp/htdocs/ManageMo/ERD_DFD.md\")"
     ]
   }
 }

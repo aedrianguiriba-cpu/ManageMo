@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ManageMo — ERD &amp; DFD</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+
+<style>
+  :root{
+    --bg:#EEF0F3;
+    --surface:#FFFFFF;
+    --surface-2:#F7F8FA;
+    --ink:#171A21;
+    --ink-2:#545B68;
+    --ink-3:#8991A0;
+    --line:#DADFE6;
+    --accent:#8B0000;
+    --accent-ink:#FFFFFF;
+    --accent-soft:rgba(139,0,0,0.08);
+
+    /* Blueprint sheet — a single deliberate visual world for the diagrams,
+       independent of page light/dark mode (see artifact-design rationale). */
+    --blue-bg:#0E3A5F;
+    --blue-bg-2:#0A2E4D;
+    --blue-line:rgba(198,228,247,0.16);
+    --blue-line-strong:rgba(198,228,247,0.34);
+    --blue-ink:#E7F3FB;
+    --blue-amber:#F2B84B;
+    --blue-stamp:#FF7A63;
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#14161B;
+      --surface:#1B1E25;
+      --surface-2:#21252C;
+      --ink:#EDEFF3;
+      --ink-2:#A7AEBB;
+      --ink-3:#6C7280;
+      --line:#2C313B;
+      --accent:#D2635F;
+      --accent-ink:#1A1D23;
+      --accent-soft:rgba(210,99,95,0.16);
+    }
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:48px 28px 96px; }
+
+  .mono{
+    font-family:ui-monospace,SFMono-Regular,"Cascadia Code",Consolas,"Liberation Mono",monospace;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ── Masthead ── */
+  .masthead{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    gap:32px; flex-wrap:wrap;
+    padding-bottom:32px; margin-bottom:40px;
+    border-bottom:3px solid var(--ink);
+  }
+  .masthead-text{ max-width:640px; }
+  .eyebrow{
+    font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 10px;
+  }
+  h1{
+    font-size:clamp(26px,4vw,38px); font-weight:800; letter-spacing:-0.01em;
+    margin:0 0 12px; text-wrap:balance; color:var(--ink);
+  }
+  .lede{ font-size:15.5px; color:var(--ink-2); margin:0; max-width:58ch; }
+
+  /* ── Title block (engineering-drawing style metadata stamp) ── */
+  .titleblock{
+    flex-shrink:0;
+    border:1.5px solid var(--ink);
+    min-width:250px;
+  }
+  .titleblock-row{
+    display:flex; border-bottom:1px solid var(--ink);
+  }
+  .titleblock-row:last-child{ border-bottom:none; }
+  .titleblock-row .k{
+    width:92px; flex-shrink:0; padding:7px 10px;
+    font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--ink-3); border-right:1px solid var(--line);
+    background:var(--surface-2);
+  }
+  .titleblock-row .v{
+    padding:7px 10px; font-size:12.5px; color:var(--ink); flex:1;
+  }
+
+  /* ── Section ── */
+  section{ margin-top:64px; }
+  .sec-head{
+    display:flex; align-items:baseline; gap:14px; margin-bottom:14px;
+  }
+  .sec-num{
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+    font-size:13px; font-weight:700; color:var(--accent);
+    border:1.5px solid var(--accent); border-radius:3px;
+    padding:1px 7px; flex-shrink:0;
+  }
+  h2{
+    font-size:21px; font-weight:800; margin:0; letter-spacing:-0.005em;
+    color:var(--ink);
+  }
+  .sec-intro{
+    font-size:15px; color:var(--ink-2); max-width:68ch; margin:0 0 22px;
+  }
+  .sec-intro code{
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+    font-size:0.92em; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:4px; padding:0.05em 0.4em; color:var(--ink);
+  }
+
+  /* ── Blueprint diagram sheet ── */
+  .sheet{
+    position:relative;
+    background:
+      linear-gradient(var(--blue-line) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, var(--blue-line) 1px, transparent 1px) 0 0 / 28px 28px,
+      radial-gradient(ellipse at 20% 0%, var(--blue-bg) 0%, var(--blue-bg-2) 100%);
+    border:1px solid var(--blue-line-strong);
+    border-radius:2px;
+    padding:28px 20px 22px;
+    overflow-x:auto;
+    box-shadow:0 1px 2px rgba(0,0,0,0.06), inset 0 0 0 1px rgba(255,255,255,0.02);
+  }
+  .sheet-label{
+    position:absolute; top:10px; left:16px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
+    font-size:10px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--blue-line-strong);
+  }
+  .sheet .mermaid{
+    display:flex; justify-content:center; min-width:640px;
+  }
+
+  /* ── Legend ── */
+  .legend{
+    display:flex; flex-wrap:wrap; gap:10px 22px;
+    margin-top:16px; padding-top:14px; border-top:1px solid var(--line);
+  }
+  .legend-item{
+    display:flex; align-items:center; gap:8px;
+    font-size:12.5px; color:var(--ink-2);
+  }
+  .swatch{ width:20px; height:14px; flex-shrink:0; border:1.5px solid var(--ink-3); }
+  .swatch.circle{ border-radius:50%; width:15px; height:15px; }
+  .swatch.cyl{ border-radius:3px 3px 6px 6px; }
+  .swatch.rect2{ border-width:1.5px; border-style:double; border-width:4px 1.5px; }
+
+  .note{
+    margin-top:14px; font-size:13px; color:var(--ink-3);
+    padding-left:14px; border-left:2px solid var(--line);
+  }
+
+  footer{
+    margin-top:72px; padding-top:20px; border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--ink-3); display:flex; justify-content:space-between;
+    flex-wrap:wrap; gap:8px;
+  }
+
+  @media (max-width:640px){
+    .masthead{ flex-direction:column; }
+    .titleblock{ width:100%; }
+  }
+
+  @media print{
+    body{ background:#fff; }
+    .sheet{ break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div class="masthead-text">
+      <p class="eyebrow">System Schematics</p>
+      <h1>ManageMo — Entity Relationship &amp; Data Flow Diagrams</h1>
+      <p class="lede">
+        The full data model and information flow for the inventory &amp; asset
+        management system — web app (PHP + Supabase/Postgres) and the
+        companion Flutter delivery-scanner app.
+      </p>
+    </div>
+    <div class="titleblock mono">
+      <div class="titleblock-row"><div class="k">Project</div><div class="v">ManageMo</div></div>
+      <div class="titleblock-row"><div class="k">Client</div><div class="v">Pampanga State Univ.</div></div>
+      <div class="titleblock-row"><div class="k">Rev</div><div class="v">2.0.0</div></div>
+      <div class="titleblock-row"><div class="k">Sheets</div><div class="v">1–3 · ERD / DFD / Flowchart</div></div>
+      <div class="titleblock-row"><div class="k">Source</div><div class="v">database/schema.sql</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SHEET 1 — ERD ═══════════════ -->
+  <section id="erd">
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>Entity Relationship Diagram</h2>
+    </div>
+    <p class="sec-intro">
+      The seven live tables in the Supabase database. <code>request_items</code>
+      is defined in <code>schema.sql</code> but does not exist in the running
+      database (confirmed by a direct query) — it's dead code, so it's excluded
+      here. Departments' two dashed lines are not real foreign keys: <code>college_id</code>
+      on Users and Inventory is a free-text abbreviation (e.g. <code>"CCS"</code>)
+      matched against <code>Departments.abbreviation</code> in application code
+      (<code>getMainCampusColleges()</code>), with no DB constraint enforcing it.
+    </p>
+
+    <div class="sheet">
+      <span class="sheet-label">Sheet 01 / Schema</span>
+      <pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#123E63',
+  'primaryBorderColor':'#8FD1EF',
+  'primaryTextColor':'#EAF6FD',
+  'lineColor':'#8FD1EF',
+  'tertiaryColor':'#0E3A5F',
+  'fontFamily':'ui-monospace, SFMono-Regular, Consolas, monospace',
+  'fontSize':'13px'
+}, 'er': {'entityPadding':18, 'minEntityWidth':160}}}%%
+erDiagram
+    CAMPUSES ||--o{ USERS : "based at"
+    CAMPUSES ||--o{ INVENTORY : "located at"
+    CAMPUSES ||--o{ USER_OWNED_ITEMS : "located at"
+    USERS ||--o{ REQUESTS : "submits"
+    USERS ||--o{ BORROW_RECORDS : "borrows as"
+    USERS ||--o{ USER_OWNED_ITEMS : "owns"
+    INVENTORY ||--o{ REQUESTS : "requested item"
+    INVENTORY ||--o{ BORROW_RECORDS : "borrowed unit"
+    REQUESTS ||--o| BORROW_RECORDS : "fulfilled by"
+    DEPARTMENTS |o..o{ USERS : "college_id ↔ abbreviation (soft match, no FK)"
+    DEPARTMENTS |o..o{ INVENTORY : "college_id ↔ abbreviation (soft match, no FK)"
+
+    USERS {
+        bigint id PK
+        text email UK
+        text password
+        text full_name
+        text role
+        int campus_id FK
+        text college_id
+        text phone
+        int is_active
+    }
+    INVENTORY {
+        bigint id PK
+        text qr_code_id UK
+        text item_name
+        text category
+        int campus_id FK
+        text college_id
+        int quantity
+        text status
+        text condition
+        text condemnation_reason
+        text group_id
+    }
+    REQUESTS {
+        bigint id PK
+        text request_number UK
+        int user_id FK
+        int inventory_id FK
+        text group_id
+        text qr_code_id
+        text request_type
+        text urgency
+        text status
+        text delivery_status
+        int approved_by FK
+        date expected_return_date
+    }
+    BORROW_RECORDS {
+        bigint id PK
+        int user_id FK
+        int inventory_id FK
+        int request_id FK
+        date borrow_date
+        date expected_return_date
+        date actual_return_date
+        text status
+    }
+    USER_OWNED_ITEMS {
+        bigint id PK
+        text qr_code_id UK
+        int user_id FK
+        text item_name
+        text category
+        int campus_id FK
+        text condition
+        text group_id
+    }
+    CAMPUSES {
+        bigint id PK
+        text name
+        text location
+        boolean is_default
+    }
+    DEPARTMENTS {
+        bigint id PK
+        text type
+        text abbreviation UK
+        text full_name
+        boolean is_default
+    }
+      </pre>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="mono">PK</span> — primary key</div>
+      <div class="legend-item"><span class="mono">FK</span> — foreign key</div>
+      <div class="legend-item"><span class="mono">UK</span> — unique key</div>
+      <div class="legend-item"><span class="mono">||--o{</span> — one‑to‑many, "many" side optional</div>
+      <div class="legend-item"><span class="mono">||--o|</span> — one‑to‑zero‑or‑one</div>
+      <div class="legend-item">dashed line — logical/soft reference, not a DB‑enforced foreign key</div>
+    </div>
+    <p class="note">
+      <code>REQUESTS.inventory_id</code> is nullable — a submitted "Item"
+      request with no catalog match has no inventory row until an admin
+      approves it (custom items only get counted in inventory on approval).
+      <code>REQUESTS.approved_by</code> is also a foreign key back to Users
+      (the reviewing admin) — its relationship line is omitted above since
+      Users↔Requests is already drawn once; the FK is still listed in the
+      Requests attribute box.
+    </p>
+  </section>
+
+  <!-- ═══════════════ SHEET 2 — DFD ═══════════════ -->
+  <section id="dfd">
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>Data Flow Diagram — Level 1</h2>
+    </div>
+    <p class="sec-intro">
+      How a request moves through the system end to end — from submission,
+      through admin review and dispatch, to delivery confirmation by either
+      an admin clicking "Mark Delivered" or the requester scanning the item's
+      QR code in the mobile app.
+    </p>
+
+    <div class="sheet">
+      <span class="sheet-label">Sheet 02 / Process Flow</span>
+      <pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#123E63',
+  'primaryBorderColor':'#8FD1EF',
+  'primaryTextColor':'#EAF6FD',
+  'lineColor':'#8FD1EF',
+  'tertiaryColor':'#0E3A5F',
+  'fontFamily':'ui-monospace, SFMono-Regular, Consolas, monospace',
+  'fontSize':'13px'
+}, 'flowchart': {'curve':'linear', 'nodeSpacing':38, 'rankSpacing':70}}}%%
+flowchart LR
+    REQ[["Requester<br/>(User role)"]]
+    ADM[["Admin /<br/>Custodian"]]
+    EMAIL[["Email / SMTP<br/>(external)"]]
+
+    nAuth(("1.0<br/>Authenticate"))
+    nSubmit(("2.0<br/>Submit<br/>Request"))
+    nApprove(("3.0<br/>Review &amp;<br/>Approve"))
+    nDeliver(("4.0<br/>Dispatch &amp;<br/>Confirm Delivery"))
+    nInventory(("5.0<br/>Manage &amp;<br/>Retire Inventory"))
+    nReports(("6.0<br/>Analytics &amp;<br/>Reports"))
+
+    D1[(D1 · Users)]
+    D2[(D2 · Inventory)]
+    D3[(D3 · Requests)]
+    D4[(D4 · Borrow<br/>Records)]
+    D5[(D5 · Campuses /<br/>Departments)]
+
+    REQ --> nAuth
+    ADM --> nAuth
+    nAuth <-->|verify| D1
+
+    REQ -->|"borrow / item / service"| nSubmit
+    nSubmit <-->|"check + reserve unit"| D2
+    nSubmit --> D3
+
+    ADM -->|"approve / disapprove"| nApprove
+    nApprove <--> D3
+    nApprove -->|"create row<br/>(custom item)"| D2
+    nApprove --> EMAIL
+    EMAIL -.->|delivery email| REQ
+
+    ADM -->|"mark delivered"| nDeliver
+    REQ -->|"scan QR<br/>(mobile app)"| nDeliver
+    nDeliver <--> D3
+    nDeliver --> D2
+    nDeliver --> D4
+
+    ADM -->|"add / edit /<br/>condemn / dispose"| nInventory
+    nInventory <--> D2
+    nInventory --> D5
+
+    ADM --> nReports
+    D2 -.-> nReports
+    D3 -.-> nReports
+    D4 -.-> nReports
+    D5 -.-> nReports
+    nReports -->|"charts &amp; KPIs"| ADM
+      </pre>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch rect2"></span>External entity — a person or system outside ManageMo</div>
+      <div class="legend-item"><span class="swatch circle"></span>Process — a numbered transformation of data</div>
+      <div class="legend-item"><span class="swatch cyl"></span>Data store — a table at rest</div>
+      <div class="legend-item">— solid line — write / read‑write flow · ···· dotted line — read‑only flow</div>
+    </div>
+    <p class="note">
+      Process 4.0 is the one place the web app and mobile app converge: both
+      "Mark Delivered" (admin) and a QR scan (requester, per unit) run the
+      identical delivery-confirmation logic against the same Requests /
+      Inventory / Borrow Records stores. Dotted lines mark read-only flows
+      (Process 6.0 reading each store for dashboards; the email notice, which
+      leaves the system rather than writing to a store).
+    </p>
+  </section>
+
+  <!-- ═══════════════ SHEET 3 — FLOWCHART ═══════════════ -->
+  <section id="flowchart">
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>Request Lifecycle Flowchart</h2>
+    </div>
+    <p class="sec-intro">
+      Unlike the DFD (data moving between processes and stores), this is the
+      actual step-by-step path a single request takes, including its two
+      real decision points: does the admin approve it, and is it a borrow
+      request (continues as an active loan) versus an item/service request
+      (ends at "Delivered").
+    </p>
+
+    <div class="sheet">
+      <span class="sheet-label">Sheet 03 / Lifecycle</span>
+      <pre class="mermaid">
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#123E63',
+  'primaryBorderColor':'#8FD1EF',
+  'primaryTextColor':'#EAF6FD',
+  'lineColor':'#8FD1EF',
+  'tertiaryColor':'#0E3A5F',
+  'fontFamily':'ui-monospace, SFMono-Regular, Consolas, monospace',
+  'fontSize':'13px'
+}}}%%
+flowchart TD
+    START(["Start: user wants to borrow, request,<br/>or receive service on an item"])
+    A["Log in"]
+    B["Choose request type:<br/>Borrow, Item, or Service"]
+    C["Fill out and submit request"]
+    D{"Admin approves?"}
+    E["Status: Disapproved"]
+    ENDA(["End"])
+    F["Status: Approved"]
+    G["Admin marks<br/>Out for Delivery"]
+    H["Confirm delivery: requester scans QR,<br/>or admin marks delivered"]
+    J{"Request type<br/>is Borrow?"}
+    K["Create borrow record;<br/>inventory unit set to Borrowed"]
+    ENDBORROW(["End: item borrowed<br/>(see Borrow Status Flow for return)"])
+    L["Status: Delivered"]
+    ENDDONE(["End"])
+
+    START --> A --> B --> C --> D
+    D -- No --> E --> ENDA
+    D -- Yes --> F --> G --> H --> J
+    J -- Yes --> K --> ENDBORROW
+    J -- No --> L --> ENDDONE
+      </pre>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="border-radius:8px;"></span>Start / End terminator</div>
+      <div class="legend-item"><span class="swatch"></span>A step or state change</div>
+      <div class="legend-item"><span class="swatch" style="transform:rotate(45deg);width:14px;height:14px;"></span>Decision — exactly one branch taken</div>
+    </div>
+    <p class="note">
+      Reaching "End: item borrowed" isn't the end of that unit's story — it
+      later moves through <code>active → returned</code> or
+      <code>active → overdue</code>, tracked separately in Borrow Records
+      (see the Borrow Status Flow in <code>SYSTEM_DOCUMENTATION.txt</code>).
+      This flowchart stops there to keep the request-submission path
+      readable on its own.
+    </p>
+  </section>
+
+  <footer>
+    <span>Generated from the live schema + current application logic, not a static spec.</span>
+    <span class="mono">ManageMo v2.0.0</span>
+  </footer>
+
+</div>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, securityLevel: 'loose' });
+</script>
+</body>
+</html>

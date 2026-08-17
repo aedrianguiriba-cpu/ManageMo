@@ -5,10 +5,23 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
-    
+
     # Force HTTPS (optional, uncomment if your server supports it)
     # RewriteCond %{HTTPS} off
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Some Apache/PHP setups strip the Authorization header before it reaches PHP.
+    # This re-exposes it as HTTP_AUTHORIZATION for the mobile API under /api/.
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+</IfModule>
+
+# Same intent, for CGI/FastCGI PHP setups
+<IfModule mod_cgi.c>
+    CGIPassAuth On
+</IfModule>
+<IfModule mod_fcgid.c>
+    CGIPassAuth On
 </IfModule>
 
 # Set BASE_URL to root (for InfinityFree)
