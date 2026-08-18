@@ -1,7 +1,7 @@
 {
     "description": "DO NOT DELETE THIS FILE. This file is used to keep track of which files have been synced in the most recent deployment. If you delete this file a resync will need to be done (which can take a while) - read more: https://github.com/SamKirkland/FTP-Deploy-Action",
     "version": "1.0.0",
-    "generatedTime": 1787013918282,
+    "generatedTime": 1787014109474,
     "data": [
         {
             "type": "folder",
@@ -17,7 +17,7 @@
             "type": "file",
             "name": ".ftp-deploy-sync-state.json",
             "size": 49025,
-            "hash": "3b1a0192424a17c10250e8f9fb888bbf59ef420483ce5edb3b08d24faa705952"
+            "hash": "53b075158dec9571a128972799c772bc8abf853722507c3a68255253b19f1b3b"
         },
         {
             "type": "file",
@@ -93,11 +93,11 @@
         },
         {
             "type": "folder",
-            "name": "api"
+            "name": "admin"
         },
         {
             "type": "folder",
-            "name": "admin"
+            "name": "api"
         },
         {
             "type": "folder",
@@ -118,30 +118,24 @@
             "name": "css"
         },
         {
-            "type": "folder",
-            "name": "database"
-        },
-        {
             "type": "file",
             "name": "debug.php",
             "size": 24810,
             "hash": "292a8107c3810727845a6c88b40649c72abd49ffeec9b816230fc9ece1b058c9"
         },
         {
-            "type": "file",
-            "name": "forgot-password.php",
-            "size": 13413,
-            "hash": "92199e32692a5bcf4339f3aab530d3995ef5271fda8d1fb2015cd16f87b86008"
-        },
-        {
             "type": "folder",
-            "name": "includes"
+            "name": "database"
         },
         {
             "type": "file",
             "name": "index.php",
             "size": 16656,
             "hash": "64492f25a7a0499ae88d49d3b70eff7aa174ea17ec68fab960f6735ac7fa1329"
+        },
+        {
+            "type": "folder",
+            "name": "includes"
         },
         {
             "type": "file",
@@ -152,6 +146,12 @@
         {
             "type": "folder",
             "name": "js"
+        },
+        {
+            "type": "file",
+            "name": "forgot-password.php",
+            "size": 13413,
+            "hash": "92199e32692a5bcf4339f3aab530d3995ef5271fda8d1fb2015cd16f87b86008"
         },
         {
             "type": "folder",
@@ -233,7 +233,7 @@
             "type": "file",
             "name": ".git/FETCH_HEAD",
             "size": 217,
-            "hash": "8048aebdd81fb057ab985f8c7396e50bb41486f9116fde29a7683091d498aa88"
+            "hash": "fbc205e78248510f9a35969c609714052bce2ec6205f9e84d86d527913d2a413"
         },
         {
             "type": "file",
@@ -243,29 +243,29 @@
         },
         {
             "type": "file",
+            "name": ".git/config",
+            "size": 872,
+            "hash": "b9e222198db7966a45036af248e4624655c43e9d731e78054095ad20d9ddfb2e"
+        },
+        {
+            "type": "file",
             "name": ".git/description",
             "size": 73,
             "hash": "85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
         },
         {
-            "type": "file",
-            "name": ".git/config",
-            "size": 872,
-            "hash": "21f3b3f58d781b11a0cdc481bbabfdcb1e3a917123c6d73f5c1c8c54e796cc81"
+            "type": "folder",
+            "name": ".git/hooks"
         },
         {
             "type": "file",
             "name": ".git/index",
             "size": 18416,
-            "hash": "389d7e79889989f36313acf1d81a03e7d7247912a4e00ec3da7dfcbcaea91291"
+            "hash": "1668381c43634a42816830982752506ed220f581a362734e06f2b46e34bb1a68"
         },
         {
             "type": "folder",
             "name": ".git/info"
-        },
-        {
-            "type": "folder",
-            "name": ".git/hooks"
         },
         {
             "type": "folder",
@@ -285,57 +285,21 @@
         },
         {
             "type": "file",
-            "name": "api/_bootstrap.php",
-            "size": 3176,
-            "hash": "7eeb1a4a44bc22ff3c099d3ba7d2176b6ec0ff43b8968bd7cb2f964d3d465bf6"
-        },
-        {
-            "type": "file",
-            "name": "api/confirm_delivery.php",
-            "size": 2531,
-            "hash": "3aef98b4231b6da16b0616d4fc0ae4c96121759dfd18c46c22a0569814912018"
-        },
-        {
-            "type": "file",
-            "name": "api/login.php",
-            "size": 909,
-            "hash": "2365247aa6d2d3d9a80f13616bc49446b49c5d9dd97c4a24edcc66b06aeaa151"
-        },
-        {
-            "type": "file",
-            "name": "api/me.php",
-            "size": 411,
-            "hash": "185131ae6dddb7faf6d2dd6b209d1bf1526eac9d3c8858d3ad4cec190e1efccf"
-        },
-        {
-            "type": "file",
-            "name": "api/notify_delivered.php",
-            "size": 2058,
-            "hash": "33e738e05d9af2cc0b6f6b34fc2ef8d90ae81d939db9e5deaf9d5e88161600a7"
-        },
-        {
-            "type": "file",
-            "name": "api/pending_deliveries.php",
-            "size": 1320,
-            "hash": "db3c5643813eb1d1653bbc2dc66207061b654e1a5d0d326ec028d65d7b39a8d5"
-        },
-        {
-            "type": "file",
             "name": "admin/analytics.php",
             "size": 18314,
             "hash": "b2b397d4c2074ca60a246ef2d4cb9d3f16fb7c25cb40af8ca0bceca888332656"
         },
         {
             "type": "file",
-            "name": "admin/campus-detail.php",
-            "size": 13860,
-            "hash": "294b0950081cb29cd899f6f8dec352709bd822b95d3449772ce8dda0dee8b370"
-        },
-        {
-            "type": "file",
             "name": "admin/backfill-owned-items.php",
             "size": 9055,
             "hash": "45a864ac784b9cdfaea328925dea7a8f5e60db912d5e9cf02305802a7d1fcdd7"
+        },
+        {
+            "type": "file",
+            "name": "admin/campus-detail.php",
+            "size": 13860,
+            "hash": "294b0950081cb29cd899f6f8dec352709bd822b95d3449772ce8dda0dee8b370"
         },
         {
             "type": "file",
@@ -357,15 +321,15 @@
         },
         {
             "type": "file",
-            "name": "admin/inventory.php",
-            "size": 87944,
-            "hash": "ff9072cc9903644dbc97c44b7ee6af1c8a0abddd5c21aaa829634b72527e5b79"
-        },
-        {
-            "type": "file",
             "name": "admin/reports.php",
             "size": 35379,
             "hash": "102e09b951efdf4212697836d0433bfd88ba05a49202440d203e8d071c515e02"
+        },
+        {
+            "type": "file",
+            "name": "admin/inventory.php",
+            "size": 87944,
+            "hash": "ff9072cc9903644dbc97c44b7ee6af1c8a0abddd5c21aaa829634b72527e5b79"
         },
         {
             "type": "file",
@@ -380,14 +344,50 @@
             "hash": "a2c35bff4aeb7e86566dae01851b7053f51ed8b495455d7f19d5f34b2b733dd8"
         },
         {
-            "type": "folder",
-            "name": "assets/pics"
-        },
-        {
             "type": "file",
             "name": "admin/users.php",
             "size": 38155,
             "hash": "8d0172855596f7a485f7374d05681bb5dc51d020534f5d54e5559ed899f2696f"
+        },
+        {
+            "type": "file",
+            "name": "api/_bootstrap.php",
+            "size": 3176,
+            "hash": "7eeb1a4a44bc22ff3c099d3ba7d2176b6ec0ff43b8968bd7cb2f964d3d465bf6"
+        },
+        {
+            "type": "file",
+            "name": "api/confirm_delivery.php",
+            "size": 2531,
+            "hash": "3aef98b4231b6da16b0616d4fc0ae4c96121759dfd18c46c22a0569814912018"
+        },
+        {
+            "type": "file",
+            "name": "api/me.php",
+            "size": 411,
+            "hash": "185131ae6dddb7faf6d2dd6b209d1bf1526eac9d3c8858d3ad4cec190e1efccf"
+        },
+        {
+            "type": "file",
+            "name": "api/login.php",
+            "size": 909,
+            "hash": "2365247aa6d2d3d9a80f13616bc49446b49c5d9dd97c4a24edcc66b06aeaa151"
+        },
+        {
+            "type": "file",
+            "name": "api/notify_delivered.php",
+            "size": 2058,
+            "hash": "33e738e05d9af2cc0b6f6b34fc2ef8d90ae81d939db9e5deaf9d5e88161600a7"
+        },
+        {
+            "type": "file",
+            "name": "api/pending_deliveries.php",
+            "size": 1320,
+            "hash": "db3c5643813eb1d1653bbc2dc66207061b654e1a5d0d326ec028d65d7b39a8d5"
+        },
+        {
+            "type": "folder",
+            "name": "assets/pics"
         },
         {
             "type": "folder",
@@ -528,14 +528,14 @@
             "name": "mobile_app/assets"
         },
         {
-            "type": "folder",
-            "name": "mobile_app/ios"
-        },
-        {
             "type": "file",
             "name": "mobile_app/devtools_options.yaml",
             "size": 184,
             "hash": "e8ba6877169885107d577db47d3e9eb10b32b7aded5959dfc52cae8022a5de84"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/ios"
         },
         {
             "type": "folder",
@@ -590,20 +590,14 @@
         {
             "type": "file",
             "name": "user/requests.php",
-            "size": 104019,
-            "hash": "fd24d59746ed8fbc1be9140b8d22956efad65d54a55c8eb482d06b872797f5ab"
+            "size": 104263,
+            "hash": "a0beb5335cd8cac5aebd64c61bc0d0c29d55b49341ebcbeb0c580bc383f059c0"
         },
         {
             "type": "file",
             "name": "user/settings.php",
             "size": 23868,
             "hash": "a52e98fcd00ddc17bde79186fe1ad147b5d4dda1997ea3dfb40d03ee14e38175"
-        },
-        {
-            "type": "file",
-            "name": ".git/info/exclude",
-            "size": 240,
-            "hash": "6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
         },
         {
             "type": "file",
@@ -649,15 +643,15 @@
         },
         {
             "type": "file",
-            "name": ".git/hooks/pre-push.sample",
-            "size": 1374,
-            "hash": "ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
-        },
-        {
-            "type": "file",
             "name": ".git/hooks/pre-rebase.sample",
             "size": 4898,
             "hash": "4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+        },
+        {
+            "type": "file",
+            "name": ".git/hooks/pre-push.sample",
+            "size": 1374,
+            "hash": "ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
         },
         {
             "type": "file",
@@ -691,9 +685,15 @@
         },
         {
             "type": "file",
+            "name": ".git/info/exclude",
+            "size": 240,
+            "hash": "6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+        },
+        {
+            "type": "file",
             "name": ".git/logs/HEAD",
             "size": 218,
-            "hash": "36da56dddb91cbc6d049bd5c7c1f71a220e936932b958a7358d6c141bd38bb40"
+            "hash": "9afe20413d2b388b4933c3a9e4d9b154b2b901b6ee5d8e52a03e0e2f9080b6d3"
         },
         {
             "type": "folder",
@@ -752,10 +752,6 @@
             "hash": "6a26dba2cb8dfba1e74f540b0d17a89d96c1301d3c3bfda14348bed257fddcba"
         },
         {
-            "type": "folder",
-            "name": "mobile_app/android/gradle"
-        },
-        {
             "type": "file",
             "name": "mobile_app/android/gradle.properties",
             "size": 138,
@@ -770,6 +766,10 @@
         {
             "type": "folder",
             "name": "mobile_app/assets/images"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/gradle"
         },
         {
             "type": "folder",
@@ -799,10 +799,6 @@
         },
         {
             "type": "folder",
-            "name": "mobile_app/lib/screens"
-        },
-        {
-            "type": "folder",
             "name": "mobile_app/lib/services"
         },
         {
@@ -813,7 +809,7 @@
         },
         {
             "type": "folder",
-            "name": "mobile_app/lib/widgets"
+            "name": "mobile_app/lib/screens"
         },
         {
             "type": "file",
@@ -823,7 +819,7 @@
         },
         {
             "type": "folder",
-            "name": ".git/logs/refs/heads"
+            "name": "mobile_app/lib/widgets"
         },
         {
             "type": "folder",
@@ -831,31 +827,35 @@
         },
         {
             "type": "folder",
+            "name": ".git/logs/refs/heads"
+        },
+        {
+            "type": "file",
+            "name": ".git/objects/pack/pack-d9dbed345af4a9f868b2483cd02b31da97c7ef60.idx",
+            "size": 29996,
+            "hash": "2642e280446d144d6961e5378f03d980b28fdb6c9b80d4b3e159c74c3b695062"
+        },
+        {
+            "type": "file",
+            "name": ".git/objects/pack/pack-d9dbed345af4a9f868b2483cd02b31da97c7ef60.pack",
+            "size": 1288618,
+            "hash": "88d472fe280c2794427d0c63a357797e1ebd580c1b594deb976835cbdf687085"
+        },
+        {
+            "type": "file",
+            "name": ".git/objects/pack/pack-d9dbed345af4a9f868b2483cd02b31da97c7ef60.rev",
+            "size": 4184,
+            "hash": "58ffc3ede92ac98121a1a4dfc4fb2ec00cfa007594ad3f146bb0c2b4e1aee678"
+        },
+        {
+            "type": "folder",
             "name": ".git/objects/info/commit-graphs"
-        },
-        {
-            "type": "file",
-            "name": ".git/objects/pack/pack-55674e36c7ff71f585e1b9a4d8b8a93800ef2bf3.idx",
-            "size": 29744,
-            "hash": "f7389a542577e452285f14fbaf0fd76f881c0310cbabc75879ab25f02e74d8c7"
-        },
-        {
-            "type": "file",
-            "name": ".git/objects/pack/pack-55674e36c7ff71f585e1b9a4d8b8a93800ef2bf3.rev",
-            "size": 4148,
-            "hash": "bb4f6adcef61c032f502996abae3cdfe8e2cc224c77c092df10137f6696a2b7a"
-        },
-        {
-            "type": "file",
-            "name": ".git/objects/pack/pack-55674e36c7ff71f585e1b9a4d8b8a93800ef2bf3.pack",
-            "size": 1287715,
-            "hash": "f8a36d0c43db408edc76de05ab43782541e60a08def33d75b4d766fc9971e0c1"
         },
         {
             "type": "file",
             "name": ".git/refs/heads/main",
             "size": 41,
-            "hash": "0e4a50256ebec907f2c2b1319f1cbf5d42661f99afea5ef77211022b55315456"
+            "hash": "44dc6f3cbc2ec00349fdc1f14929614bdc87506ec06a87bd5d6ebd9ee62d1076"
         },
         {
             "type": "folder",
@@ -969,36 +969,6 @@
         },
         {
             "type": "file",
-            "name": "mobile_app/lib/screens/dashboard_screen.dart",
-            "size": 8754,
-            "hash": "b7d40ac7503299239a7babbd308316313f9e240e54ade6e5525e43ccf3e27310"
-        },
-        {
-            "type": "file",
-            "name": "mobile_app/lib/screens/home_screen.dart",
-            "size": 3573,
-            "hash": "c69082da6db89f847c48d0565b8602be0c4bc7e239713e1a4f047247fd81483d"
-        },
-        {
-            "type": "file",
-            "name": "mobile_app/lib/screens/login_screen.dart",
-            "size": 7439,
-            "hash": "91fee96147cdc5f23914a524194fbd772808f820cdcac677813e5dc253c4cd6f"
-        },
-        {
-            "type": "file",
-            "name": "mobile_app/lib/screens/requests_tab.dart",
-            "size": 7661,
-            "hash": "c9b7a70359b082c5f09872aec8440855d13aa64652824138933b98e0508d39f7"
-        },
-        {
-            "type": "file",
-            "name": "mobile_app/lib/screens/scanner_screen.dart",
-            "size": 14791,
-            "hash": "b631dc574add3bd753754666efddb739806b1f98196523b8c8a521bb17f1a711"
-        },
-        {
-            "type": "file",
             "name": "mobile_app/lib/services/api_client.dart",
             "size": 12291,
             "hash": "753753b766829c68aa83afc80ffb633a45f9f7bd604c434749dec21dd3a4768e"
@@ -1023,15 +993,39 @@
         },
         {
             "type": "file",
-            "name": "mobile_app/lib/widgets/app_header.dart",
-            "size": 4370,
-            "hash": "f01484efa93cba6abd77924d0b6f81fcbf5c625b767b775d702300bcb2744baf"
+            "name": "mobile_app/lib/screens/home_screen.dart",
+            "size": 3573,
+            "hash": "c69082da6db89f847c48d0565b8602be0c4bc7e239713e1a4f047247fd81483d"
         },
         {
             "type": "file",
-            "name": ".git/logs/refs/heads/main",
-            "size": 227,
-            "hash": "916423b2eb0cb694d88f4ec5be5c2839f0e91f21640308fc1276d58da4a1d471"
+            "name": "mobile_app/lib/screens/dashboard_screen.dart",
+            "size": 8754,
+            "hash": "b7d40ac7503299239a7babbd308316313f9e240e54ade6e5525e43ccf3e27310"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/screens/login_screen.dart",
+            "size": 7439,
+            "hash": "91fee96147cdc5f23914a524194fbd772808f820cdcac677813e5dc253c4cd6f"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/screens/requests_tab.dart",
+            "size": 7661,
+            "hash": "c9b7a70359b082c5f09872aec8440855d13aa64652824138933b98e0508d39f7"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/screens/scanner_screen.dart",
+            "size": 14791,
+            "hash": "b631dc574add3bd753754666efddb739806b1f98196523b8c8a521bb17f1a711"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/lib/widgets/app_header.dart",
+            "size": 4370,
+            "hash": "f01484efa93cba6abd77924d0b6f81fcbf5c625b767b775d702300bcb2744baf"
         },
         {
             "type": "folder",
@@ -1039,15 +1033,21 @@
         },
         {
             "type": "file",
-            "name": ".git/objects/info/commit-graphs/commit-graph-chain",
-            "size": 41,
-            "hash": "3a849bf9863604254fe2e7e2eee56e6437673460de668a7ca9e60660722149fb"
+            "name": ".git/logs/refs/heads/main",
+            "size": 227,
+            "hash": "9e6838d4970c45f1201a2af380d624f1f6b62b1ac0afd68c62504145b793b5cb"
         },
         {
             "type": "file",
-            "name": ".git/objects/info/commit-graphs/graph-8141094250edb80d261bdf19c49f74957f7c0f4e.graph",
-            "size": 13172,
-            "hash": "02cb864344b6fa5e4282aa269071e13a71799e13b6df7d04c6fe73715adc86b7"
+            "name": ".git/objects/info/commit-graphs/commit-graph-chain",
+            "size": 41,
+            "hash": "b898f05b9a074612e90b6904f53d19e0cb5656a5211b4e23b0cd014844c36dcc"
+        },
+        {
+            "type": "file",
+            "name": ".git/objects/info/commit-graphs/graph-4eaed176de20d4ea123ff8447c0d710670350874.graph",
+            "size": 13352,
+            "hash": "4a8cb1e1bd7db8d105a92d6bae2baba029cabbe161642228313e6a9c508592fd"
         },
         {
             "type": "file",
@@ -1059,7 +1059,7 @@
             "type": "file",
             "name": ".git/refs/remotes/origin/main",
             "size": 41,
-            "hash": "0e4a50256ebec907f2c2b1319f1cbf5d42661f99afea5ef77211022b55315456"
+            "hash": "44dc6f3cbc2ec00349fdc1f14929614bdc87506ec06a87bd5d6ebd9ee62d1076"
         },
         {
             "type": "folder",
@@ -1129,13 +1129,13 @@
             "type": "file",
             "name": ".git/logs/refs/remotes/origin/changes-1",
             "size": 312,
-            "hash": "d9c51391045be295a196c910eec9e4c0d1fef6a791e01bbb2e4d2123733307fd"
+            "hash": "9d7503c9eb09cf6e89670016abf37b77086539397d5760a6b2321fe44aa6905c"
         },
         {
             "type": "file",
             "name": ".git/logs/refs/remotes/origin/main",
             "size": 312,
-            "hash": "bc9a2ddcf48afa407b41b002281f8c75b3b1ecf279da242dbc5b40750a1730aa"
+            "hash": "11c146d3f6fe948e941e469d0af38902ae9be68d8d9d4c01ff9be4a23d744e9d"
         },
         {
             "type": "file",
@@ -1195,15 +1195,15 @@
         },
         {
             "type": "file",
-            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png",
-            "size": 282,
-            "hash": "5dee24dc104ac76dc162e42ae0beb163d426bf365562ee28ba7b3ad368559a60"
-        },
-        {
-            "type": "file",
             "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png",
             "size": 462,
             "hash": "a9b21eb6f4271385655a8771f76e29eef8c1107d7879cbcfc567e6619d1f716a"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png",
+            "size": 282,
+            "hash": "5dee24dc104ac76dc162e42ae0beb163d426bf365562ee28ba7b3ad368559a60"
         },
         {
             "type": "file",
@@ -1285,15 +1285,15 @@
         },
         {
             "type": "file",
-            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md",
-            "size": 336,
-            "hash": "a985b626c4f7546a8ba392d135e9226c3547c8e2b46895f5f2bdf40d7b14ef9f"
-        },
-        {
-            "type": "file",
             "name": "mobile_app/ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
             "size": 238,
             "hash": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md",
+            "size": 336,
+            "hash": "a985b626c4f7546a8ba392d135e9226c3547c8e2b46895f5f2bdf40d7b14ef9f"
         },
         {
             "type": "file",
@@ -1313,11 +1313,11 @@
         },
         {
             "type": "folder",
-            "name": "mobile_app/android/app/src/main/res/drawable-v21"
+            "name": "mobile_app/android/app/src/main/res/drawable"
         },
         {
             "type": "folder",
-            "name": "mobile_app/android/app/src/main/res/drawable"
+            "name": "mobile_app/android/app/src/main/res/drawable-v21"
         },
         {
             "type": "folder",
@@ -1329,19 +1329,19 @@
         },
         {
             "type": "folder",
-            "name": "mobile_app/android/app/src/main/res/mipmap-xhdpi"
-        },
-        {
-            "type": "folder",
             "name": "mobile_app/android/app/src/main/res/mipmap-xxhdpi"
         },
         {
             "type": "folder",
-            "name": "mobile_app/android/app/src/main/res/mipmap-xxxhdpi"
+            "name": "mobile_app/android/app/src/main/res/mipmap-xhdpi"
         },
         {
             "type": "folder",
             "name": "mobile_app/android/app/src/main/res/values"
+        },
+        {
+            "type": "folder",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xxxhdpi"
         },
         {
             "type": "folder",
@@ -1353,15 +1353,15 @@
         },
         {
             "type": "file",
-            "name": "mobile_app/android/app/src/main/res/drawable-v21/launch_background.xml",
-            "size": 438,
-            "hash": "7ca6d5cec2169c5a98661a119db23a6f3399c8fef2256ff04f3a642831282478"
-        },
-        {
-            "type": "file",
             "name": "mobile_app/android/app/src/main/res/drawable/launch_background.xml",
             "size": 434,
             "hash": "94433756fe10005ddd6fc55cc5c0b1e9f3c10b66a08ceac795ece6713d34e28a"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/drawable-v21/launch_background.xml",
+            "size": 438,
+            "hash": "7ca6d5cec2169c5a98661a119db23a6f3399c8fef2256ff04f3a642831282478"
         },
         {
             "type": "file",
@@ -1377,27 +1377,27 @@
         },
         {
             "type": "file",
-            "name": "mobile_app/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
-            "size": 4047,
-            "hash": "0f8676ebd313a4af06b2a950fa563b0ade16ac02c46b8efe47b8d07f172d8521"
-        },
-        {
-            "type": "file",
             "name": "mobile_app/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
             "size": 7737,
             "hash": "1fb209dc2f6d96481ac0a2e64e0e1a7140e86125616886aa3b0517fe4e53aa81"
         },
         {
             "type": "file",
-            "name": "mobile_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
-            "size": 12569,
-            "hash": "40cef04968942c20365895ed9b12197ea6d8e20c62dfaeb76ab3609754640404"
-        },
-        {
-            "type": "file",
             "name": "mobile_app/android/app/src/main/res/values/styles.xml",
             "size": 996,
             "hash": "937d7c82f539c72eb94fd3a3773f29b3d3fef1997213c92cb632298cedf4bda9"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+            "size": 4047,
+            "hash": "0f8676ebd313a4af06b2a950fa563b0ade16ac02c46b8efe47b8d07f172d8521"
+        },
+        {
+            "type": "file",
+            "name": "mobile_app/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+            "size": 12569,
+            "hash": "40cef04968942c20365895ed9b12197ea6d8e20c62dfaeb76ab3609754640404"
         },
         {
             "type": "file",
