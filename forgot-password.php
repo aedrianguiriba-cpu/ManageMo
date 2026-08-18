@@ -37,21 +37,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($user_exists) {
             // Generate a secure token and save it to the user record
-            $token   = bin2hex(random_bytes(32));                          // 64-char hex
-            $expires = date('Y-m-d H:i:s', time() + 3600);               // 1 hour
+            $token   = bin2hex(random_bytes(32));   // 64-char hex
+            $expires = date('Y-m-d H:i:s', time() + 3600); // 1 hour
 
             dbUpdateUser((int)$matched_user['id'], [
                 'reset_token'         => $token,
                 'reset_token_expires' => $expires,
             ]);
 
-            // Build the reset URL and send the email
-            $reset_url = rtrim(BASE_URL, '/') . '/reset-password.php?token=' . urlencode($token);
-            _sendPasswordResetEmail($matched_user['full_name'], $email, $reset_url);
+            // Build a fully-absolute reset URL (BASE_URL is path-only, so we prepend scheme + host)
+            $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host      = $_SERVER['HTTP_HOST'];
+            $reset_url = $scheme . '://' . $host . rtrim(BASE_URL, '/') . '/reset-password.php?token=' . urlencode($token);
+
+            $sent = _sendPasswordResetEmail($matched_user['full_name'], $email, $reset_url);
+            if (!$sent) {
+                $error = 'Could not send the reset email. Please contact the administrator.';
+            }
         }
 
-        // Always show the same vague message (don't reveal whether the email exists)
-        $success = 'If an account exists with this email, password reset instructions have been sent. Please check your inbox (and spam folder).';
+        if (!$error) {
+            // Always show a vague message (don't reveal whether the email exists)
+            $success = 'If an account exists with this email, password reset instructions have been sent. Please check your inbox (and spam folder).';
+        }
     }
 }
 ?>
