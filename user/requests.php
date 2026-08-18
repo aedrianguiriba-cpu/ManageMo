@@ -323,11 +323,25 @@ if (!empty($submit_error)): ?>
     .rq-summary-card { position:static; max-height:none; overflow:visible; }
 }
 
-/* Hide the sidebar scrollbar track (cosmetic) while keeping it functional */
-.rq-summary-card::-webkit-scrollbar { width:4px; }
-.rq-summary-card::-webkit-scrollbar-track { background:transparent; }
-.rq-summary-card::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.15); border-radius:4px; }
-.rq-summary-card { scrollbar-width:thin; scrollbar-color:rgba(0,0,0,0.15) transparent; }
+/* ── Sidebar scrollbar ── */
+.rq-summary-card::-webkit-scrollbar {
+    width: 6px;
+}
+.rq-summary-card::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 0 8px 8px 0;
+    margin: 6px 0;
+}
+.rq-summary-card::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #8B0000 0%, #b91c1c 100%);
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.3);
+    transition: background 0.2s;
+}
+.rq-summary-card::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #6b0000 0%, #8B0000 100%);
+}
+.rq-summary-card { scrollbar-width:thin; scrollbar-color:#8B0000 #f1f1f1; }
 
 /* ── Form card ── */
 .rq-form-card {
