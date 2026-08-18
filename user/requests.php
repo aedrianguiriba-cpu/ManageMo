@@ -1629,8 +1629,9 @@ function handleCatalogChange(select) {
 
 /* ── Item Availability Calendar ── */
 var itemAvailData   = <?php echo $item_avail_json; ?>;
-var iacCurrentId    = null;
-var iacViewDate     = new Date(); iacViewDate.setDate(1);
+var iacCurrentId      = null;
+var iacCurrentRecords = [];   // aggregated records for the selected item group
+var iacViewDate       = new Date(); iacViewDate.setDate(1);
 var IAC_MONTHS      = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 var IAC_DAYS        = ['S','M','T','W','T','F','S'];
 
@@ -1702,6 +1703,7 @@ function renderItemAvailCal(select) {
         iacViewDate  = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
     }
 
+    iacCurrentRecords = records;   // cache for iacNav month-navigation
     wrap.style.display = 'block';
     renderIacGrid(records);
 }
@@ -1759,7 +1761,7 @@ function renderIacGrid(records) {
 
 window.iacNav = function(dir) {
     iacViewDate = new Date(iacViewDate.getFullYear(), iacViewDate.getMonth() + dir, 1);
-    renderIacGrid(iacCurrentId ? (itemAvailData[iacCurrentId] || []) : []);
+    renderIacGrid(iacCurrentRecords);
 };
 function selectItemReqCard(card) {
     document.querySelectorAll('#ishop-grid .bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
