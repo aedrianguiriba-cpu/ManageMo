@@ -14,9 +14,11 @@ if (isLoggedIn()) {
 $error = '';
 $success = '';
 
+$debug_log = [];   // temporary — remove after confirming it works
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = strtolower(trim($_POST['email'] ?? ''));
-    
+
     if (!$email) {
         $error = 'Email address is required';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -33,29 +35,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        $debug_log[] = $matched_user
+            ? '✅ User found: ' . htmlspecialchars($matched_user['full_name']) . ' (id=' . $matched_user['id'] . ')'
+            : '❌ No user found for email: ' . htmlspecialchars($email) . ' — checked ' . count($users) . ' users';
+
         if ($matched_user) {
             // Generate a secure token and save it to the DB
-            $token   = bin2hex(random_bytes(32));                   // 64-char hex
-            $expires = date('Y-m-d H:i:s', time() + 3600);        // 1 hour
+            $token   = bin2hex(random_bytes(32));
+            $expires = date('Y-m-d H:i:s', time() + 3600);
 
-            dbUpdateUser((int)$matched_user['id'], [
+            $saved = dbUpdateUser((int)$matched_user['id'], [
                 'reset_token'         => $token,
                 'reset_token_expires' => $expires,
             ]);
+            $debug_log[] = $saved
+                ? '✅ Token saved to DB'
+                : '❌ DB save failed (columns may not exist — run the ALTER TABLE in Supabase SQL editor). Supabase error: ' . htmlspecialchars(supabase()->lastError ?? '');
 
             // Build fully-absolute reset URL
             $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $host      = $_SERVER['HTTP_HOST'];
             $reset_url = $scheme . '://' . $host . rtrim(BASE_URL, '/') . '/reset-password.php?token=' . urlencode($token);
+            $debug_log[] = '🔗 Reset URL: ' . htmlspecialchars($reset_url);
 
             $sent = _sendPasswordResetEmail($matched_user['full_name'], $matched_user['email'], $reset_url);
+            $debug_log[] = $sent
+                ? '✅ Email sent to ' . htmlspecialchars($matched_user['email'])
+                : '❌ Email failed to send — check SMTP settings';
+
             if (!$sent) {
                 $error = 'Could not send the reset email — SMTP error. Please contact the administrator.';
             }
         }
 
         if (!$error) {
-            // Always show the same vague message (don't reveal whether the email exists)
             $success = 'If an account exists with this email, password reset instructions have been sent. Please check your inbox (and spam folder).';
         }
     }
@@ -358,6 +371,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <button type="button" class="btn-close" onclick="this.parentElement.parentElement.style.display='none';">&times;</button>
                         </div>
                     </div>
+                <?php endif; ?>
+
+                <?php if (!empty($debug_log)): ?>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:12.5px;font-family:monospace;line-height:1.9;">
+                    <div style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:6px;">Debug (remove later)</div>
+                    <?php foreach ($debug_log as $line): ?>
+                        <div><?php echo $line; ?></div>
+                    <?php endforeach; ?>
+                </div>
                 <?php endif; ?>
 
                 <form method="POST" action="">
