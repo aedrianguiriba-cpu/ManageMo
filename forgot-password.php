@@ -15,7 +15,7 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = sanitizeInput($_POST['email'] ?? '');
+    $email = strtolower(trim($_POST['email'] ?? ''));
     
     if (!$email) {
         $error = 'Email address is required';
@@ -34,11 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($matched_user) {
-            // Generate a secure token and store it in a temp file (no DB migration needed)
-            $token   = bin2hex(random_bytes(32));   // 64-char hex
-            $expires = time() + 3600;               // 1 hour from now
+            // Generate a secure token and save it to the DB
+            $token   = bin2hex(random_bytes(32));                   // 64-char hex
+            $expires = date('Y-m-d H:i:s', time() + 3600);        // 1 hour
 
-            _pwrSaveToken($token, (int)$matched_user['id'], $expires);
+            dbUpdateUser((int)$matched_user['id'], [
+                'reset_token'         => $token,
+                'reset_token_expires' => $expires,
+            ]);
 
             // Build fully-absolute reset URL
             $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
