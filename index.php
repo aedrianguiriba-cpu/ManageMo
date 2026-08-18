@@ -37,21 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
     }
 }
 
-$forgot_error   = '';
-$forgot_success = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
-    $forgot_email = sanitizeInput($_POST['forgot_email'] ?? '');
-    if (!$forgot_email) {
-        $forgot_error = 'Email address is required';
-    } elseif (!filter_var($forgot_email, FILTER_VALIDATE_EMAIL)) {
-        $forgot_error = 'Invalid email address';
-    } else {
-        $users = getUsers();
-        $found = false;
-        foreach ($users as $u) { if ($u['email'] === $forgot_email && $u['is_active'] == 1) { $found = true; break; } }
-        $forgot_success = 'If an account exists with this email, you will receive reset instructions shortly.';
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -422,47 +407,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
                         <label class="login-remember">
                             <input type="checkbox" name="remember"> Remember me
                         </label>
-                        <button type="button" class="login-forgot" onclick="showForgot()">Forgot Password</button>
+                        <a href="<?php echo BASE_URL; ?>forgot-password.php" class="login-forgot">Forgot Password</a>
                     </div>
                     <button type="submit" name="login_submit" class="login-btn">Sign In</button>
                 </form>
             </div>
 
-            <!-- Forgot Password Form -->
-            <div id="forgotPanel" style="display:none;">
-                <div class="login-heading">Reset Password</div>
-                <p class="login-sub">Enter your email to receive reset instructions</p>
-
-                <?php if ($forgot_success): ?>
-                <div class="login-alert login-alert-success">
-                    <span><i class="fas fa-check-circle me-1"></i><?php echo htmlspecialchars($forgot_success); ?></span>
-                    <button class="login-alert-close" onclick="this.parentElement.remove()">&times;</button>
-                </div>
-                <?php endif; ?>
-
-                <?php if ($forgot_error): ?>
-                <div class="login-alert login-alert-danger">
-                    <span><i class="fas fa-exclamation-circle me-1"></i><?php echo htmlspecialchars($forgot_error); ?></span>
-                    <button class="login-alert-close" onclick="this.parentElement.remove()">&times;</button>
-                </div>
-                <?php endif; ?>
-
-                <form method="POST" action="">
-                    <div class="login-field">
-                        <label class="login-label">Email Address</label>
-                        <input type="email" name="forgot_email" class="login-input" placeholder="Enter your email" required
-                               value="<?php echo isset($_POST['forgot_email']) ? htmlspecialchars($_POST['forgot_email']) : ''; ?>">
-                    </div>
-                    <p style="font-size:0.78rem;color:#999;margin-bottom:20px;">
-                        We'll send you a link to reset your password.
-                    </p>
-                    <button type="submit" name="forgot_submit" class="login-btn">Send Reset Link</button>
-                </form>
-
-                <button class="login-back" onclick="showLogin()">
-                    <i class="fas fa-arrow-left"></i> Back to Sign In
-                </button>
-            </div>
 
         </div><!-- /login-right -->
     </div><!-- /login-card -->
@@ -475,19 +425,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['forgot_submit'])) {
             btn.innerHTML = showing ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
         }
 
-        function showForgot() {
-            document.getElementById('loginPanel').style.display  = 'none';
-            document.getElementById('forgotPanel').style.display = 'block';
-        }
-
-        function showLogin() {
-            document.getElementById('forgotPanel').style.display = 'none';
-            document.getElementById('loginPanel').style.display  = 'block';
-        }
-
-        <?php if ($forgot_success || $forgot_error): ?>
-        document.addEventListener('DOMContentLoaded', showForgot);
-        <?php endif; ?>
     </script>
 </body>
 </html>
