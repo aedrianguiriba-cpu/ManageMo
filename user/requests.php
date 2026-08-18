@@ -318,7 +318,16 @@ if (!empty($submit_error)): ?>
 
 /* ── Layout wrapper ── */
 .rq-layout { display:grid; grid-template-columns:1fr 300px; gap:20px; align-items:start; }
-@media(max-width:900px){ .rq-layout { grid-template-columns:1fr; } }
+@media(max-width:900px){
+    .rq-layout { grid-template-columns:1fr; }
+    .rq-summary-card { position:static; max-height:none; overflow:visible; }
+}
+
+/* Hide the sidebar scrollbar track (cosmetic) while keeping it functional */
+.rq-summary-card::-webkit-scrollbar { width:4px; }
+.rq-summary-card::-webkit-scrollbar-track { background:transparent; }
+.rq-summary-card::-webkit-scrollbar-thumb { background:rgba(0,0,0,0.15); border-radius:4px; }
+.rq-summary-card { scrollbar-width:thin; scrollbar-color:rgba(0,0,0,0.15) transparent; }
 
 /* ── Form card ── */
 .rq-form-card {
@@ -410,7 +419,9 @@ if (!empty($submit_error)): ?>
 .rq-summary-card {
     background:#fff; border:1px solid #e5e7eb; border-radius:8px;
     box-shadow:0 1px 4px rgba(0,0,0,0.06);
-    overflow:hidden; position:sticky; top:88px;
+    overflow-x:hidden; overflow-y:auto;
+    position:sticky; top:80px;
+    max-height:calc(100vh - 96px);
 }
 .rq-summary-head {
     background:#8B0000;
