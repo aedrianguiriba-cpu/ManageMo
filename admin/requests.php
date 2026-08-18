@@ -129,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWithMessage('requests.php?action=view&' . $redirect_param, $label, 'success');
 
     } elseif ($action_type === 'mark_delivered') {
+        $req_user = findById(getUsers(), (int)($trigger_req['user_id'] ?? 0));
         foreach ($group_reqs as $gr) {
             dbUpdateRequest((int)$gr['id'], ['delivery_status' => 'delivered', 'status' => 'delivered']);
             if ($gr['request_type'] === 'borrow' && !empty($gr['inventory_id'])) {
@@ -141,6 +142,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'expected_return_date' => $gr['expected_return_date'] ?? null,
                     'status'               => 'active',
                     'notes'                => $gr['reason_for_request'] ?? null,
+                ]);
+            } elseif ($gr['request_type'] === 'item' && !empty($gr['inventory_id'])) {
+                // Transfer ownership: mark inventory disposed, create user_owned_items record
+                $inv_item = findById(getInventory(), (int)$gr['inventory_id']);
+                dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'disposed']);
+                dbCreateUserOwnedItem([
+                    'user_id'    => (int)$gr['user_id'],
+                    'qr_code_id' => $gr['qr_code_id'] ?? ($inv_item['qr_code_id'] ?? null),
+                    'item_name'  => $inv_item['item_name']  ?? 'Unknown Item',
+                    'category'   => $inv_item['category']   ?? 'General',
+                    'description'=> $inv_item['description'] ?? null,
+                    'year_owned' => (int)date('Y'),
+                    'campus_id'  => (int)($req_user['campus_id'] ?? $inv_item['campus_id'] ?? 1),
+                    'quantity'   => 1,
+                    'condition'  => $inv_item['condition'] ?? null,
+                    'notes'      => $gr['reason_for_request'] ?? null,
+                    'group_id'   => $gr['group_id'] ?? null,
                 ]);
             }
         }
