@@ -11,19 +11,12 @@ $token   = trim($_GET['token'] ?? '');
 $error   = '';
 $success = '';
 
-// ── Look up the token in the DB ──────────────────────────────────────────────
+// ── Look up the token (file-based) ───────────────────────────────────────────
 $matched_user = null;
 if ($token) {
-    foreach (getUsers() as $u) {
-        if (
-            !empty($u['reset_token'])
-            && hash_equals($u['reset_token'], $token)
-            && !empty($u['reset_token_expires'])
-            && strtotime($u['reset_token_expires']) > time()
-        ) {
-            $matched_user = $u;
-            break;
-        }
+    $tdata = _pwrLoadToken($token);
+    if ($tdata) {
+        $matched_user = findById(getUsers(), (int)$tdata['user_id']);
     }
 }
 
@@ -40,10 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$invalid_token) {
         $error = 'Passwords do not match.';
     } else {
         dbUpdateUser((int)$matched_user['id'], [
-            'password'            => hashPassword($password),
-            'reset_token'         => null,
-            'reset_token_expires' => null,
+            'password' => hashPassword($password),
         ]);
+        _pwrDeleteToken($token); // one-time use — delete immediately
         $success = 'Your password has been updated. You can now sign in with your new password.';
         $invalid_token = true; // hide the form after success
     }
