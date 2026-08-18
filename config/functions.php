@@ -303,6 +303,80 @@ function sendDeliveryEmail($to_email, $to_name, $request_number, $stage = 'out_f
     return sendStatusEmail($to_email, $to_name, $request_number, $stage);
 }
 
+// ── Password Reset Email ────────────────────────────────────────────────────
+function _sendPasswordResetEmail(string $to_name, string $to_email, string $reset_url): bool {
+    $mailer = SmtpMailer::fromEnv();
+    if (!$mailer) return false;
+
+    $safeName = htmlspecialchars($to_name);
+    $safeUrl  = htmlspecialchars($reset_url);
+    $subject  = '[ManageMo] Password Reset Request';
+
+    $text = "Dear $to_name,\n\nYou requested a password reset for your ManageMo account.\n\n"
+          . "Click the link below to set a new password (valid for 1 hour):\n$reset_url\n\n"
+          . "If you did not request this, you can safely ignore this email — your password will not change.\n\n"
+          . "– ManageMo System, Pampanga State University";
+
+    $html = <<<HTML
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
+  <tr>
+    <td style="background:#8B0000;padding:22px 28px;">
+      <span style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:0.3px;">ManageMo</span>
+      <div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:2px;">Pampanga State University</div>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:32px 28px 8px;">
+      <div style="display:inline-block;width:52px;height:52px;line-height:52px;text-align:center;border-radius:50%;background:#fee2e2;color:#8B0000;font-size:24px;margin-bottom:18px;">🔑</div>
+      <div style="font-size:20px;font-weight:800;color:#1a1d23;margin-bottom:6px;">Dear {$safeName},</div>
+      <div style="font-size:17px;font-weight:700;color:#8B0000;margin-bottom:14px;">Password Reset Request</div>
+      <p style="font-size:14.5px;line-height:1.6;color:#374151;margin:0 0 20px;">
+        We received a request to reset the password for your ManageMo account.
+        Click the button below to choose a new password. This link is valid for <strong>1 hour</strong>.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="border-radius:8px;background:#8B0000;">
+            <a href="{$safeUrl}" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.3px;">
+              Reset My Password
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="font-size:12.5px;line-height:1.6;color:#9ca3af;margin:20px 0 0;">
+        If the button doesn't work, copy and paste this URL into your browser:<br>
+        <span style="word-break:break-all;color:#8B0000;">{$safeUrl}</span>
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:20px 28px 28px;">
+      <div style="border-top:1px solid #e5e7eb;padding-top:16px;font-size:12px;color:#9ca3af;line-height:1.6;">
+        If you did not request a password reset, you can safely ignore this email — your password will not change.
+        <br>This is an automated message from ManageMo. Do not reply to this email.
+      </div>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>
+HTML;
+
+    try {
+        return $mailer->sendHtml($to_email, $to_name, $subject, $html, $text);
+    } catch (\Throwable $e) {
+        error_log('_sendPasswordResetEmail failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
 // ── In-app notifications ────────────────────────────────────────────────────
 
 function dbCreateNotification(array $data): ?array {

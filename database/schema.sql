@@ -40,18 +40,24 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 -- ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS users (
-    id          BIGSERIAL PRIMARY KEY,
-    email       TEXT UNIQUE NOT NULL,
-    password    TEXT NOT NULL,
-    full_name   TEXT NOT NULL,
-    role        TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin','user')),
-    campus_id   INT  NOT NULL DEFAULT 1,
-    college_id  TEXT,
-    phone       TEXT,
-    is_active   INT  NOT NULL DEFAULT 1,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id                   BIGSERIAL PRIMARY KEY,
+    email                TEXT UNIQUE NOT NULL,
+    password             TEXT NOT NULL,
+    full_name            TEXT NOT NULL,
+    role                 TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin','user')),
+    campus_id            INT  NOT NULL DEFAULT 1,
+    college_id           TEXT,
+    phone                TEXT,
+    is_active            INT  NOT NULL DEFAULT 1,
+    reset_token          TEXT,
+    reset_token_expires  TIMESTAMPTZ,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migration: add password-reset columns to an existing users table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token         TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS inventory (
     id                   BIGSERIAL PRIMARY KEY,
