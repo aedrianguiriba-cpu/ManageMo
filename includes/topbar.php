@@ -42,16 +42,17 @@ $_notif_redirect = urlencode($_SERVER['REQUEST_URI'] ?? (BASE_URL . ($current_us
                     <div style="display:flex;align-items:center;gap:10px;">
                         <?php if ($_notif_unread > 0): ?>
                         <a href="<?php echo BASE_URL; ?>notifications.php?action=mark_all_read&redirect=<?php echo $_notif_redirect; ?>"
+                           class="notif-mark-read-link"
                            style="font-size:0.74rem;font-weight:700;color:#8B0000;text-decoration:none;">Mark all read</a>
                         <?php endif; ?>
                         <?php if (!empty($_notif_list)): ?>
-                        <a href="<?php echo BASE_URL; ?>notifications.php?action=delete_all&redirect=<?php echo $_notif_redirect; ?>"
-                           style="font-size:0.74rem;font-weight:600;color:#9ca3af;text-decoration:none;"
-                           onclick="return confirm('Delete all notifications?')">Clear all</a>
+                        <button onclick="deleteAllNotifs(event)"
+                                class="notif-clear-all-btn"
+                                style="font-size:0.74rem;font-weight:600;color:#9ca3af;background:none;border:none;cursor:pointer;padding:0;">Clear all</button>
                         <?php endif; ?>
                     </div>
                 </div>
-                <div style="max-height:360px;overflow-y:auto;">
+                <div class="notif-scroll-list" style="max-height:360px;overflow-y:auto;">
                     <?php if (empty($_notif_list)): ?>
                     <div style="padding:32px 16px;text-align:center;color:rgba(0,0,0,0.35);">
                         <i class="fas fa-bell-slash" style="font-size:1.6rem;display:block;margin-bottom:8px;opacity:0.5;"></i>
@@ -68,7 +69,7 @@ $_notif_redirect = urlencode($_SERVER['REQUEST_URI'] ?? (BASE_URL . ($current_us
                     <?php
                         $delete_href = BASE_URL . 'notifications.php?action=delete&id=' . $n['id'] . '&redirect=' . $_notif_redirect;
                     ?>
-                    <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6;<?php echo $n['is_read'] ? '' : 'background:rgba(139,0,0,0.03);'; ?>">
+                    <div class="notif-row" style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6;<?php echo $n['is_read'] ? '' : 'background:rgba(139,0,0,0.03);'; ?>">
                         <a href="<?php echo $href; ?>" style="display:flex;gap:10px;padding:12px 16px;text-decoration:none;color:inherit;flex:1;min-width:0;">
                             <div style="width:32px;height:32px;border-radius:50%;background:<?php echo $bg; ?>;color:<?php echo $color; ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.85rem;">
                                 <i class="fas <?php echo $icon; ?>"></i>
@@ -86,13 +87,13 @@ $_notif_redirect = urlencode($_SERVER['REQUEST_URI'] ?? (BASE_URL . ($current_us
                                 <div style="font-size:0.70rem;color:rgba(0,0,0,0.35);margin-top:3px;"><?php echo timeAgo($n['created_at']); ?></div>
                             </div>
                         </a>
-                        <a href="<?php echo $delete_href; ?>"
-                           title="Delete notification"
-                           style="display:flex;align-items:center;justify-content:center;width:32px;flex-shrink:0;color:rgba(0,0,0,0.25);text-decoration:none;font-size:0.75rem;transition:color 0.15s,background 0.15s;"
-                           onmouseover="this.style.color='#b91c1c';this.style.background='rgba(185,28,28,0.06)';"
-                           onmouseout="this.style.color='rgba(0,0,0,0.25)';this.style.background='transparent';">
+                        <button onclick="deleteNotif(event, this, <?php echo $n['id']; ?>)"
+                                title="Delete notification"
+                                style="display:flex;align-items:center;justify-content:center;width:32px;flex-shrink:0;color:rgba(0,0,0,0.25);background:none;border:none;cursor:pointer;font-size:0.75rem;transition:color 0.15s,background 0.15s;padding:0;"
+                                onmouseover="this.style.color='#b91c1c';this.style.background='rgba(185,28,28,0.06)';"
+                                onmouseout="this.style.color='rgba(0,0,0,0.25)';this.style.background='transparent';">
                             <i class="fas fa-times"></i>
-                        </a>
+                        </button>
                     </div>
                     <?php endforeach; endif; ?>
                 </div>
@@ -138,3 +139,73 @@ $_notif_redirect = urlencode($_SERVER['REQUEST_URI'] ?? (BASE_URL . ($current_us
         </div>
     </div>
 </div>
+
+<style>
+.notif-row {
+    overflow: hidden;
+    transition: max-height 0.32s cubic-bezier(.4,0,.2,1),
+                opacity    0.22s ease,
+                transform  0.28s cubic-bezier(.4,0,.2,1);
+    max-height: 120px;
+    opacity: 1;
+    transform: translateX(0);
+}
+.notif-row.notif-removing {
+    max-height: 0 !important;
+    opacity: 0;
+    transform: translateX(40px);
+    pointer-events: none;
+}
+</style>
+
+<script>
+function deleteNotif(e, btn, id) {
+    e.stopPropagation();
+    var row = btn.closest('.notif-row');
+    if (!row) return;
+    row.classList.add('notif-removing');
+    fetch('<?php echo BASE_URL; ?>notifications.php?action=delete&id=' + id + '&redirect=_ajax')
+        .catch(function(){});
+    setTimeout(function() {
+        row.remove();
+        _notifCheckEmpty();
+        _notifUpdateBadge(-1);
+    }, 340);
+}
+
+function deleteAllNotifs(e) {
+    e.stopPropagation();
+    if (!confirm('Delete all notifications?')) return;
+    var rows = document.querySelectorAll('.notif-row');
+    rows.forEach(function(r, i) {
+        setTimeout(function() { r.classList.add('notif-removing'); }, i * 50);
+    });
+    fetch('<?php echo BASE_URL; ?>notifications.php?action=delete_all&redirect=_ajax')
+        .catch(function(){});
+    setTimeout(function() {
+        rows.forEach(function(r) { r.remove(); });
+        _notifCheckEmpty();
+        _notifUpdateBadge(0, true);
+    }, rows.length * 50 + 360);
+}
+
+function _notifCheckEmpty() {
+    var list = document.querySelector('.notif-scroll-list');
+    if (!list || list.querySelector('.notif-row')) return;
+    list.innerHTML =
+        '<div style="padding:32px 16px;text-align:center;color:rgba(0,0,0,0.35);">'
+      + '<i class="fas fa-bell-slash" style="font-size:1.6rem;display:block;margin-bottom:8px;opacity:0.5;"></i>'
+      + '<span style="font-size:0.82rem;">No notifications yet</span></div>';
+    document.querySelectorAll('.notif-clear-all-btn, .notif-mark-read-link')
+            .forEach(function(el){ el.style.display = 'none'; });
+}
+
+function _notifUpdateBadge(delta, clear) {
+    var badge = document.querySelector('.topbar-bell span');
+    if (!badge) return;
+    if (clear) { badge.remove(); return; }
+    var next = Math.max(0, (parseInt(badge.textContent) || 0) + delta);
+    if (next === 0) badge.remove();
+    else badge.textContent = next > 9 ? '9+' : next;
+}
+</script>
