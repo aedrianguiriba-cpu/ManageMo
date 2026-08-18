@@ -303,6 +303,39 @@ function sendDeliveryEmail($to_email, $to_name, $request_number, $stage = 'out_f
     return sendStatusEmail($to_email, $to_name, $request_number, $stage);
 }
 
+// ── Password Reset Token (file-based, no DB columns needed) ─────────────────
+function _pwrTokenDir(): string {
+    $dir = sys_get_temp_dir() . '/managemo_pwr';
+    if (!is_dir($dir)) @mkdir($dir, 0700, true);
+    return $dir;
+}
+
+function _pwrTokenFile(string $token): string {
+    // Store by SHA-256 of token so the raw token never sits on disk as a filename
+    return _pwrTokenDir() . '/' . hash('sha256', $token) . '.json';
+}
+
+function _pwrSaveToken(string $token, int $user_id, int $expires): void {
+    $file = _pwrTokenFile($token);
+    file_put_contents($file, json_encode(['user_id' => $user_id, 'expires' => $expires]), LOCK_EX);
+}
+
+function _pwrLoadToken(string $token): ?array {
+    $file = _pwrTokenFile($token);
+    if (!file_exists($file)) return null;
+    $data = json_decode(file_get_contents($file), true);
+    if (!$data || !isset($data['expires'])) return null;
+    if ($data['expires'] < time()) {
+        @unlink($file); // expired — clean up
+        return null;
+    }
+    return $data;
+}
+
+function _pwrDeleteToken(string $token): void {
+    @unlink(_pwrTokenFile($token));
+}
+
 // ── Password Reset Email ────────────────────────────────────────────────────
 function _sendPasswordResetEmail(string $to_name, string $to_email, string $reset_url): bool {
     $mailer = SmtpMailer::fromEnv();

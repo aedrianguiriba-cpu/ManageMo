@@ -22,42 +22,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Invalid email address';
     } else {
-        // Check if email exists in system
+        // Case-insensitive email lookup
         $users        = getUsers();
-        $user_exists  = false;
         $matched_user = null;
 
         foreach ($users as $u) {
-            if ($u['email'] === $email && $u['is_active'] == 1) {
-                $user_exists  = true;
+            if (strtolower($u['email']) === strtolower($email) && $u['is_active'] == 1) {
                 $matched_user = $u;
                 break;
             }
         }
-        
-        if ($user_exists) {
-            // Generate a secure token and save it to the user record
+
+        if ($matched_user) {
+            // Generate a secure token and store it in a temp file (no DB migration needed)
             $token   = bin2hex(random_bytes(32));   // 64-char hex
-            $expires = date('Y-m-d H:i:s', time() + 3600); // 1 hour
+            $expires = time() + 3600;               // 1 hour from now
 
-            dbUpdateUser((int)$matched_user['id'], [
-                'reset_token'         => $token,
-                'reset_token_expires' => $expires,
-            ]);
+            _pwrSaveToken($token, (int)$matched_user['id'], $expires);
 
-            // Build a fully-absolute reset URL (BASE_URL is path-only, so we prepend scheme + host)
+            // Build fully-absolute reset URL
             $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $host      = $_SERVER['HTTP_HOST'];
             $reset_url = $scheme . '://' . $host . rtrim(BASE_URL, '/') . '/reset-password.php?token=' . urlencode($token);
 
-            $sent = _sendPasswordResetEmail($matched_user['full_name'], $email, $reset_url);
+            $sent = _sendPasswordResetEmail($matched_user['full_name'], $matched_user['email'], $reset_url);
             if (!$sent) {
-                $error = 'Could not send the reset email. Please contact the administrator.';
+                $error = 'Could not send the reset email — SMTP error. Please contact the administrator.';
             }
         }
 
         if (!$error) {
-            // Always show a vague message (don't reveal whether the email exists)
+            // Always show the same vague message (don't reveal whether the email exists)
             $success = 'If an account exists with this email, password reset instructions have been sent. Please check your inbox (and spam folder).';
         }
     }
