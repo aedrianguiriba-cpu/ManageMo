@@ -453,6 +453,17 @@ function markAllNotificationsRead(int $user_id): bool {
     return $rows !== [];
 }
 
+function deleteNotification(int $id, int $user_id): bool {
+    // Scoped to user_id so users can only delete their own notifications.
+    $rows = supabase()->delete('notifications', "id=eq.$id&user_id=eq.$user_id");
+    return $rows !== false;
+}
+
+function deleteAllNotifications(int $user_id): bool {
+    $rows = supabase()->delete('notifications', "user_id=eq.$user_id");
+    return $rows !== false;
+}
+
 // Relative "time ago" label for notification timestamps.
 function timeAgo(string $datetime): string {
     $diff = time() - strtotime($datetime);

@@ -25,5 +25,18 @@ if ($action === 'mark_all_read') {
     exit;
 }
 
+if ($action === 'delete') {
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id > 0) deleteNotification($id, (int)$current_user['id']);
+    header('Location: ' . $redirect);
+    exit;
+}
+
+if ($action === 'delete_all') {
+    deleteAllNotifications((int)$current_user['id']);
+    header('Location: ' . $redirect);
+    exit;
+}
+
 header('Location: ' . $redirect);
 exit;

@@ -39,10 +39,17 @@ $_notif_redirect = urlencode($_SERVER['REQUEST_URI'] ?? (BASE_URL . ($current_us
             <div class="dropdown-menu dropdown-menu-end" style="width:340px;max-width:90vw;padding:0;overflow:hidden;">
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e5e7eb;">
                     <strong style="font-size:0.88rem;">Notifications</strong>
-                    <?php if ($_notif_unread > 0): ?>
-                    <a href="<?php echo BASE_URL; ?>notifications.php?action=mark_all_read&redirect=<?php echo $_notif_redirect; ?>"
-                       style="font-size:0.74rem;font-weight:700;color:#8B0000;text-decoration:none;">Mark all read</a>
-                    <?php endif; ?>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <?php if ($_notif_unread > 0): ?>
+                        <a href="<?php echo BASE_URL; ?>notifications.php?action=mark_all_read&redirect=<?php echo $_notif_redirect; ?>"
+                           style="font-size:0.74rem;font-weight:700;color:#8B0000;text-decoration:none;">Mark all read</a>
+                        <?php endif; ?>
+                        <?php if (!empty($_notif_list)): ?>
+                        <a href="<?php echo BASE_URL; ?>notifications.php?action=delete_all&redirect=<?php echo $_notif_redirect; ?>"
+                           style="font-size:0.74rem;font-weight:600;color:#9ca3af;text-decoration:none;"
+                           onclick="return confirm('Delete all notifications?')">Clear all</a>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <div style="max-height:360px;overflow-y:auto;">
                     <?php if (empty($_notif_list)): ?>
@@ -58,23 +65,35 @@ $_notif_redirect = urlencode($_SERVER['REQUEST_URI'] ?? (BASE_URL . ($current_us
                                . '&redirect=' . $_notif_redirect
                                . (!empty($n['link']) ? '&link=' . urlencode(BASE_URL . $n['link']) : '');
                     ?>
-                    <a href="<?php echo $href; ?>" style="display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid #f3f4f6;text-decoration:none;color:inherit;<?php echo $n['is_read'] ? '' : 'background:rgba(139,0,0,0.03);'; ?>">
-                        <div style="width:32px;height:32px;border-radius:50%;background:<?php echo $bg; ?>;color:<?php echo $color; ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.85rem;">
-                            <i class="fas <?php echo $icon; ?>"></i>
-                        </div>
-                        <div style="min-width:0;flex:1;">
-                            <div style="font-size:0.83rem;font-weight:<?php echo $n['is_read'] ? '600' : '800'; ?>;color:#1a1d23;line-height:1.3;">
-                                <?php echo htmlspecialchars($n['title']); ?>
-                                <?php if (!$n['is_read']): ?><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#8B0000;margin-left:5px;vertical-align:middle;"></span><?php endif; ?>
+                    <?php
+                        $delete_href = BASE_URL . 'notifications.php?action=delete&id=' . $n['id'] . '&redirect=' . $_notif_redirect;
+                    ?>
+                    <div style="display:flex;align-items:stretch;border-bottom:1px solid #f3f4f6;<?php echo $n['is_read'] ? '' : 'background:rgba(139,0,0,0.03);'; ?>">
+                        <a href="<?php echo $href; ?>" style="display:flex;gap:10px;padding:12px 16px;text-decoration:none;color:inherit;flex:1;min-width:0;">
+                            <div style="width:32px;height:32px;border-radius:50%;background:<?php echo $bg; ?>;color:<?php echo $color; ?>;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.85rem;">
+                                <i class="fas <?php echo $icon; ?>"></i>
                             </div>
-                            <?php if (!empty($n['message'])): ?>
-                            <div style="font-size:0.78rem;color:rgba(0,0,0,0.50);margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
-                                <?php echo htmlspecialchars($n['message']); ?>
+                            <div style="min-width:0;flex:1;">
+                                <div style="font-size:0.83rem;font-weight:<?php echo $n['is_read'] ? '600' : '800'; ?>;color:#1a1d23;line-height:1.3;">
+                                    <?php echo htmlspecialchars($n['title']); ?>
+                                    <?php if (!$n['is_read']): ?><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#8B0000;margin-left:5px;vertical-align:middle;"></span><?php endif; ?>
+                                </div>
+                                <?php if (!empty($n['message'])): ?>
+                                <div style="font-size:0.78rem;color:rgba(0,0,0,0.50);margin-top:2px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">
+                                    <?php echo htmlspecialchars($n['message']); ?>
+                                </div>
+                                <?php endif; ?>
+                                <div style="font-size:0.70rem;color:rgba(0,0,0,0.35);margin-top:3px;"><?php echo timeAgo($n['created_at']); ?></div>
                             </div>
-                            <?php endif; ?>
-                            <div style="font-size:0.70rem;color:rgba(0,0,0,0.35);margin-top:3px;"><?php echo timeAgo($n['created_at']); ?></div>
-                        </div>
-                    </a>
+                        </a>
+                        <a href="<?php echo $delete_href; ?>"
+                           title="Delete notification"
+                           style="display:flex;align-items:center;justify-content:center;width:32px;flex-shrink:0;color:rgba(0,0,0,0.25);text-decoration:none;font-size:0.75rem;transition:color 0.15s,background 0.15s;"
+                           onmouseover="this.style.color='#b91c1c';this.style.background='rgba(185,28,28,0.06)';"
+                           onmouseout="this.style.color='rgba(0,0,0,0.25)';this.style.background='transparent';">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
                     <?php endforeach; endif; ?>
                 </div>
             </div>
