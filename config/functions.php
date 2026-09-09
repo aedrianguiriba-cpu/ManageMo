@@ -134,6 +134,7 @@ function groupInventoryItems(array $items): array {
                 'item_name'   => $item['item_name'],
                 'category'    => $item['category'] ?? '',
                 'campus_id'   => (int)$item['campus_id'],
+                'college_id'  => $item['college_id'] ?? null,
                 'location'    => $item['location'] ?? '',
                 'description' => $item['description'] ?? '',
                 'cost'        => $item['cost'],
@@ -601,22 +602,30 @@ function dbAddCustomDepartment(string $type, array $data): bool {
         ]);
         clearDataCache('campuses');
     } else {
+        // campus_id: null/1 = Main Campus (matches existing rows), anything
+        // else scopes this college/office to that other campus.
+        $campus_id = isset($data['campus_id']) && (int)$data['campus_id'] > 1 ? (int)$data['campus_id'] : null;
         $rows = supabase()->insert('departments', [
             'type'         => $type,
             'abbreviation' => $data['abbreviation'],
             'full_name'    => $data['full_name'],
+            'campus_id'    => $campus_id,
             'is_default'   => false,
         ]);
-        clearDataCache('departments_colleges', 'departments_offices');
+        // Department cache keys are per campus (departments_{type}_{campus_id});
+        // clear everything rather than trying to enumerate them all.
+        clearDataCache();
     }
     return !empty($rows);
 }
 
-function dbDeleteCustomDepartment(string $type, string $abbreviation): bool {
-    $rows = supabase()->select('departments', 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation));
+function dbDeleteCustomDepartment(string $type, string $abbreviation, ?int $campus_id = null): bool {
+    $filter = 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation);
+    $filter .= ($campus_id === null || $campus_id === 1) ? '&or=(campus_id.is.null,campus_id.eq.1)' : '&campus_id=eq.' . $campus_id;
+    $rows = supabase()->select('departments', $filter);
     if (empty($rows) || $rows[0]['is_default']) return false;
-    supabase()->delete('departments', 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation));
-    clearDataCache('departments_colleges', 'departments_offices');
+    supabase()->delete('departments', $filter);
+    clearDataCache();
     return true;
 }
 

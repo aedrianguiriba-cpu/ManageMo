@@ -17,6 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // inspector's own record, distinct from the live inventory.condition field
         // (which could theoretically be edited later).
         $item_at_condemn = findById(getInventory(), $item_id);
+        if ($item_at_condemn && in_array($item_at_condemn['status'], ['requested', 'borrowed'])) {
+            redirectWithMessage('condemnation.php?tab=evaluate', 'This item is currently requested or borrowed and cannot be condemned.', 'danger');
+        }
         dbUpdateInventory($item_id, [
             'status'                => 'condemned',
             'condemnation_reason'   => $condemn_reason,
@@ -51,6 +54,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         logActivity($current_user['id'], 'RESTORE', "Restored inventory item #$item_id from condemnation", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=evaluate', 'Item restored to evaluation list.', 'info');
+
+    } elseif ($action_type === 'approve_condemn_request') {
+        $req_id = (int)($_POST['request_id'] ?? 0);
+        $req = $req_id ? findById(getRequests(), $req_id) : null;
+        if ($req && $req['request_type'] === 'condemnation' && $req['status'] === 'pending') {
+            $item_at_condemn = !empty($req['inventory_id']) ? findById(getInventory(), (int)$req['inventory_id']) : null;
+            if ($item_at_condemn) {
+                dbUpdateInventory((int)$req['inventory_id'], [
+                    'status'              => 'condemned',
+                    'condemnation_reason' => $req['reason_for_request'] ?? 'User-requested condemnation',
+                    'condemned_at'        => date('Y-m-d H:i:s'),
+                    'condemned_by'        => $current_user['id'],
+                    'condemned_condition' => $item_at_condemn['condition'] ?? null,
+                ]);
+            }
+            dbUpdateRequest($req_id, ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+            logActivity($current_user['id'], 'CONDEMN', "Approved user condemnation request #$req_id", 'requests', $req_id);
+        }
+        redirectWithMessage('condemnation.php?tab=requested', 'Condemnation request approved — item condemned.', 'success');
+
+    } elseif ($action_type === 'disapprove_condemn_request') {
+        $req_id = (int)($_POST['request_id'] ?? 0);
+        $req = $req_id ? findById(getRequests(), $req_id) : null;
+        if ($req && $req['request_type'] === 'condemnation' && $req['status'] === 'pending') {
+            dbUpdateRequest($req_id, ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+            logActivity($current_user['id'], 'DISAPPROVE', "Disapproved user condemnation request #$req_id", 'requests', $req_id);
+        }
+        redirectWithMessage('condemnation.php?tab=requested', 'Condemnation request disapproved.', 'info');
     }
 }
 
@@ -68,18 +99,24 @@ $all_users     = getUsers();
 
 // Build tab lists (re-index with array_values for clean iteration)
 // "Evaluate" includes every item not already condemned/disposed, so admins can condemn any item, not just damaged/maintenance ones.
-$evaluate_items  = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
+// Items currently out on a request/borrow are mid-use and shouldn't be condemnable
+// until they're back in the admin's hands (available/maintenance/damaged, etc.).
+$evaluate_items  = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed', 'requested', 'borrowed'])));
 $condemned_items = array_values(array_filter($all_inventory, fn($i) => $i['status'] === 'condemned'));
 $disposed_items  = array_values(array_filter($all_inventory, fn($i) => $i['status'] === 'disposed'));
 
+// User-submitted "please condemn this" requests awaiting admin review (see user/borrow-records.php)
+$requested_condemnations = array_values(array_filter(getRequests(), fn($r) => $r['request_type'] === 'condemnation' && $r['status'] === 'pending'));
+
 // Active tab
 $active_tab = $_GET['tab'] ?? 'evaluate';
-if (!in_array($active_tab, ['evaluate', 'condemned', 'disposed'])) {
+if (!in_array($active_tab, ['evaluate', 'requested', 'condemned', 'disposed'])) {
     $active_tab = 'evaluate';
 }
 
 // KPI values
 $evaluate_count   = count($evaluate_items);
+$requested_count  = count($requested_condemnations);
 $condemned_count  = count($condemned_items);
 $disposed_count   = count($disposed_items);
 $value_at_risk    = array_sum(array_column($evaluate_items, 'cost'));
@@ -319,6 +356,15 @@ foreach ($all_campuses as $c) {
             </div>
         </div>
         <div class="cd-kpi-card">
+            <div class="cd-kpi-icon" style="background:rgba(59,130,246,0.10);">
+                <i class="fas fa-inbox" style="color:#1d4ed8;"></i>
+            </div>
+            <div>
+                <div class="cd-kpi-val" style="color:#1d4ed8;"><?php echo $requested_count; ?></div>
+                <div class="cd-kpi-lbl">User Requested</div>
+            </div>
+        </div>
+        <div class="cd-kpi-card">
             <div class="cd-kpi-icon" style="background:rgba(139,0,0,0.10);">
                 <i class="fas fa-ban" style="color:#8B0000;"></i>
             </div>
@@ -354,6 +400,10 @@ foreach ($all_campuses as $c) {
         <a href="condemnation.php?tab=evaluate" class="cd-tab-btn <?php echo $active_tab==='evaluate'?'active':''; ?>">
             <i class="fas fa-search"></i> For Evaluation
             <span class="cd-tab-count"><?php echo $evaluate_count; ?></span>
+        </a>
+        <a href="condemnation.php?tab=requested" class="cd-tab-btn <?php echo $active_tab==='requested'?'active':''; ?>">
+            <i class="fas fa-inbox"></i> Requested
+            <span class="cd-tab-count"><?php echo $requested_count; ?></span>
         </a>
         <a href="condemnation.php?tab=condemned" class="cd-tab-btn <?php echo $active_tab==='condemned'?'active':''; ?>">
             <i class="fas fa-ban"></i> Condemned
@@ -414,6 +464,58 @@ foreach ($all_campuses as $c) {
         </div>
     </form>
 
+    <?php if ($active_tab === 'requested'): ?>
+    <!-- User-requested condemnations, pending review -->
+    <div class="cd-table-card">
+        <?php if (count($requested_condemnations) > 0): ?>
+        <div style="overflow-x:auto;">
+        <table class="cd-table">
+            <thead>
+                <tr>
+                    <th>Item</th><th>Requested By</th><th>Reason</th><th>Submitted</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($requested_condemnations as $req):
+                $req_item = !empty($req['inventory_id']) ? findById($all_inventory, (int)$req['inventory_id']) : null;
+                $req_user = findById($all_users, (int)$req['user_id']);
+            ?>
+                <tr>
+                    <td>
+                        <div style="font-weight:700;font-size:0.88rem;color:#1a1d23;"><?php echo htmlspecialchars($req_item['item_name'] ?? 'Unknown item'); ?></div>
+                        <?php if ($req_item && !empty($req_item['qr_code_id'])): ?>
+                        <div style="font-size:0.72rem;font-family:monospace;color:rgba(139,0,0,0.65);margin-top:2px;"><?php echo htmlspecialchars($req_item['qr_code_id']); ?></div>
+                        <?php endif; ?>
+                    </td>
+                    <td style="font-size:0.83rem;color:rgba(0,0,0,0.55);"><?php echo htmlspecialchars($req_user['full_name'] ?? 'Unknown user'); ?></td>
+                    <td style="max-width:260px;font-size:0.83rem;color:#374151;"><?php echo htmlspecialchars($req['reason_for_request'] ?? ''); ?></td>
+                    <td style="font-size:0.80rem;color:rgba(0,0,0,0.45);"><?php echo !empty($req['created_at']) ? formatDate($req['created_at'], 'M d, Y') : '—'; ?></td>
+                    <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <form method="POST" action="condemnation.php" style="display:inline;">
+                            <input type="hidden" name="action" value="approve_condemn_request">
+                            <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
+                            <button type="submit" class="cd-btn-condemn" onclick="return confirm('Condemn this item?')"><i class="fas fa-ban"></i> Approve &amp; Condemn</button>
+                        </form>
+                        <form method="POST" action="condemnation.php" style="display:inline;">
+                            <input type="hidden" name="action" value="disapprove_condemn_request">
+                            <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
+                            <button type="submit" class="cd-btn-restore"><i class="fas fa-times"></i> Disapprove</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
+        <?php else: ?>
+        <div class="cd-empty-state">
+            <i class="fas fa-inbox"></i>
+            <p>No pending condemnation requests</p>
+            <small>Requests users submit from their borrowed items will appear here</small>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php else: ?>
     <!-- Item Table -->
     <div class="cd-table-card">
         <?php if (count($display_items) > 0): ?>
@@ -571,6 +673,7 @@ foreach ($all_campuses as $c) {
             </div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 
 </div><!-- /.container-fluid -->
 </div><!-- /.main-wrapper -->

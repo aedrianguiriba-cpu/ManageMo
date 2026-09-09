@@ -30,15 +30,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
         } else {
             $abbr = strtoupper(trim($_POST['dept_abbr'] ?? ''));
             $name = trim($_POST['dept_name'] ?? '');
+            $dept_campus_id = (int)($_POST['dept_campus_id'] ?? 1) ?: 1;
             $dbtype = rtrim($type, 's'); // 'colleges' -> 'college', 'offices' -> 'office'
             if (!in_array($type, ['colleges', 'offices'])) {
                 $dept_err = 'Invalid department type.';
             } elseif (!$abbr || !$name) {
                 $dept_err = 'Abbreviation and full name are required.';
-            } elseif (isset(getMainCampusColleges()[$abbr]) || isset(getMainCampusOffices()[$abbr])) {
-                $dept_err = "Abbreviation \"$abbr\" already exists.";
+            } elseif (isset(getMainCampusColleges($dept_campus_id)[$abbr]) || isset(getMainCampusOffices($dept_campus_id)[$abbr])) {
+                $dept_err = "Abbreviation \"$abbr\" already exists for that campus.";
             } else {
-                $ok = dbAddCustomDepartment($dbtype, ['abbreviation' => $abbr, 'full_name' => $name]);
+                $ok = dbAddCustomDepartment($dbtype, ['abbreviation' => $abbr, 'full_name' => $name, 'campus_id' => $dept_campus_id]);
                 $dept_msg = $ok ? ucfirst($dbtype) . " \"$abbr\" added successfully." : '';
                 if (!$ok) $dept_err = 'Failed to add entry. Please try again.';
             }
@@ -58,7 +59,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
         } else {
             $abbr   = $_POST['dept_abbr'] ?? '';
             $dbtype = rtrim($type, 's');
-            $ok = dbDeleteCustomDepartment($dbtype, $abbr);
+            $del_campus_id = (int)($_POST['dept_campus_id'] ?? 1) ?: 1;
+            $ok = dbDeleteCustomDepartment($dbtype, $abbr, $del_campus_id);
             if ($ok) {
                 $dept_msg = "\"$abbr\" removed successfully.";
             } else {
@@ -66,8 +68,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
             }
         }
     }
-    // Redirect to avoid resubmit
-    $qs = $dept_msg ? '?msg=' . urlencode($dept_msg) : ($dept_err ? '?err=' . urlencode($dept_err) : '');
+    // Redirect to avoid resubmit — keep the modal open on the same campus the change was made on.
+    $redirect_campus_id = (int)($_POST['dept_campus_id'] ?? 1) ?: 1;
+    $qs = $dept_msg ? '?msg=' . urlencode($dept_msg) : ($dept_err ? '?err=' . urlencode($dept_err) : '?');
+    $qs .= ($qs === '?' ? '' : '&') . 'openDeptModal=1&dept_campus_id=' . $redirect_campus_id;
     header('Location: inventory-campus.php' . $qs);
     exit;
 }
@@ -414,11 +418,22 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <button onclick="deptTab('offices')"  id="tab-offices"  class="dept-tab"              style="flex:1;padding:7px 0;border:none;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;background:transparent;color:#555;">Offices</button>
                 <button onclick="deptTab('campuses')" id="tab-campuses" class="dept-tab"              style="flex:1;padding:7px 0;border:none;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;background:transparent;color:#555;">Campuses</button>
             </div>
-            <div id="main-campus-note" style="font-size:.76rem;color:#b45309;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);border-radius:5px;padding:6px 12px;margin-bottom:16px;display:flex;align-items:center;gap:7px;">
-                <i class="fas fa-info-circle"></i> Colleges and Offices belong to <strong>Main Campus</strong> only.
-            </div>
             <div id="campuses-note" style="display:none;font-size:.76rem;color:#555;background:#f7f7f7;border:1px solid #e5e7eb;border-radius:5px;padding:6px 12px;margin-bottom:16px;">
                 <i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i> Manage all PSU campuses here.
+            </div>
+
+            <?php
+            // Which campus's colleges/offices are we viewing/editing? Defaults to Main Campus.
+            $dept_view_campus_id = (int)($_GET['dept_campus_id'] ?? 1) ?: 1;
+            ?>
+            <div id="dept-campus-picker" style="margin-bottom:14px;">
+                <label style="font-size:.78rem;font-weight:700;color:#333;display:block;margin-bottom:5px;">Campus</label>
+                <select id="deptCampusSelect" onchange="deptCampusChange(this.value)"
+                        style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;outline:none;color:#111;">
+                    <?php foreach ($campuses as $c): ?>
+                    <option value="<?php echo $c['id']; ?>" <?php echo $c['id'] == $dept_view_campus_id ? 'selected' : ''; ?>><?php echo htmlspecialchars($c['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
 
             <!-- ── Colleges panel ── -->
@@ -426,6 +441,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <form method="POST" style="background:#f7f7f7;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:18px;">
                     <input type="hidden" name="dept_action" value="add">
                     <input type="hidden" name="dept_type"   value="colleges">
+                    <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                     <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:10px;">Add College</div>
                     <div style="display:grid;grid-template-columns:120px 1fr 110px;gap:10px;align-items:end;">
                         <div>
@@ -447,8 +463,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </form>
                 <?php
                 $default_college_keys = ['CEA','COE','CCS','CBS','CAS','CIT','CHTM','CSSP'];
-                foreach (getMainCampusColleges() as $abbr => $name):
-                    $is_default = in_array($abbr, $default_college_keys);
+                foreach (getMainCampusColleges($dept_view_campus_id) as $abbr => $name):
+                    $is_default = $dept_view_campus_id === 1 && in_array($abbr, $default_college_keys);
                 ?>
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:6px;background:#fff;">
                     <div>
@@ -461,6 +477,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <input type="hidden" name="dept_action" value="delete">
                         <input type="hidden" name="dept_type" value="colleges">
                         <input type="hidden" name="dept_abbr" value="<?php echo htmlspecialchars($abbr); ?>">
+                        <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                         <button type="submit" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:#dc2626;border-radius:5px;padding:4px 10px;font-size:.75rem;cursor:pointer;"><i class="fas fa-trash"></i></button>
                     </form>
                     <?php endif; ?>
@@ -473,6 +490,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <form method="POST" style="background:#f7f7f7;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:18px;">
                     <input type="hidden" name="dept_action" value="add">
                     <input type="hidden" name="dept_type"   value="offices">
+                    <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                     <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:10px;">Add Office</div>
                     <div style="display:grid;grid-template-columns:120px 1fr 110px;gap:10px;align-items:end;">
                         <div>
@@ -494,8 +512,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </form>
                 <?php
                 $default_office_keys = ['OUP','OVPAA','OVPAF','OVPRDE','OUR','OSAS','HRMO','ICTO','FBO','PMO','PPMO','ULib','GCC','PDO'];
-                foreach (getMainCampusOffices() as $abbr => $name):
-                    $is_default = in_array($abbr, $default_office_keys);
+                foreach (getMainCampusOffices($dept_view_campus_id) as $abbr => $name):
+                    $is_default = $dept_view_campus_id === 1 && in_array($abbr, $default_office_keys);
                 ?>
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:6px;background:#fff;">
                     <div>
@@ -508,6 +526,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <input type="hidden" name="dept_action" value="delete">
                         <input type="hidden" name="dept_type" value="offices">
                         <input type="hidden" name="dept_abbr" value="<?php echo htmlspecialchars($abbr); ?>">
+                        <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                         <button type="submit" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:#dc2626;border-radius:5px;padding:4px 10px;font-size:.75rem;cursor:pointer;"><i class="fas fa-trash"></i></button>
                     </form>
                     <?php endif; ?>
@@ -591,89 +610,102 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 </div>
 
 <script>
+var icModalItems = [];      // this campus/college's raw item rows
+var icModalSortBy = 'name'; // 'name' | 'quantity' | 'status'
+
+// Collapse individual unit rows into one entry per item_name (one row = one
+// physical unit in this model), so 5 "Network Server" rows show as a single
+// "Network Server — 5 units" group instead of 5 separate jumbled entries.
+function icGroupItems(items) {
+    var groups = {};
+    items.forEach(function(item) {
+        var key = item.item_name.toLowerCase();
+        if (!groups[key]) {
+            groups[key] = { item_name: item.item_name, category: item.category, units: [] };
+        }
+        groups[key].units.push(item);
+    });
+    return Object.values(groups);
+}
+
 function openInventoryModal(campusId, filterCode, filterName) {
     const modal = document.getElementById('inventoryModal');
     const modalTitle = document.getElementById('modalTitle');
     const modalContent = document.getElementById('modalContent');
-    
+
     modalTitle.textContent = filterName + ' - Inventory Items';
-    
-    // Loading state
-    modalContent.innerHTML = '<div class="ic-modal-empty"><i class="fas fa-spinner fa-spin"></i><p>Loading inventory items...</p></div>';
     modal.classList.add('active');
-    
-    // Fetch inventory items for campus and filter by college/office if provided
+
     const inventory = <?php echo json_encode(getInventory()); ?>;
     let allCampusItems = inventory.filter(item => item.campus_id == campusId);
-    
-    // If filterCode is provided (for main campus colleges/offices), further filter by college_id
     if (filterCode) {
         allCampusItems = allCampusItems.filter(item => item.college_id === filterCode);
     }
-    
-    // Separate items by status: owned (available) and others
-    const ownedItems = allCampusItems.filter(item => item.status === 'available');
-    const otherItems = allCampusItems.filter(item => item.status !== 'available');
-    
-    if (ownedItems.length === 0 && otherItems.length === 0) {
-        modalContent.innerHTML = '<div class="ic-modal-empty"><i class="fas fa-inbox"></i><p>No inventory items found for this campus.</p></div>';
+    icModalItems = allCampusItems;
+    icModalSortBy = 'name';
+    renderInventoryModal('');
+}
+
+function renderInventoryModal(searchTerm) {
+    const modalContent = document.getElementById('modalContent');
+    const term = (searchTerm || '').toLowerCase().trim();
+
+    let items = icModalItems;
+    if (term) {
+        items = items.filter(function(item) {
+            return item.item_name.toLowerCase().indexOf(term) !== -1
+                || (item.category || '').toLowerCase().indexOf(term) !== -1
+                || (item.qr_code_id || '').toLowerCase().indexOf(term) !== -1;
+        });
+    }
+
+    let groups = icGroupItems(items);
+    groups.sort(function(a, b) {
+        if (icModalSortBy === 'quantity') return b.units.length - a.units.length;
+        if (icModalSortBy === 'status') {
+            var as = a.units[0] ? a.units[0].status : '', bs = b.units[0] ? b.units[0].status : '';
+            return as.localeCompare(bs);
+        }
+        return a.item_name.localeCompare(b.item_name);
+    });
+
+    // Search + sort toolbar, always shown (re-render keeps the box focused/typed value).
+    let html = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">';
+    html += '<input type="text" id="icModalSearch" placeholder="Search items…" value="' + htmlEscape(searchTerm || '') + '" oninput="renderInventoryModal(this.value)" ' +
+            'style="flex:1;min-width:180px;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;outline:none;">';
+    html += '<select onchange="icModalSortBy=this.value; renderInventoryModal(document.getElementById(\'icModalSearch\').value);" style="padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;">';
+    html += '<option value="name"' + (icModalSortBy === 'name' ? ' selected' : '') + '>Sort: Name</option>';
+    html += '<option value="quantity"' + (icModalSortBy === 'quantity' ? ' selected' : '') + '>Sort: Quantity</option>';
+    html += '<option value="status"' + (icModalSortBy === 'status' ? ' selected' : '') + '>Sort: Status</option>';
+    html += '</select>';
+    html += '</div>';
+
+    if (groups.length === 0) {
+        html += '<div class="ic-modal-empty"><i class="fas fa-inbox"></i><p>No inventory items match.</p></div>';
+        modalContent.innerHTML = html;
         return;
     }
-    
-    let html = '';
-    
-    // Display Owned Items as Cards
-    if (ownedItems.length > 0) {
-        html += '<div style="margin-bottom: 28px;">';
-        html += '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">';
-        html += '<h5 style="font-size: 0.9rem; font-weight: 800; color: #1a1d23; text-transform: uppercase; letter-spacing: 0.5px; margin: 0;"><i class="fas fa-check-circle" style="color: #15803d; margin-right: 6px;"></i>Owned Items</h5>';
-        html += '<span style="background: rgba(34,197,94,0.12); color: #15803d; padding: 4px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: 700;">' + ownedItems.length + ' item' + (ownedItems.length !== 1 ? 's' : '') + '</span>';
-        html += '</div>';
-        html += '<div class="ic-items-cards-grid">';
-        
-        ownedItems.forEach(item => {
-            html += '<div class="ic-item-card">';
-            html += '<div class="ic-item-card-name">' + htmlEscape(item.item_name) + '</div>';
-            html += '<div class="ic-item-card-category">' + htmlEscape(item.category) + '</div>';
-            html += '<div class="ic-item-card-info">';
-            html += '<div class="ic-item-card-stat"><div class="ic-item-card-stat-val">' + item.quantity + '</div><div class="ic-item-card-stat-lbl">Quantity</div></div>';
-            html += '<div class="ic-item-card-stat"><div class="ic-item-card-stat-val" style="color: #15803d;"><i class="fas fa-check"></i></div><div class="ic-item-card-stat-lbl">Available</div></div>';
-            html += '</div>';
-            html += '<div class="ic-item-card-condition">';
-            html += '<span class="ic-item-card-condition-lbl">Condition:</span>';
-            html += '<span class="ic-item-card-condition-val">' + htmlEscape(item.condition || 'Good') + '</span>';
-            html += '</div>';
-            html += '<div class="ic-item-card-qr">QR: ' + htmlEscape(item.qr_code_id) + '</div>';
-            html += '</div>';
-        });
-        
-        html += '</div></div>';
-    }
-    
-    // Display Other Items as Table
-    if (otherItems.length > 0) {
-        html += '<div style="margin-top: 28px;">';
-        html += '<h5 style="font-size: 0.9rem; font-weight: 800; color: #1a1d23; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fas fa-info-circle" style="color: #1d4ed8; margin-right: 6px;"></i>Active Status Items (' + otherItems.length + ')</h5>';
-        html += '<table class="ic-items-table"><thead><tr>';
-        html += '<th>Item Name</th><th>Category</th><th>Quantity</th><th>Status</th><th>Condition</th><th>QR Code</th>';
-        html += '</tr></thead><tbody>';
-        
-        otherItems.forEach(item => {
-            const statusClass = getStatusBadgeClass(item.status);
-            html += '<tr>';
-            html += '<td><strong>' + htmlEscape(item.item_name) + '</strong></td>';
-            html += '<td>' + htmlEscape(item.category) + '</td>';
-            html += '<td style="text-align:center; font-weight:600;">' + item.quantity + '</td>';
-            html += '<td><span class="ic-badge ' + statusClass + '">' + item.status.charAt(0).toUpperCase() + item.status.slice(1) + '</span></td>';
-            html += '<td>' + htmlEscape(item.condition || 'N/A') + '</td>';
-            html += '<td><code style="font-size:0.75rem;">' + htmlEscape(item.qr_code_id) + '</code></td>';
-            html += '</tr>';
-        });
-        
-        html += '</tbody></table>';
-        html += '</div>';
-    }
-    
+
+    html += '<table class="ic-items-table"><thead><tr>';
+    html += '<th>Item Name</th><th>Category</th><th>Units</th><th>Status</th><th>Condition</th>';
+    html += '</tr></thead><tbody>';
+
+    groups.forEach(function(group) {
+        var statuses = [...new Set(group.units.map(function(u) { return u.status; }))];
+        var statusLabel = statuses.length === 1 ? statuses[0] : 'mixed';
+        var statusClass = statuses.length === 1 ? getStatusBadgeClass(statuses[0]) : 'ic-badge-secondary';
+        var conditions = [...new Set(group.units.map(function(u) { return u.condition || 'N/A'; }))];
+        var condLabel = conditions.length === 1 ? conditions[0] : 'Mixed';
+        html += '<tr>';
+        html += '<td><strong>' + htmlEscape(group.item_name) + '</strong></td>';
+        html += '<td>' + htmlEscape(group.category || '') + '</td>';
+        html += '<td style="text-align:center; font-weight:600;">' + group.units.length + '</td>';
+        html += '<td><span class="ic-badge ' + statusClass + '">' + statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1) + '</span></td>';
+        html += '<td>' + htmlEscape(condLabel) + '</td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
     modalContent.innerHTML = html;
 }
 
@@ -712,14 +744,27 @@ function deptTab(tab) {
             btn.style.boxShadow = 'none';
         }
     });
-    document.getElementById('main-campus-note').style.display = (tab === 'campuses') ? 'none' : 'flex';
-    document.getElementById('campuses-note').style.display    = (tab === 'campuses') ? 'flex' : 'none';
+    document.getElementById('dept-campus-picker').style.display = (tab === 'campuses') ? 'none' : 'block';
+    document.getElementById('campuses-note').style.display      = (tab === 'campuses') ? 'flex' : 'none';
+}
+
+// Reload with the modal reopened, scoped to the chosen campus's colleges/offices
+function deptCampusChange(campusId) {
+    var url = new URL(window.location.href);
+    url.searchParams.set('dept_campus_id', campusId);
+    url.searchParams.set('openDeptModal', '1');
+    window.location.href = url.toString();
 }
 
 // Close dept modal on outside click
 document.getElementById('deptModal').addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('active');
 });
+
+// Reopen the dept modal after a campus switch / add / delete redirect
+<?php if (isset($_GET['openDeptModal'])): ?>
+document.getElementById('deptModal').classList.add('active');
+<?php endif; ?>
 
 // Close modal when clicking outside
 document.getElementById('inventoryModal').addEventListener('click', function(e) {

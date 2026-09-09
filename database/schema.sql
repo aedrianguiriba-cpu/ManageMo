@@ -22,6 +22,23 @@ END $$;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS disapproval_reason      TEXT;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS scheduled_delivery_date DATE;
 
+-- Scope a college/office to a specific campus. NULL = Main Campus (id 1),
+-- matching pre-existing behavior where departments were Main-Campus-only.
+ALTER TABLE departments ADD COLUMN IF NOT EXISTS campus_id INT;
+
+-- "Date needed" for item/service requests (borrow already has expected_return_date).
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS date_needed DATE;
+
+-- Add 'condemnation' as a 4th request type (user-initiated request to condemn
+-- one of their own owned/borrowed items), alongside existing borrow/item/service.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'requests_request_type_check') THEN
+        ALTER TABLE requests DROP CONSTRAINT requests_request_type_check;
+    END IF;
+    ALTER TABLE requests ADD CONSTRAINT requests_request_type_check
+        CHECK (request_type IN ('borrow','item','service','condemnation'));
+END $$;
+
 CREATE TABLE IF NOT EXISTS notifications (
     id         BIGSERIAL PRIMARY KEY,
     user_id    INT  NOT NULL,
@@ -95,7 +112,7 @@ CREATE TABLE IF NOT EXISTS requests (
     inventory_id         INT,
     group_id             TEXT,
     qr_code_id           TEXT,
-    request_type         TEXT NOT NULL CHECK (request_type IN ('borrow','item','service')),
+    request_type         TEXT NOT NULL CHECK (request_type IN ('borrow','item','service','condemnation')),
 -- Run in Supabase SQL Editor if table already exists:
 -- ALTER TABLE requests ADD COLUMN IF NOT EXISTS qr_code_id TEXT;
 -- ALTER TABLE requests ADD COLUMN IF NOT EXISTS group_id TEXT;
@@ -105,6 +122,7 @@ CREATE TABLE IF NOT EXISTS requests (
     reason_for_request   TEXT,
     service_description  TEXT,
     expected_return_date DATE,
+    date_needed          DATE,
     quantity_requested   INT  NOT NULL DEFAULT 1,
     status               TEXT NOT NULL DEFAULT 'pending'
                              CHECK (status IN ('pending','approved','disapproved','delivered','completed')),
@@ -177,9 +195,21 @@ CREATE TABLE IF NOT EXISTS departments (
     type         TEXT NOT NULL CHECK (type IN ('college','office')),
     abbreviation TEXT NOT NULL,
     full_name    TEXT NOT NULL,
+    campus_id    INT, -- NULL = Main Campus (id 1)
     is_default   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ DEFAULT NOW()
 );
+-- One abbreviation per (type, campus) — NULL and 1 both mean Main Campus, so they're
+-- coalesced together here to actually prevent a Main Campus duplicate.
+-- If this CREATE UNIQUE INDEX fails with "could not create unique index" / "duplicate
+-- key", your departments table already has duplicate (type, abbreviation) rows from an
+-- earlier non-idempotent run of this seed block — run this first to remove the extras
+-- (keeps the lowest id per group), then re-run this file:
+--   DELETE FROM departments a USING departments b
+--     WHERE a.id > b.id AND a.type = b.type AND a.abbreviation = b.abbreviation
+--       AND COALESCE(a.campus_id,1) = COALESCE(b.campus_id,1);
+CREATE UNIQUE INDEX IF NOT EXISTS departments_type_abbr_campus_uq
+    ON departments (type, abbreviation, COALESCE(campus_id, 1));
 
 CREATE TABLE IF NOT EXISTS notifications (
     id         BIGSERIAL PRIMARY KEY,
@@ -215,7 +245,8 @@ INSERT INTO users (id, email, password, full_name, role, campus_id, college_id, 
 (1, 'admin@university.edu',       '$2y$10$nLrah9DuGOziCM/BlWJFheD7ECyeITABU6Lnb5dei5IIrC3nXdPCG', 'John Administrator', 'admin', 1, NULL,  '09171234567', 1, '2026-01-15 08:00:00', '2026-04-11 10:00:00'),
 (2, 'user@university.edu',        '$2y$10$ujcshmXy9T9ncnJxOE7oNueB16kTlTiWH9QY0ggUHrXSZUClfXpVa', 'Maria Garcia',       'user',  1, 'CCS', '09171234568', 1, '2026-01-20 09:00:00', '2026-04-11 10:00:00'),
 (3, 'custodian1@university.edu',  '$2y$10$6aKE8TKp4PxeX/jg3Y5TE.fITuRur4vsK1MSGBaE8pWUhPQFyi8Ea', 'Carlos Santos',      'user',  2, NULL,  '09171234569', 1, '2026-02-01 08:30:00', '2026-04-11 10:00:00'),
-(4, 'custodian2@university.edu',  '$2y$10$6aKE8TKp4PxeX/jg3Y5TE.fITuRur4vsK1MSGBaE8pWUhPQFyi8Ea', 'Anna Rodriguez',     'user',  3, NULL,  '09171234570', 1, '2026-02-05 09:15:00', '2026-04-11 10:00:00');
+(4, 'custodian2@university.edu',  '$2y$10$6aKE8TKp4PxeX/jg3Y5TE.fITuRur4vsK1MSGBaE8pWUhPQFyi8Ea', 'Anna Rodriguez',     'user',  3, NULL,  '09171234570', 1, '2026-02-05 09:15:00', '2026-04-11 10:00:00')
+ON CONFLICT DO NOTHING;
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
 -- Inventory
@@ -249,7 +280,8 @@ INSERT INTO inventory (id, qr_code_id, item_name, category, description, campus_
 (27, 'QR-A7B8C9D0E1', 'Portable Generator',     'Equipment',        '3.5 kVA portable gasoline generator, engine seized',           2, NULL,   1,  'damaged',     'Utility Room 001',           '2022-11-05', 18000.00, 'poor',      '2026-05-12 10:30:00'),
 (28, 'QR-F2G3H4I5J6', 'Industrial Floor Buffer','Equipment',        '175 RPM floor polisher/buffer, motor damaged',                 1, NULL,   1,  'maintenance', 'Custodial Office',           '2023-03-18', 12000.00, 'fair',      '2026-05-15 08:00:00'),
 (29, 'QR-K7L8M9N0O1', 'Overhead Projector',     'Electronics',      'Old-model overhead projector, lamp cracked and flickering',    3, NULL,   1,  'damaged',     'Lecture Hall 202',           '2022-06-20', 9500.00,  'poor',      '2026-05-18 11:00:00'),
-(30, 'QR-P2Q3R4S5T6', 'UPS Battery Backup',     'Electronics',      '1200VA UPS unit, battery no longer holds charge',              1, NULL,   2,  'maintenance', 'Server Room 101',            '2023-01-30', 7800.00,  'fair',      '2026-05-20 13:00:00');
+(30, 'QR-P2Q3R4S5T6', 'UPS Battery Backup',     'Electronics',      '1200VA UPS unit, battery no longer holds charge',              1, NULL,   2,  'maintenance', 'Server Room 101',            '2023-01-30', 7800.00,  'fair',      '2026-05-20 13:00:00')
+ON CONFLICT DO NOTHING;
 SELECT setval('inventory_id_seq', (SELECT MAX(id) FROM inventory));
 
 -- Requests
@@ -265,7 +297,8 @@ INSERT INTO requests (id, request_number, user_id, inventory_id, request_type, u
 (9,  'REQ-00009', 2, NULL, 'service', 'high',     NULL,       NULL,                                                                      'Air conditioning unit in Room 204 is not cooling properly. Needs cleaning and refrigerant refill.', NULL, 1, 'pending', NULL,             NULL, NULL,                     '2026-04-14 09:30:00', '2026-04-14 09:30:00'),
 (10, 'REQ-00010', 3, NULL, 'service', 'medium',   NULL,       NULL,                                                                      'Several electrical outlets in the faculty lounge are loose and need to be replaced to prevent hazards.', NULL, 1, 'pending', NULL,          NULL, NULL,                     '2026-04-14 10:15:00', '2026-04-14 10:15:00'),
 (11, 'REQ-00011', 4, 6,    'borrow',  'low',      'pickup',   'Students need calculators for engineering board exam review',              NULL,                                                                                     '2026-04-25', 8,  'pending',     NULL,              NULL, NULL,                     '2026-04-14 14:00:00', '2026-04-14 14:00:00'),
-(12, 'REQ-00012', 2, NULL, 'item',    'critical', 'delivery', 'Emergency: whiteboard in main lecture hall is cracked and unusable',      'Portable Whiteboard - Qty: 1',                                                           NULL,         1,  'pending',     NULL,              NULL, NULL,                     '2026-04-15 07:55:00', '2026-04-15 07:55:00');
+(12, 'REQ-00012', 2, NULL, 'item',    'critical', 'delivery', 'Emergency: whiteboard in main lecture hall is cracked and unusable',      'Portable Whiteboard - Qty: 1',                                                           NULL,         1,  'pending',     NULL,              NULL, NULL,                     '2026-04-15 07:55:00', '2026-04-15 07:55:00')
+ON CONFLICT DO NOTHING;
 SELECT setval('requests_id_seq', (SELECT MAX(id) FROM requests));
 
 -- Borrow records
@@ -287,7 +320,8 @@ INSERT INTO borrow_records (id, user_id, inventory_id, request_id, borrow_date, 
 (15, 4, 18, NULL, '2026-06-22', '2026-07-01', NULL,         'active',   'Accounting finals week — extra units',        '2026-06-22 10:00:00'),
 (16, 3, 18, NULL, '2026-06-22', '2026-07-05', NULL,         'active',   'CPA review class practice set',               '2026-06-22 11:00:00'),
 (17, 2, 21, NULL, '2026-06-22', '2026-07-04', NULL,         'active',   'Second cart for catering event overflow',     '2026-06-22 07:30:00'),
-(18, 4, 17, NULL, '2026-06-22', '2026-07-10', NULL,         'active',   'CEA capstone project — second workstation',   '2026-06-22 09:00:00');
+(18, 4, 17, NULL, '2026-06-22', '2026-07-10', NULL,         'active',   'CEA capstone project — second workstation',   '2026-06-22 09:00:00')
+ON CONFLICT DO NOTHING;
 SELECT setval('borrow_records_id_seq', (SELECT MAX(id) FROM borrow_records));
 
 -- User owned items
@@ -296,7 +330,8 @@ INSERT INTO user_owned_items (id, user_id, item_name, category, description, yea
 (2, 2, 'Office Chair',     'Furniture',   'Ergonomic swivel office chair',        2023, 1, 3, 'good',      'Minor wear on armrests',          '2023-03-20', '2024-07-01 14:30:00'),
 (3, 3, 'Projector',        'Electronics', '4K Multimedia Projector',              2024, 2, 1, 'excellent', 'Used for semester presentations', '2024-01-15', '2024-08-10 09:15:00'),
 (4, 4, 'Whiteboard Set',   'Equipment',   'Portable whiteboard with markers',     2022, 3, 2, 'fair',      'Surface has some stains but functional', '2022-09-12', '2024-05-22 11:45:00'),
-(5, 2, 'Printer',          'Electronics', 'Canon Laser Printer',                  2024, 1, 1, 'excellent', 'Department use',                  '2024-02-28', '2024-09-05 16:20:00');
+(5, 2, 'Printer',          'Electronics', 'Canon Laser Printer',                  2024, 1, 1, 'excellent', 'Department use',                  '2024-02-28', '2024-09-05 16:20:00')
+ON CONFLICT DO NOTHING;
 SELECT setval('user_owned_items_id_seq', (SELECT MAX(id) FROM user_owned_items));
 
 -- Campuses
@@ -308,7 +343,8 @@ INSERT INTO campuses (id, name, location, description, is_default) VALUES
 (5, 'Lubao Campus',                'Sta. Catalina, Lubao, Pampanga',       'PSU extension campus offering specialized courses in the Lubao area.',                               true),
 (6, 'Candaba Campus',              'Candaba, Pampanga',                    'PSU extension campus serving the educational needs of the Candaba community.',                        true),
 (7, 'Apalit Campus',               'Apalit, Pampanga',                     'PSU dedicated campus serving the Apalit municipality.',                                               true),
-(8, 'City of San Fernando Campus', 'City of San Fernando, Pampanga',       'PSU satellite campus in the provincial capital, City of San Fernando.',                              true);
+(8, 'City of San Fernando Campus', 'City of San Fernando, Pampanga',       'PSU satellite campus in the provincial capital, City of San Fernando.',                              true)
+ON CONFLICT DO NOTHING;
 SELECT setval('campuses_id_seq', (SELECT MAX(id) FROM campuses));
 
 -- Departments (colleges and offices)
@@ -334,4 +370,5 @@ INSERT INTO departments (type, abbreviation, full_name, is_default) VALUES
 ('office',  'PPMO',   'Physical Plant and Maintenance Office (PPMO)',                 true),
 ('office',  'ULib',   'University Library (ULib)',                                    true),
 ('office',  'GCC',    'Guidance and Counseling Center (GCC)',                         true),
-('office',  'PDO',    'Planning and Development Office (PDO)',                        true);
+('office',  'PDO',    'Planning and Development Office (PDO)',                        true)
+ON CONFLICT DO NOTHING;

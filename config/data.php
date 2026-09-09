@@ -62,32 +62,38 @@ function clearDataCache(string ...$keys): void {
     }
 }
 
-// ── Main Campus Colleges ──────────────────────────────────────────────────────
+// ── Colleges / Offices (Main Campus by default; pass a campus_id for others) ──
+// campus_id is nullable on the departments row — NULL (or 1) means Main Campus,
+// preserving pre-existing behavior for every no-arg call site.
 
-function getMainCampusColleges(): array {
-    return _dbCache('departments_colleges', function () {
-        $rows = supabase()->select('departments', 'type=eq.college&order=abbreviation.asc');
+function _departmentsByType(string $type, ?int $campus_id = null): array {
+    $cache_key = $campus_id === null || $campus_id === 1
+        ? "departments_{$type}_1"
+        : "departments_{$type}_{$campus_id}";
+    return _dbCache($cache_key, function () use ($type, $campus_id) {
+        $qs = "type=eq.$type&order=abbreviation.asc&";
+        $qs .= ($campus_id === null || $campus_id === 1)
+            ? 'or=(campus_id.is.null,campus_id.eq.1)'
+            : 'campus_id=eq.' . $campus_id;
+        $rows = supabase()->select('departments', $qs);
         $out = [];
         foreach ($rows as $r) $out[$r['abbreviation']] = $r['full_name'];
         return $out;
     });
 }
 
-// ── Main Campus Offices ───────────────────────────────────────────────────────
+function getMainCampusColleges(?int $campus_id = null): array {
+    return _departmentsByType('college', $campus_id);
+}
 
-function getMainCampusOffices(): array {
-    return _dbCache('departments_offices', function () {
-        $rows = supabase()->select('departments', 'type=eq.office&order=abbreviation.asc');
-        $out = [];
-        foreach ($rows as $r) $out[$r['abbreviation']] = $r['full_name'];
-        return $out;
-    });
+function getMainCampusOffices(?int $campus_id = null): array {
+    return _departmentsByType('office', $campus_id);
 }
 
 // ── Combined departments ──────────────────────────────────────────────────────
 
-function getMainCampusDepartments(): array {
-    return array_merge(getMainCampusColleges(), getMainCampusOffices());
+function getMainCampusDepartments(?int $campus_id = null): array {
+    return array_merge(getMainCampusColleges($campus_id), getMainCampusOffices($campus_id));
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────

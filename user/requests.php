@@ -57,10 +57,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $shared['expected_return_date'] = !empty($first['return_date']) ? $first['return_date'] : null;
         } elseif ($safe_type === 'item') {
             $shared['reason_for_request'] = sanitizeInput($first['reason'] ?? '');
+            $shared['date_needed']        = !empty($first['date_needed']) ? $first['date_needed'] : null;
         } elseif ($safe_type === 'service') {
-            $svc_type = sanitizeInput($first['service_type'] ?? '');
-            $svc_desc = sanitizeInput($first['description'] ?? '');
-            $shared['service_description'] = $svc_type ? "[$svc_type] $svc_desc" : $svc_desc;
+            // No inventory link anymore (pure free text) — the subject name is the only
+            // display name available, so fold it into service_description alongside the
+            // type + details so every "resolve item/service name" fallback still finds it.
+            $svc_subject = sanitizeInput($first['name'] ?? 'Service Request');
+            $svc_type    = sanitizeInput($first['service_type'] ?? '');
+            $svc_desc    = sanitizeInput($first['description'] ?? '');
+            $shared['service_description'] = $svc_subject . ($svc_type ? " [$svc_type]" : '') . ($svc_desc ? " — $svc_desc" : '');
+            $shared['date_needed']         = !empty($first['date_needed']) ? $first['date_needed'] : null;
         }
 
         // Collect all units to create as individual request rows
@@ -107,12 +113,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ];
                 }
             } elseif ($safe_type === 'service') {
-                $svc_inv_id = !empty($entry['item_id']) ? (int)$entry['item_id'] : null;
-                $svc_item   = $svc_inv_id ? findById($all_inv, $svc_inv_id) : null;
+                // Pure free-text now — no item dropdown/inventory link, just what the user typed.
                 $units_to_save[] = [
-                    'inventory_id' => $svc_inv_id,
-                    'qr_code_id'   => $svc_item['qr_code_id'] ?? generateQRCodeId(),
-                    'item_name'    => $svc_item['item_name'] ?? 'Service Item',
+                    'inventory_id' => null,
+                    'qr_code_id'   => generateQRCodeId(),
+                    'item_name'    => sanitizeInput($entry['name'] ?? 'Service Request'),
                 ];
             }
         }
@@ -1266,12 +1271,22 @@ if (!empty($submit_error)): ?>
                         <input type="hidden" id="item_desc_display" name="item_desc_detail">
                     </div>
 
-                    <div class="rq-field" style="max-width:160px;">
-                        <label>Quantity <span class="rq-req">*</span></label>
-                        <div class="rq-input-wrap">
-                            <i class="fas fa-hashtag rq-input-icon"></i>
-                            <input type="number" class="form-control" id="quantity" name="quantity"
-                                   value="1" min="1" oninput="updateSummary()">
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                        <div class="rq-field" style="max-width:160px;">
+                            <label>Quantity <span class="rq-req">*</span></label>
+                            <div class="rq-input-wrap">
+                                <i class="fas fa-hashtag rq-input-icon"></i>
+                                <input type="number" class="form-control" id="quantity" name="quantity"
+                                       value="1" min="1" oninput="updateSummary()">
+                            </div>
+                        </div>
+
+                        <div class="rq-field" style="max-width:220px;">
+                            <label>Date Needed</label>
+                            <div class="rq-input-wrap">
+                                <i class="fas fa-calendar rq-input-icon"></i>
+                                <input type="date" class="form-control" id="item_date_needed" name="item_date_needed" oninput="updateSummary()">
+                            </div>
                         </div>
                     </div>
 
@@ -1291,104 +1306,38 @@ if (!empty($submit_error)): ?>
                     <div class="rq-section-title"><i class="fas fa-tools"></i> Service Request Details</div>
 
                     <div class="rq-field">
-                        <label>Item Requiring Service <span class="rq-req">*</span></label>
-
-                        <?php
-                        // NOTE: $svc_by_cat must be computed BEFORE the hidden <select> below —
-                        // it used to be built after the <select> rendered, so the <select> always
-                        // ended up with no real <option> elements, and JS could never successfully
-                        // set its value (a <select>'s value only takes if a matching <option>
-                        // exists). That silently broke "Add to List" for every service request.
-                        $svcStatusMeta = [
-                            'available'   => ['label'=>'Available',   'cls'=>'bshop-pill-avail',    'badge'=>'bshop-avail-ok'],
-                            'borrowed'    => ['label'=>'Borrowed',    'cls'=>'bshop-pill-borrowed',  'badge'=>'bshop-avail-none'],
-                            'maintenance' => ['label'=>'Maintenance', 'cls'=>'bshop-pill-maint',    'badge'=>'bshop-avail-maint'],
-                            'damaged'     => ['label'=>'Damaged',     'cls'=>'bshop-pill-damaged',  'badge'=>'bshop-avail-none'],
-                            'requested'   => ['label'=>'Requested',   'cls'=>'bshop-pill-borrowed', 'badge'=>'bshop-avail-none'],
-                        ];
-                        // Group inventory items by category for filter — exclude condemned/disposed items,
-                        // since a retired item can no longer need service.
-                        $serviceable_items = array_values(array_filter($inventory_items, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
-                        $svc_by_cat = [];
-                        foreach (groupInventoryItems($serviceable_items) as $group) {
-                            $c = $group['category'] ?? 'Other';
-                            $svc_by_cat[$c][] = $group;
-                        }
-                        ?>
-
-                        <!-- Hidden select (used by addToCart for item name + id) -->
-                        <select id="item_id" name="item_id" style="display:none;" required>
-                            <option value="">— Select an item —</option>
-                            <?php foreach ($svc_by_cat as $__svc_groups): foreach ($__svc_groups as $__sg): $__svc_first = $__sg['units'][0]; ?>
-                            <option value="<?php echo $__svc_first['id']; ?>">
-                                <?php echo htmlspecialchars($__sg['item_name']); ?>
-                            </option>
-                            <?php endforeach; endforeach; ?>
-                        </select>
-
-                        <!-- Shop grid -->
-                        <div class="bshop-wrap">
-                            <div class="bshop-controls">
-                                <div class="bshop-search-wrap">
-                                    <i class="fas fa-search bshop-search-icon"></i>
-                                    <input type="text" id="sshop-search" placeholder="Search items…" oninput="filterServiceShop()">
-                                </div>
-                            </div>
-                            <div class="bshop-cats" id="sshop-cats">
-                                <button type="button" class="bshop-cat active" data-cat="" onclick="filterServiceShop(this)">All</button>
-                                <?php foreach (array_keys($svc_by_cat) as $cat): ?>
-                                <button type="button" class="bshop-cat" data-cat="<?php echo htmlspecialchars($cat); ?>" onclick="filterServiceShop(this)"><?php echo htmlspecialchars($cat); ?></button>
-                                <?php endforeach; ?>
-                            </div>
-                            <div class="bshop-grid" id="sshop-grid">
-                                <?php foreach ($svc_by_cat as $category => $svc_groups):
-                                    foreach ($svc_groups as $svc_grp):
-                                        $meta       = $catMeta[$category] ?? $defaultMeta;
-                                        $svc_first  = $svc_grp['units'][0];
-                                        $svc_total  = count($svc_grp['units']);
-                                        $svc_statuses = array_unique(array_column($svc_grp['units'], 'status'));
-                                        $svc_status   = count($svc_statuses) === 1 ? $svc_statuses[0] : 'mixed';
-                                        $sm = $svcStatusMeta[$svc_status] ?? ['label'=>ucfirst($svc_status),'cls'=>'bshop-pill-custom','badge'=>'bshop-avail-none'];
-                                        $svc_desc = $svc_grp['description'] ?: ($svc_first['description'] ?? '');
-                                ?>
-                                <div class="bshop-card"
-                                     data-value="<?php echo $svc_first['id']; ?>"
-                                     data-category="<?php echo htmlspecialchars($category); ?>"
-                                     onclick="selectServiceCard(this)">
-                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
-                                    <div class="bshop-avail-badge <?php echo $sm['badge']; ?>"><?php echo $svc_total; ?> unit<?php echo $svc_total > 1 ? 's' : ''; ?></div>
-                                    <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
-                                        <i class="fas <?php echo $meta['icon']; ?>"></i>
-                                    </div>
-                                    <div class="bshop-name"><?php echo htmlspecialchars($svc_grp['item_name']); ?></div>
-                                    <div class="bshop-desc"><?php echo htmlspecialchars($svc_desc); ?></div>
-                                    <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($svc_first['location'] ?? ''); ?></div>
-                                    <div class="bshop-foot">
-                                        <div class="bshop-price">₱<?php echo number_format($svc_first['cost'] ?? 0, 2); ?></div>
-                                        <div class="bshop-status-pill <?php echo $sm['cls']; ?>"><?php echo $sm['label']; ?></div>
-                                    </div>
-                                </div>
-                                <?php endforeach; endforeach; ?>
-                                <div id="sshop-empty" class="bshop-empty" style="display:none;">
-                                    <i class="fas fa-search"></i><span>No items match</span>
-                                </div>
-                            </div>
+                        <label>What needs service? <span class="rq-req">*</span></label>
+                        <div class="rq-input-wrap">
+                            <i class="fas fa-box rq-input-icon"></i>
+                            <input type="text" class="form-control" id="service_subject" name="service_subject"
+                                   placeholder="e.g., Aircon in Room 204, CCS Server Rack"
+                                   oninput="updateSummary()">
                         </div>
                     </div>
 
-                    <div class="rq-field">
-                        <label>Type of Service <span class="rq-req">*</span></label>
-                        <div class="rq-input-wrap">
-                            <i class="fas fa-wrench rq-input-icon"></i>
-                            <select class="form-select" id="service_type" name="service_type"
-                                    onchange="updateSummary()">
-                                <option value="">— Select service type —</option>
-                                <option value="repair">🔧 Repair</option>
-                                <option value="maintenance">🛠️ Maintenance</option>
-                                <option value="inspection">🔍 Inspection</option>
-                                <option value="cleaning">🧹 Cleaning</option>
-                                <option value="other">📋 Other</option>
-                            </select>
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                        <div class="rq-field" style="flex:1;min-width:180px;">
+                            <label>Type of Service <span class="rq-req">*</span></label>
+                            <div class="rq-input-wrap">
+                                <i class="fas fa-wrench rq-input-icon"></i>
+                                <select class="form-select" id="service_type" name="service_type"
+                                        onchange="updateSummary()">
+                                    <option value="">— Select service type —</option>
+                                    <option value="repair">🔧 Repair</option>
+                                    <option value="maintenance">🛠️ Maintenance</option>
+                                    <option value="inspection">🔍 Inspection</option>
+                                    <option value="cleaning">🧹 Cleaning</option>
+                                    <option value="other">📋 Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="rq-field" style="max-width:220px;">
+                            <label>Date Needed</label>
+                            <div class="rq-input-wrap">
+                                <i class="fas fa-calendar rq-input-icon"></i>
+                                <input type="date" class="form-control" id="service_date_needed" name="service_date_needed" oninput="updateSummary()">
+                            </div>
                         </div>
                     </div>
 
@@ -1568,7 +1517,7 @@ function updateRequestType(type) {
     // Hide availability calendar whenever request type changes
     var iacWrap = document.getElementById('iac-wrap');
     if (iacWrap) iacWrap.style.display = 'none';
-    ['borrow_catalog_select','expected_return_date','borrow_quantity','item_description','quantity','item_id','service_type','service_description'].forEach(id => {
+    ['borrow_catalog_select','expected_return_date','borrow_quantity','item_description','quantity','service_subject','service_type','service_description'].forEach(id => {
         document.getElementById(id).removeAttribute('required');
     });
     // Hide receiving method for service requests (not applicable)
@@ -1584,7 +1533,7 @@ function updateRequestType(type) {
         document.getElementById('quantity').setAttribute('required','required');
     } else if (type === 'service') {
         document.getElementById('service_fields').style.display = 'block';
-        document.getElementById('item_id').setAttribute('required','required');
+        document.getElementById('service_subject').setAttribute('required','required');
         document.getElementById('service_type').setAttribute('required','required');
         document.getElementById('service_description').setAttribute('required','required');
     }
@@ -1923,15 +1872,17 @@ function addToCart() {
         var itemUnitIds = [];
         try { itemUnitIds = JSON.parse(itemUnitIdsRaw); } catch(e) { itemUnitIds = []; }
         var itemFirstUnitId = itemCard ? (itemCard.getAttribute('data-first-unit-id') || '') : '';
-        entry = { type:'item', name:name2, qty:qty2, reason:reason2, inventory_id:itemFirstUnitId, unit_ids:itemUnitIds };
+        var dateNeeded2 = document.getElementById('item_date_needed').value;
+        entry = { type:'item', name:name2, qty:qty2, reason:reason2, inventory_id:itemFirstUnitId, unit_ids:itemUnitIds, date_needed:dateNeeded2 };
     } else {
-        var itemSel = document.getElementById('item_id');
-        if (!itemSel.value) { showCartError('Please select an item requiring service.'); return; }
+        var svcSubject = document.getElementById('service_subject').value.trim();
+        if (!svcSubject) { showCartError('Please describe what needs service.'); return; }
         var svcType = document.getElementById('service_type').value;
         if (!svcType) { showCartError('Please select a service type.'); return; }
         var svcDesc = document.getElementById('service_description').value.trim();
         if (!svcDesc) { showCartError('Please describe the service needed.'); return; }
-        entry = { type:'service', name:itemSel.options[itemSel.selectedIndex].text, item_id:itemSel.value, service_type:svcType, description:svcDesc };
+        var dateNeeded3 = document.getElementById('service_date_needed').value;
+        entry = { type:'service', name:svcSubject, service_type:svcType, description:svcDesc, date_needed:dateNeeded3 };
     }
     cart.push(entry);
     renderCart();
@@ -1960,6 +1911,7 @@ function renderCart() {
         var meta = [];
         if (e.qty && e.qty > 1) meta.push('Qty: ' + e.qty);
         if (e.return_date) meta.push('Return: ' + new Date(e.return_date + 'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}));
+        if (e.date_needed) meta.push('Needed: ' + new Date(e.date_needed + 'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}));
         if (e.service_type) meta.push(svcLabels[e.service_type] || e.service_type);
         if (e.description)  meta.push(e.description.substring(0,40) + (e.description.length > 40 ? '…' : ''));
         if (e.reason)       meta.push(e.reason.substring(0,40) + (e.reason.length > 40 ? '…' : ''));
@@ -1992,11 +1944,12 @@ function resetStaging(type) {
         document.getElementById('item_desc_display_wrap').style.display = 'none';
         document.getElementById('quantity').value = 1;
         document.getElementById('item_reason').value = '';
+        document.getElementById('item_date_needed').value = '';
     } else {
-        document.getElementById('item_id').value = '';
-        document.querySelectorAll('#sshop-grid .bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
+        document.getElementById('service_subject').value = '';
         document.getElementById('service_type').value = '';
         document.getElementById('service_description').value = '';
+        document.getElementById('service_date_needed').value = '';
     }
 }
 
@@ -2033,8 +1986,7 @@ function updateSummary() {
             var sel2 = document.getElementById('item_description');
             stagingName = (sel2.value && sel2.value !== '__custom__') ? sel2.value : document.getElementById('custom_item_req_name').value;
         } else {
-            var sel3 = document.getElementById('item_id');
-            stagingName = sel3.value ? sel3.options[sel3.selectedIndex].text : '';
+            stagingName = document.getElementById('service_subject').value.trim();
         }
         sumItemsEl.innerHTML = stagingName
             ? '<div class="rq-sum-preview-item"><span class="rq-sum-preview-num">?</span><span style="font-size:0.82rem;font-weight:600;">' + escHtml(stagingName) + '</span> <span style="font-size:0.72rem;color:rgba(0,0,0,0.35);">(not added)</span></div>'

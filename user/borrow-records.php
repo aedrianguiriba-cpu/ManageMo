@@ -9,6 +9,43 @@ $user_id = $current_user['id'];
 $active_tab    = $_GET['tab']    ?? 'borrow';
 $status_filter = $_GET['status'] ?? '';
 
+// User-initiated "please condemn this" request — pure text reason, no item
+// dropdown (the item is already fixed: whichever unit they're currently borrowing).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'request_condemnation') {
+    $inv_id = (int)($_POST['inventory_id'] ?? 0);
+    $reason = sanitizeInput($_POST['condemn_reason'] ?? '');
+    $item   = $inv_id ? findById(getInventory(), $inv_id) : null;
+    if (!$item || !$reason) {
+        redirectWithMessage('borrow-records.php?tab=borrow', 'Please provide a reason to request condemnation.', 'danger');
+    }
+    // Only the item's current borrower may request this, and only while they actually hold it.
+    $holds_it = array_filter(getBorrowRecords(), fn($b) => $b['user_id'] == $user_id && (int)$b['inventory_id'] === $inv_id && $b['status'] !== 'returned');
+    if (empty($holds_it)) {
+        redirectWithMessage('borrow-records.php?tab=borrow', 'You can only request condemnation for an item you currently hold.', 'danger');
+    }
+    $base_rows = supabase()->select('requests', 'select=request_number&order=id.desc&limit=1');
+    preg_match('/REQ-(\d+)/', $base_rows[0]['request_number'] ?? 'REQ-00000', $__m);
+    $next_num = isset($__m[1]) ? (int)$__m[1] + 1 : 1;
+    $result = dbCreateRequest([
+        'request_number'      => 'REQ-' . str_pad($next_num, 5, '0', STR_PAD_LEFT),
+        'user_id'              => $user_id,
+        'inventory_id'         => $inv_id,
+        'group_id'             => generateGroupId(),
+        'qr_code_id'           => $item['qr_code_id'] ?? generateQRCodeId(),
+        'request_type'         => 'condemnation',
+        'urgency'               => 'medium',
+        'reason_for_request'    => $reason,
+        'quantity_requested'    => 1,
+        'status'                => 'pending',
+    ]);
+    if ($result['success']) {
+        notifyAdmins('New condemnation request', $current_user['full_name'] . ' requested condemnation of "' . $item['item_name'] . '"', 'warning', 'admin/condemnation.php?tab=requested');
+        redirectWithMessage('borrow-records.php?tab=borrow', 'Condemnation request submitted for admin review.', 'success');
+    } else {
+        redirectWithMessage('borrow-records.php?tab=borrow', 'Failed to submit condemnation request: ' . $result['error'], 'danger');
+    }
+}
+
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
@@ -320,7 +357,7 @@ displayMessage();
             <table class="table">
                 <thead><tr>
                     <th>Item</th><th>Borrowed</th>
-                    <th>Expected Return</th><th>Returned On</th><th>Status</th><th>Notes</th>
+                    <th>Expected Return</th><th>Returned On</th><th>Status</th><th>Notes</th><th>Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($borrow_records_page) > 0):
@@ -378,9 +415,17 @@ displayMessage();
                         </span>
                     </td>
                     <td><span class="br-notes"><?php echo $rec['notes'] ? htmlspecialchars($rec['notes']) : '—'; ?></span></td>
+                    <td>
+                        <?php if (!$is_request && in_array($rec['status'], ['active', 'overdue'])): ?>
+                        <button type="button" class="btn btn-sm" style="background:rgba(139,0,0,0.08);color:#8B0000;border:1px solid rgba(139,0,0,0.2);border-radius:6px;font-size:0.75rem;font-weight:600;"
+                                onclick="openCondemnRequestModal(<?php echo (int)$rec['inventory_id']; ?>, '<?php echo htmlspecialchars(addslashes($rec['item_name'])); ?>')">
+                            <i class="fas fa-ban"></i> Request Condemnation
+                        </button>
+                        <?php else: ?>—<?php endif; ?>
+                    </td>
                 </tr>
                 <?php endforeach; else: ?>
-                <tr><td colspan="6">
+                <tr><td colspan="7">
                     <div class="br-empty"><i class="fas fa-box-open"></i><p>No borrow records found.</p></div>
                 </td></tr>
                 <?php endif; ?>
@@ -574,6 +619,41 @@ displayMessage();
     <?php endif; ?>
 
 </div>
+
+<!-- Request Condemnation modal — text-only reason, no item dropdown (item is already fixed) -->
+<div class="modal fade" id="condemnRequestModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:8px;border:1px solid #e5e7eb;">
+            <form method="POST" action="borrow-records.php?tab=borrow">
+                <input type="hidden" name="action" value="request_condemnation">
+                <input type="hidden" name="inventory_id" id="condemnReqInvId">
+                <div class="modal-header" style="border-bottom:1px solid #e5e7eb;">
+                    <h5 class="modal-title" style="font-size:1.05rem;font-weight:700;">Request Condemnation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="padding:24px;">
+                    <p style="font-size:0.85rem;color:#555;margin-bottom:14px;">
+                        Item: <strong id="condemnReqItemName"></strong>
+                    </p>
+                    <label class="form-label fw-semibold">Reason *</label>
+                    <textarea class="form-control" name="condemn_reason" rows="4" required
+                              placeholder="Explain why this item should be condemned (e.g. beyond repair, unsafe to use)."></textarea>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #e5e7eb;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn" style="background:#8B0000;color:#fff;"><i class="fas fa-ban"></i> Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+function openCondemnRequestModal(inventoryId, itemName) {
+    document.getElementById('condemnReqInvId').value = inventoryId;
+    document.getElementById('condemnReqItemName').textContent = itemName;
+    new bootstrap.Modal(document.getElementById('condemnRequestModal')).show();
+}
+</script>
 </div>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
