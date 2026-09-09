@@ -1,5 +1,13 @@
 -- ManageMo PostgreSQL Schema for Supabase
 -- Run this in the Supabase SQL Editor (Dashboard → SQL Editor → New Query)
+--
+-- NOTE: Campuses, like colleges and offices, are rows in the `departments`
+-- table (type='campus') — there is no separate `campuses` table anymore (it
+-- never actually existed on the live DB, which is why campus dropdowns were
+-- empty before this revision). `campus_id` on `inventory`, `users`, and
+-- `user_owned_items` now means departments.id, not a foreign key into some
+-- other table (same non-enforced convention `college_id` already used,
+-- pointing at departments.abbreviation).
 
 -- ═════════════════════════════════════════════════════════════════════════
 -- ⚠ REQUIRED MIGRATION — run this block now against the LIVE database.
@@ -22,12 +30,38 @@ END $$;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS disapproval_reason      TEXT;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS scheduled_delivery_date DATE;
 
--- Scope a college/office to a specific campus. NULL = Main Campus (id 1),
--- matching pre-existing behavior where departments were Main-Campus-only.
-ALTER TABLE departments ADD COLUMN IF NOT EXISTS campus_id INT;
+-- Colleges/offices are a global list, independent of any campus — not scoped
+-- or nested under a "Main Campus". Drop the old per-campus scoping so the
+-- live DB matches the CREATE TABLE / index below.
+DROP INDEX IF EXISTS departments_type_abbr_campus_uq;
+ALTER TABLE departments DROP COLUMN IF EXISTS campus_id;
+
+-- Campuses now live in the departments table too (type='campus'), alongside
+-- colleges/offices. Add the extra columns a campus needs (location/description;
+-- colleges/offices leave them NULL) and widen the type check.
+ALTER TABLE departments ADD COLUMN IF NOT EXISTS location    TEXT;
+ALTER TABLE departments ADD COLUMN IF NOT EXISTS description TEXT;
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'departments_type_check') THEN
+        ALTER TABLE departments DROP CONSTRAINT departments_type_check;
+    END IF;
+    ALTER TABLE departments ADD CONSTRAINT departments_type_check
+        CHECK (type IN ('college','office','campus'));
+END $$;
+
+-- The `campuses` table was never actually created on the live DB (dropped/never
+-- run) — every campus dropdown in the app read from it and silently got an
+-- empty list. Drop it if it exists anywhere else. (The campus_id remap onto
+-- departments.id runs at the very end of this file, after the campus rows
+-- are seeded below — it needs them to exist first.)
+DROP TABLE IF EXISTS campuses;
 
 -- "Date needed" for item/service requests (borrow already has expected_return_date).
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS date_needed DATE;
+
+-- College/office affiliation for a recorded user-owned item (same combined
+-- Colleges/Offices list used everywhere else — not a separate lookup).
+ALTER TABLE user_owned_items ADD COLUMN IF NOT EXISTS college_id TEXT;
 
 -- Add 'condemnation' as a 4th request type (user-initiated request to condemn
 -- one of their own owned/borrowed items), alongside existing borrow/item/service.
@@ -171,6 +205,7 @@ CREATE TABLE IF NOT EXISTS user_owned_items (
     description   TEXT,
     year_owned    INT,
     campus_id     INT  NOT NULL DEFAULT 1,
+    college_id    TEXT,
     quantity      INT  NOT NULL DEFAULT 1,
     condition     TEXT,
     notes         TEXT,
@@ -181,35 +216,28 @@ CREATE TABLE IF NOT EXISTS user_owned_items (
 -- Run in Supabase SQL Editor if table already exists:
 -- ALTER TABLE user_owned_items ADD COLUMN IF NOT EXISTS qr_code_id TEXT UNIQUE;
 
-CREATE TABLE IF NOT EXISTS campuses (
-    id          BIGSERIAL PRIMARY KEY,
-    name        TEXT NOT NULL,
-    location    TEXT,
-    description TEXT,
-    is_default  BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
-);
+-- No separate `campuses` table — campuses are departments rows (type='campus'),
+-- see the CREATE TABLE departments below.
 
 CREATE TABLE IF NOT EXISTS departments (
     id           BIGSERIAL PRIMARY KEY,
-    type         TEXT NOT NULL CHECK (type IN ('college','office')),
+    type         TEXT NOT NULL CHECK (type IN ('college','office','campus')),
     abbreviation TEXT NOT NULL,
     full_name    TEXT NOT NULL,
-    campus_id    INT, -- NULL = Main Campus (id 1)
+    location     TEXT, -- campus rows only
+    description  TEXT, -- campus rows only
     is_default   BOOLEAN NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ DEFAULT NOW()
 );
--- One abbreviation per (type, campus) — NULL and 1 both mean Main Campus, so they're
--- coalesced together here to actually prevent a Main Campus duplicate.
+-- One abbreviation per type — colleges/offices are a single global list.
 -- If this CREATE UNIQUE INDEX fails with "could not create unique index" / "duplicate
 -- key", your departments table already has duplicate (type, abbreviation) rows from an
 -- earlier non-idempotent run of this seed block — run this first to remove the extras
 -- (keeps the lowest id per group), then re-run this file:
 --   DELETE FROM departments a USING departments b
---     WHERE a.id > b.id AND a.type = b.type AND a.abbreviation = b.abbreviation
---       AND COALESCE(a.campus_id,1) = COALESCE(b.campus_id,1);
-CREATE UNIQUE INDEX IF NOT EXISTS departments_type_abbr_campus_uq
-    ON departments (type, abbreviation, COALESCE(campus_id, 1));
+--     WHERE a.id > b.id AND a.type = b.type AND a.abbreviation = b.abbreviation;
+CREATE UNIQUE INDEX IF NOT EXISTS departments_type_abbr_uq
+    ON departments (type, abbreviation);
 
 CREATE TABLE IF NOT EXISTS notifications (
     id         BIGSERIAL PRIMARY KEY,
@@ -232,7 +260,6 @@ ALTER TABLE inventory      DISABLE ROW LEVEL SECURITY;
 ALTER TABLE requests       DISABLE ROW LEVEL SECURITY;
 ALTER TABLE borrow_records DISABLE ROW LEVEL SECURITY;
 ALTER TABLE user_owned_items DISABLE ROW LEVEL SECURITY;
-ALTER TABLE campuses       DISABLE ROW LEVEL SECURITY;
 ALTER TABLE departments    DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications  DISABLE ROW LEVEL SECURITY;
 
@@ -281,6 +308,18 @@ INSERT INTO inventory (id, qr_code_id, item_name, category, description, campus_
 (28, 'QR-F2G3H4I5J6', 'Industrial Floor Buffer','Equipment',        '175 RPM floor polisher/buffer, motor damaged',                 1, NULL,   1,  'maintenance', 'Custodial Office',           '2023-03-18', 12000.00, 'fair',      '2026-05-15 08:00:00'),
 (29, 'QR-K7L8M9N0O1', 'Overhead Projector',     'Electronics',      'Old-model overhead projector, lamp cracked and flickering',    3, NULL,   1,  'damaged',     'Lecture Hall 202',           '2022-06-20', 9500.00,  'poor',      '2026-05-18 11:00:00'),
 (30, 'QR-P2Q3R4S5T6', 'UPS Battery Backup',     'Electronics',      '1200VA UPS unit, battery no longer holds charge',              1, NULL,   2,  'maintenance', 'Server Room 101',            '2023-01-30', 7800.00,  'fair',      '2026-05-20 13:00:00')
+ON CONFLICT DO NOTHING;
+
+-- A couple more sample items per campus (1-8), so every campus has some inventory to show.
+INSERT INTO inventory (id, qr_code_id, item_name, category, description, campus_id, college_id, quantity, status, location, purchase_date, cost, condition, created_at) VALUES
+(31, 'QR-CMP1A1B2C3', 'Ergonomic Standing Desk','Furniture',        'Height-adjustable standing desk',                              1, NULL,   4,  'available',   'Admin Building - Room 110',  '2024-09-01', 9500.00,  'excellent', '2026-06-01 09:00:00'),
+(32, 'QR-CMP2D4E5F6', 'Laser Engraving Machine','Equipment',        'CO2 laser engraver for workshop use',                          2, NULL,   1,  'available',   'Workshop Building',          '2024-08-15', 55000.00, 'excellent', '2026-06-02 09:00:00'),
+(33, 'QR-CMP3G7H8I9', 'Solar Panel Kit',        'Equipment',        '5-panel solar training kit',                                   3, NULL,   2,  'available',   'Engineering Annex',          '2024-07-20', 32000.00, 'good',      '2026-06-03 09:00:00'),
+(34, 'QR-CMP4J1K2L3', 'Digital Podium',         'Electronics',      'Touchscreen lecture podium with AV controls',                  4, NULL,   1,  'available',   'Main Auditorium',            '2024-09-10', 48000.00, 'excellent', '2026-06-04 09:00:00'),
+(35, 'QR-CMP5M4N5O6', 'Portable PA System',     'Electronics',      'Battery-powered PA speaker with mic',                          5, NULL,   2,  'available',   'Events Office',              '2024-06-25', 15000.00, 'good',      '2026-06-05 09:00:00'),
+(36, 'QR-CMP6P7Q8R9', 'Agricultural Drone',     'Equipment',        'Crop-monitoring drone for farm science',                       6, NULL,   1,  'available',   'Agri Extension Office',      '2024-08-05', 68000.00, 'excellent', '2026-06-06 09:00:00'),
+(37, 'QR-CMP7S1T2U3', 'Industrial Sewing Machine','Equipment',      'Heavy-duty sewing machine for TVET training',                  7, NULL,   3,  'available',   'Skills Training Center',     '2024-05-30', 21000.00, 'good',      '2026-06-07 09:00:00'),
+(38, 'QR-CMP8V4W5X6', 'Conference Table Set',   'Furniture',        '10-seater conference table with chairs',                       8, NULL,   1,  'available',   'Administration Office',      '2024-09-18', 38000.00, 'excellent', '2026-06-08 09:00:00')
 ON CONFLICT DO NOTHING;
 SELECT setval('inventory_id_seq', (SELECT MAX(id) FROM inventory));
 
@@ -334,19 +373,6 @@ INSERT INTO user_owned_items (id, user_id, item_name, category, description, yea
 ON CONFLICT DO NOTHING;
 SELECT setval('user_owned_items_id_seq', (SELECT MAX(id) FROM user_owned_items));
 
--- Campuses
-INSERT INTO campuses (id, name, location, description, is_default) VALUES
-(1, 'Main Campus',                 'Brgy. Cabambangan, Bacolor, Pampanga', 'Central campus of Pampanga State University hosting 8 colleges and the university administration.', true),
-(2, 'Mexico Campus',               'Mexico, Pampanga',                     'PSU extension campus serving the Mexico municipality and surrounding areas.',                          true),
-(3, 'Porac Campus',                'Porac, Pampanga',                      'PSU extension campus serving the Porac municipality and surrounding areas.',                           true),
-(4, 'Santo Tomas Campus',          'Santo Tomas, Pampanga',                'PSU satellite campus providing quality education in the Santo Tomas area.',                           true),
-(5, 'Lubao Campus',                'Sta. Catalina, Lubao, Pampanga',       'PSU extension campus offering specialized courses in the Lubao area.',                               true),
-(6, 'Candaba Campus',              'Candaba, Pampanga',                    'PSU extension campus serving the educational needs of the Candaba community.',                        true),
-(7, 'Apalit Campus',               'Apalit, Pampanga',                     'PSU dedicated campus serving the Apalit municipality.',                                               true),
-(8, 'City of San Fernando Campus', 'City of San Fernando, Pampanga',       'PSU satellite campus in the provincial capital, City of San Fernando.',                              true)
-ON CONFLICT DO NOTHING;
-SELECT setval('campuses_id_seq', (SELECT MAX(id) FROM campuses));
-
 -- Departments (colleges and offices)
 INSERT INTO departments (type, abbreviation, full_name, is_default) VALUES
 ('college', 'CEA',    'College of Engineering and Architecture (CEA)',                true),
@@ -372,3 +398,43 @@ INSERT INTO departments (type, abbreviation, full_name, is_default) VALUES
 ('office',  'GCC',    'Guidance and Counseling Center (GCC)',                         true),
 ('office',  'PDO',    'Planning and Development Office (PDO)',                        true)
 ON CONFLICT DO NOTHING;
+
+-- Departments (campuses) — same table as colleges/offices, type='campus'.
+-- Abbreviation is a derived, non-user-facing code (just needs to be unique
+-- per type, same as dbAddCustomDepartment() does for admin-added campuses).
+INSERT INTO departments (type, abbreviation, full_name, location, description, is_default) VALUES
+('campus', 'MAINCAMPUS',        'Main Campus',                 'Brgy. Cabambangan, Bacolor, Pampanga', 'Central campus of Pampanga State University and seat of the university administration.', true),
+('campus', 'MEXICOCAMPUS',      'Mexico Campus',                'Mexico, Pampanga',                     'PSU extension campus serving the Mexico municipality and surrounding areas.',             true),
+('campus', 'PORACCAMPUS',       'Porac Campus',                 'Porac, Pampanga',                      'PSU extension campus serving the Porac municipality and surrounding areas.',              true),
+('campus', 'SANTOTOMASCAMPUS',  'Santo Tomas Campus',           'Santo Tomas, Pampanga',                'PSU satellite campus providing quality education in the Santo Tomas area.',               true),
+('campus', 'LUBAOCAMPUS',       'Lubao Campus',                 'Sta. Catalina, Lubao, Pampanga',       'PSU extension campus offering specialized courses in the Lubao area.',                    true),
+('campus', 'CANDABACAMPUS',     'Candaba Campus',               'Candaba, Pampanga',                    'PSU extension campus serving the educational needs of the Candaba community.',            true),
+('campus', 'APALITCAMPUS',      'Apalit Campus',                'Apalit, Pampanga',                     'PSU dedicated campus serving the Apalit municipality.',                                   true),
+('campus', 'CITYOFSANFERNANDOCAMPUS', 'City of San Fernando Campus', 'City of San Fernando, Pampanga', 'PSU satellite campus in the provincial capital, City of San Fernando.',                   true)
+ON CONFLICT DO NOTHING;
+
+-- Remap existing campus_id values (1-8, the old dropped `campuses` table's
+-- row order) onto the departments campus rows just seeded above, matched by
+-- name. Must run after the INSERT above. Safe to re-run: once a row's
+-- campus_id is remapped it no longer matches the CASE below, so it's skipped.
+DO $$
+DECLARE
+    tbl TEXT;
+BEGIN
+    FOREACH tbl IN ARRAY ARRAY['inventory', 'users', 'user_owned_items'] LOOP
+        EXECUTE format($f$
+            UPDATE %I t SET campus_id = d.id
+            FROM departments d
+            WHERE d.type = 'campus' AND d.full_name = CASE t.campus_id
+                WHEN 1 THEN 'Main Campus'
+                WHEN 2 THEN 'Mexico Campus'
+                WHEN 3 THEN 'Porac Campus'
+                WHEN 4 THEN 'Santo Tomas Campus'
+                WHEN 5 THEN 'Lubao Campus'
+                WHEN 6 THEN 'Candaba Campus'
+                WHEN 7 THEN 'Apalit Campus'
+                WHEN 8 THEN 'City of San Fernando Campus'
+            END
+        $f$, tbl);
+    END LOOP;
+END $$;

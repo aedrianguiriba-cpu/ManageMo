@@ -8,47 +8,54 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 requireAdmin();
 
 $current_user = getCurrentUser();
-$campus_stats = [];
+$dept_stats = [];
 $total_items = 0;
 $available_items = 0;
 $borrowed_items = 0;
 $pending_requests = 0;
 
-// Get all campuses with stats
-$campuses = getAllCampuses();
+// Get all colleges/offices with stats
+$all_departments = getMainCampusDepartments();
 $all_inventory = getInventory();
 $all_requests = getRequests();
 
-$campus_stats = [];
+$dept_stats = [];
 $total_items = 0;
 $available_items = 0;
 $borrowed_items = 0;
 
-foreach ($campuses as $campus) {
-    $campus_id = $campus['id'];
-    
-    // Get inventory for this campus
-    $campus_inventory = filterByColumn($all_inventory, 'campus_id', $campus_id);
-    $status_counts = countByStatus($campus_inventory);
-    
-    // Count requested items for this campus
-    $campus_inventory_ids = array_column($campus_inventory, 'id');
-    $campus_requests = filterByColumn($all_requests, 'inventory_id', $campus_inventory_ids[0] ?? null);
+foreach ($all_departments as $dept_code => $dept_name) {
+    // Get inventory for this college/office
+    $dept_inventory = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $dept_code));
+    $status_counts = countByStatus($dept_inventory);
+    if (empty($dept_inventory)) continue;
+
+    // Count requested items for this college/office
+    $dept_inventory_ids = array_column($dept_inventory, 'id');
     $requested_count = 0;
-    foreach ($campus_inventory_ids as $inv_id) {
+    foreach ($dept_inventory_ids as $inv_id) {
         $requested_count += count(filterByColumn($all_requests, 'inventory_id', $inv_id));
     }
-    
-    $campus['stats'] = [
-        'total' => count($campus_inventory),
-        'borrowed' => $status_counts['borrowed'] ?? 0,
-        'requested' => $requested_count,
-        'maintenance' => $status_counts['maintenance'] ?? 0,
+
+    $dept_stats[] = [
+        'code' => $dept_code,
+        'name' => $dept_name,
+        'stats' => [
+            'total' => count($dept_inventory),
+            'borrowed' => $status_counts['borrowed'] ?? 0,
+            'requested' => $requested_count,
+            'maintenance' => $status_counts['maintenance'] ?? 0,
+        ],
     ];
-    
-    $campus_stats[] = $campus;
-    $total_items += $campus['stats']['total'];
-    $borrowed_items += $campus['stats']['borrowed'];
+    $total_items += count($dept_inventory);
+    $borrowed_items += $status_counts['borrowed'] ?? 0;
+}
+// Items with no college/office assigned still count toward totals.
+$unassigned_inventory = array_values(array_filter($all_inventory, fn($i) => empty($i['college_id'])));
+if (!empty($unassigned_inventory)) {
+    $unassigned_status = countByStatus($unassigned_inventory);
+    $total_items += count($unassigned_inventory);
+    $borrowed_items += $unassigned_status['borrowed'] ?? 0;
 }
 
 // Get request statistics
@@ -89,26 +96,27 @@ $owned_by_user = array_reduce($user_owned_items, function($carry, $item) {
     return $carry + $item['quantity'];
 }, 0);
 
-// Prepare campus data for modal
-$modal_campuses_json = json_encode($campus_stats);
+// Prepare department data for modal
+$modal_depts_json = json_encode($dept_stats);
 $all_inventory_json = json_encode($all_inventory);
 $all_requests_json = json_encode($all_requests);
 ?>
 
 <?php
-// Compute per-campus maintenance totals for charts
-$campus_names_js   = [];
-$campus_totals_js  = [];
-$campus_borrowed_js = [];
-$campus_maint_js   = [];
-foreach ($campus_stats as $cs) {
-    $campus_names_js[]    = $cs['name'];
-    $campus_totals_js[]   = $cs['stats']['total'];
-    $campus_borrowed_js[] = $cs['stats']['borrowed'];
-    $campus_maint_js[]    = $cs['stats']['maintenance'];
+// Compute per-department maintenance totals for charts, straight from the full dataset
+// (so items with no college/office assigned are still represented in the overall totals).
+$dept_names_js     = [];
+$dept_totals_js    = [];
+$dept_borrowed_js  = [];
+$dept_maint_js     = [];
+foreach ($dept_stats as $ds) {
+    $dept_names_js[]    = $ds['name'];
+    $dept_totals_js[]   = $ds['stats']['total'];
+    $dept_borrowed_js[] = $ds['stats']['borrowed'];
+    $dept_maint_js[]    = $ds['stats']['maintenance'];
 }
-$maintenance_total  = array_sum($campus_maint_js);
-$requested_total    = array_sum(array_map(fn($cs) => $cs['stats']['requested'] ?? 0, $campus_stats));
+$maintenance_total  = count(filterByColumn($all_inventory, 'status', 'maintenance'));
+$requested_total    = count(filterByColumn($all_inventory, 'status', 'requested'));
 $computed_available = $total_items - $borrowed_items - $maintenance_total - $requested_total;
 ?>
 <style>
@@ -303,30 +311,30 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
         </div>
     </div>
 
-    <!-- ── Campus Inventory Bar Chart ── -->
+    <!-- ── Department Inventory Bar Chart ── -->
     <div class="adash-card" style="margin-bottom:18px;">
         <div class="adash-card-head">
             <div class="adash-card-title">
                 <span class="adash-card-icon"><i class="fas fa-building"></i></span>
-                Campus Inventory Overview
+                Department Inventory Overview
             </div>
             <a href="inventory-campus.php" class="adash-viewall"><i class="fas fa-arrow-right"></i> View All</a>
         </div>
-        <canvas id="campusBar" height="80"></canvas>
+        <canvas id="deptBar" height="80"></canvas>
     </div>
 
-    <!-- ── Campus Summary Table ── -->
+    <!-- ── Department Summary Table ── -->
     <div class="adash-card" style="margin-bottom:18px;">
         <div class="adash-card-head">
             <div class="adash-card-title">
                 <span class="adash-card-icon"><i class="fas fa-table"></i></span>
-                Campus Summary
+                Department Summary
             </div>
         </div>
         <div class="table-responsive">
             <table class="adash-table">
                 <thead><tr>
-                    <th>Campus</th>
+                    <th>College / Office</th>
                     <th>Total</th>
                     <th>Borrowed</th>
                     <th>Requested</th>
@@ -334,14 +342,17 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                     <th></th>
                 </tr></thead>
                 <tbody>
-                    <?php foreach ($campus_stats as $campus): ?>
+                    <?php if (empty($dept_stats)): ?>
+                    <tr><td colspan="6" style="text-align:center;padding:24px;color:#999;">No items tagged with a college/office yet.</td></tr>
+                    <?php endif; ?>
+                    <?php foreach ($dept_stats as $dept): ?>
                     <tr>
-                        <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($campus['name']); ?></div></td>
-                        <td><span style="font-weight:800;color:#0f172a;font-size:.95rem;"><?php echo $campus['stats']['total']; ?></span></td>
-                        <td><span class="adash-badge b-amber"><i class="fas fa-circle"></i><?php echo $campus['stats']['borrowed']; ?></span></td>
-                        <td><span class="adash-badge b-green"><i class="fas fa-circle"></i><?php echo $campus['stats']['requested']; ?></span></td>
-                        <td><span class="adash-badge b-blue"><i class="fas fa-circle"></i><?php echo $campus['stats']['maintenance']; ?></span></td>
-                        <td><button onclick="openCampusModal(<?php echo $campus['id']; ?>)" class="adash-viewall" style="padding:5px 10px;font-size:.75rem;background:none;border:none;cursor:pointer;"><i class="fas fa-eye"></i> View</button></td>
+                        <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($dept['name']); ?></div></td>
+                        <td><span style="font-weight:800;color:#0f172a;font-size:.95rem;"><?php echo $dept['stats']['total']; ?></span></td>
+                        <td><span class="adash-badge b-amber"><i class="fas fa-circle"></i><?php echo $dept['stats']['borrowed']; ?></span></td>
+                        <td><span class="adash-badge b-green"><i class="fas fa-circle"></i><?php echo $dept['stats']['requested']; ?></span></td>
+                        <td><span class="adash-badge b-blue"><i class="fas fa-circle"></i><?php echo $dept['stats']['maintenance']; ?></span></td>
+                        <td><button onclick="openDeptModal('<?php echo htmlspecialchars($dept['code']); ?>')" class="adash-viewall" style="padding:5px 10px;font-size:.75rem;background:none;border:none;cursor:pointer;"><i class="fas fa-eye"></i> View</button></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -450,7 +461,7 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                     </a>
                     <a href="inventory-campus.php" class="qa-btn">
                         <div class="qa-btn-icon" style="color:#7c3aed;"><i class="fas fa-map-marked-alt"></i></div>
-                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">By Campus</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Campus breakdown</div></div>
+                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">By Department</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">College/office breakdown</div></div>
                     </a>
                     <a href="settings.php" class="qa-btn">
                         <div class="qa-btn-icon" style="color:#64748b;"><i class="fas fa-cog"></i></div>
@@ -503,7 +514,7 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                     <a href="inventory.php" class="adash-viewall"><i class="fas fa-arrow-right"></i> All</a>
                 </div>
                 <?php foreach ($recent_inventory as $item):
-                    $ic = getCampus($item['campus_id']);
+                    $item_dept_name = !empty($item['college_id']) ? ($all_departments[$item['college_id']] ?? $item['college_id']) : null;
                     $cat_icons = ['Electronics'=>'fa-laptop','Furniture'=>'fa-chair','Equipment'=>'fa-tools','Office'=>'fa-briefcase'];
                     $iconf = $cat_icons[$item['category']] ?? 'fa-box';
                     $status_class = $item['status'] === 'available' ? 'b-green' : ($item['status'] === 'borrowed' ? 'b-amber' : 'b-blue');
@@ -512,7 +523,7 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                     <div class="act-avatar"><i class="fas <?php echo $iconf; ?>"></i></div>
                     <div class="act-body">
                         <div class="act-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                        <div class="act-sub"><?php echo htmlspecialchars($ic['name']); ?> &bull; <?php echo htmlspecialchars($item['category']); ?></div>
+                        <div class="act-sub"><?php echo htmlspecialchars($item_dept_name ?? '—'); ?> &bull; <?php echo htmlspecialchars($item['category']); ?></div>
                     </div>
                     <div class="act-right">
                         <span class="adash-badge <?php echo $status_class; ?>"><?php echo ucfirst($item['status']); ?></span>
@@ -526,7 +537,7 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
 
 </div>
 
-<!-- Campus Detail Modal -->
+<!-- Department Detail Modal -->
 <style>
 .campus-modal-overlay {
     display: none;
@@ -791,18 +802,12 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
     <div class="campus-modal">
         <div class="campus-modal-header">
             <div class="campus-modal-title">
-                <h2 id="modalCampusName">Campus Name</h2>
-                <p id="modalCampusLocation">Location</p>
+                <h2 id="modalDeptName">Department Name</h2>
+                <p id="modalDeptCode">Code</p>
             </div>
             <button class="campus-modal-close" onclick="closeCampusModal()"><i class="fas fa-times"></i></button>
         </div>
         <div class="campus-modal-body">
-            <!-- Info Section -->
-            <div class="campus-section">
-                <div class="campus-section-title">Overview</div>
-                <div class="campus-info" id="modalCampusInfo"></div>
-            </div>
-
             <!-- Borrowed Items Section -->
             <div class="campus-section">
                 <div class="campus-section-title">Borrowed Items</div>
@@ -826,24 +831,21 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-const campusesData = <?php echo $modal_campuses_json; ?>;
+const deptsData = <?php echo $modal_depts_json; ?>;
 const inventoryData = <?php echo $all_inventory_json; ?>;
 const requestsData = <?php echo $all_requests_json; ?>;
 
-function openCampusModal(campusId) {
-    const campus = campusesData.find(c => c.id === campusId);
-    if (!campus) return;
+function openDeptModal(deptCode) {
+    const dept = deptsData.find(d => d.code === deptCode);
+    if (!dept) return;
 
     // Update header
-    document.getElementById('modalCampusName').textContent = campus.name;
-    document.getElementById('modalCampusLocation').textContent = campus.location;
-    
-    // Update info
-    document.getElementById('modalCampusInfo').textContent = campus.description;
-    
-    // Get campus inventory
-    const campusInventory = inventoryData.filter(item => item.campus_id === campusId);
-    
+    document.getElementById('modalDeptName').textContent = dept.name;
+    document.getElementById('modalDeptCode').textContent = dept.code;
+
+    // Get this department's inventory
+    const campusInventory = inventoryData.filter(item => item.college_id === deptCode);
+
     // Filter borrowed items
     const borrowedItems = campusInventory.filter(item => item.status === 'borrowed');
     const borrowedHtml = borrowedItems.length > 0
@@ -874,10 +876,10 @@ function openCampusModal(campusId) {
         : '<div class="campus-empty">No maintenance items</div>';
     document.getElementById('modalMaintenanceItems').innerHTML = maintenanceHtml;
     
-    // Filter requested items for this campus
+    // Filter requested items for this department
     const requestedItems = requestsData.filter(req => {
         const item = inventoryData.find(inv => inv.id === req.inventory_id);
-        return item && item.campus_id === campusId;
+        return item && item.college_id === deptCode;
     });
     const requestedHtml = requestedItems.length > 0
         ? requestedItems.map(req => {
@@ -967,15 +969,15 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Campus Inventory Bar Chart
-    new Chart(document.getElementById('campusBar'), {
+    // Department Inventory Bar Chart
+    new Chart(document.getElementById('deptBar'), {
         type: 'bar',
         data: {
-            labels: <?php echo json_encode($campus_names_js); ?>,
+            labels: <?php echo json_encode($dept_names_js); ?>,
             datasets: [
                 {
                     label: 'Total',
-                    data: <?php echo json_encode($campus_totals_js); ?>,
+                    data: <?php echo json_encode($dept_totals_js); ?>,
                     backgroundColor: 'rgba(139,0,0,0.15)',
                     borderColor: '#8B0000',
                     borderWidth: 1.5,
@@ -983,7 +985,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 {
                     label: 'Borrowed',
-                    data: <?php echo json_encode($campus_borrowed_js); ?>,
+                    data: <?php echo json_encode($dept_borrowed_js); ?>,
                     backgroundColor: 'rgba(217,119,6,0.15)',
                     borderColor: '#d97706',
                     borderWidth: 1.5,
@@ -991,7 +993,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 {
                     label: 'Maintenance',
-                    data: <?php echo json_encode($campus_maint_js); ?>,
+                    data: <?php echo json_encode($dept_maint_js); ?>,
                     backgroundColor: 'rgba(37,99,235,0.15)',
                     borderColor: '#2563eb',
                     borderWidth: 1.5,

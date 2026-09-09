@@ -6,14 +6,14 @@ requireUser();
 
 $current_user = getCurrentUser();
 $user_id = $current_user['id'];
-$campus_id = $current_user['campus_id'];
 
-// Get campus information
-$campus = getCampus($campus_id);
+// Department (college/office) info for the welcome banner, if the user has one set.
+$user_departments = getMainCampusDepartments();
+$user_dept_name = !empty($current_user['college_id']) ? ($user_departments[$current_user['college_id']] ?? $current_user['college_id']) : null;
 
-// Get all inventory for user's campus
+// Inventory is a single global list — no more campus scoping.
 $all_inventory = getInventory();
-$campus_inventory = filterByColumn($all_inventory, 'campus_id', $campus_id);
+$campus_inventory = $all_inventory;
 
 // Calculate inventory stats
 $inventory_result = [
@@ -66,13 +66,8 @@ usort($recent_requests, function($a, $b) {
 });
 $recent_requests = array_slice($recent_requests, 0, 5);
 
-// Get recent inventory items for this campus
-$recent_inventory = [];
-foreach ($all_inventory as $item) {
-    if ($item['campus_id'] == $campus_id) {
-        $recent_inventory[] = $item;
-    }
-}
+// Get recent inventory items
+$recent_inventory = $all_inventory;
 // Sort by created_at descending
 usort($recent_inventory, function($a, $b) {
     return strcmp($b['created_at'], $a['created_at']);
@@ -109,7 +104,7 @@ foreach (getRequests() as $req) {
     }
 }
 
-// Calendar events: date => [item names returning that day] (campus items only)
+// Calendar events: date => [item names returning that day]
 $cal_events = [];
 foreach ($campus_inventory as $item) {
     if (isset($item_return_map[$item['id']])) {
@@ -139,9 +134,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <div>
                 <h4 class="ud-welcome-name">Welcome back, <?php echo htmlspecialchars(explode(' ', $current_user['full_name'])[0]); ?>!</h4>
                 <p class="ud-welcome-sub">
-                    <i class="fas fa-map-marker-alt me-1"></i>
-                    <?php echo htmlspecialchars($campus['name'] ?? 'Unknown Campus'); ?>
+                    <?php if ($user_dept_name): ?>
+                    <i class="fas fa-building me-1"></i>
+                    <?php echo htmlspecialchars($user_dept_name); ?>
                     &nbsp;&middot;&nbsp;
+                    <?php endif; ?>
                     <i class="fas fa-calendar me-1"></i>
                     <?php echo date('F j, Y'); ?>
                 </p>
@@ -159,7 +156,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <div class="ud-stat-card ud-stat-blue h-100">
                 <div class="ud-stat-icon"><i class="fas fa-boxes"></i></div>
                 <div class="ud-stat-value"><?php echo $inventory_result['total']; ?></div>
-                <div class="ud-stat-label">Campus Items</div>
+                <div class="ud-stat-label">Total Items</div>
             </div>
         </div>
         <div class="col min-width-0">
@@ -234,7 +231,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <span class="ud-action-icon" style="color:#1a73e8;"><i class="fas fa-warehouse"></i></span>
                         <span class="ud-action-text">
                             <strong>Browse Inventory</strong>
-                            <small>View available campus items</small>
+                            <small>View available items</small>
                         </span>
                         <i class="fas fa-chevron-right ud-action-arrow"></i>
                     </a>
@@ -314,12 +311,12 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </div>
         </div>
 
-        <!-- Campus Inventory Breakdown -->
+        <!-- Inventory Breakdown -->
         <div class="col-lg-4">
             <div class="ud-card h-100">
                 <div class="ud-card-header">
                     <i class="fas fa-building ud-card-icon" style="color:rgba(139,0,0,0.80);"></i>
-                    <span>Campus Inventory</span>
+                    <span>Inventory Overview</span>
                 </div>
                 <div class="ud-card-body">
                     <?php
@@ -436,7 +433,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     </div>
                     <?php endforeach; ?>
                     <?php if (empty($campus_inventory)): ?>
-                    <div class="ud-empty-state"><i class="fas fa-box-open"></i><p>No items found for your campus.</p></div>
+                    <div class="ud-empty-state"><i class="fas fa-box-open"></i><p>No items found.</p></div>
                     <?php endif; ?>
                     </div>
                 </div>
@@ -510,7 +507,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <div class="ud-card h-100">
                 <div class="ud-card-header">
                     <i class="fas fa-boxes ud-card-icon" style="color:rgba(139,0,0,0.80);"></i>
-                    <span>Campus Items</span>
+                    <span>Recent Items</span>
                     <a href="inventory.php" class="ud-card-link ms-auto">View all <i class="fas fa-arrow-right ms-1"></i></a>
                 </div>
                 <div class="ud-card-body p-0">
@@ -547,7 +544,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <?php else: ?>
                     <div class="ud-empty-state">
                         <i class="fas fa-box-open"></i>
-                        <p>No inventory items found for your campus</p>
+                        <p>No inventory items found</p>
                     </div>
                     <?php endif; ?>
                 </div>

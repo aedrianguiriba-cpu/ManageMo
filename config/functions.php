@@ -113,6 +113,10 @@ function groupOwnedItems(array $items): array {
                 'item_name'   => $item['item_name'],
                 'category'    => $item['category'] ?? '',
                 'description' => $item['description'] ?? '',
+                'user_id'     => $item['user_id'] ?? null,
+                'campus_id'   => $item['campus_id'] ?? null,
+                'college_id'  => $item['college_id'] ?? null,
+                'year_owned'  => $item['year_owned'] ?? null,
                 'units'       => [],
             ];
         }
@@ -594,26 +598,28 @@ function dbUpdateUserOwnedItem(int $id, array $data): bool {
 
 function dbAddCustomDepartment(string $type, array $data): bool {
     if ($type === 'campus') {
-        $rows = supabase()->insert('campuses', [
-            'name'        => $data['name'],
-            'location'    => $data['location'] ?? null,
-            'description' => $data['description'] ?? null,
-            'is_default'  => false,
+        // Campuses now live in the departments table alongside colleges/offices
+        // (type='campus'), not the separate campuses table. A campus has no
+        // natural abbreviation, so derive one from the name — it only exists to
+        // satisfy the shared (type, abbreviation) uniqueness constraint.
+        $abbr = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $data['name']));
+        $rows = supabase()->insert('departments', [
+            'type'         => 'campus',
+            'abbreviation' => $abbr,
+            'full_name'    => $data['name'],
+            'location'     => $data['location'] ?? null,
+            'description'  => $data['description'] ?? null,
+            'is_default'   => false,
         ]);
-        clearDataCache('campuses');
+        clearDataCache();
     } else {
-        // campus_id: null/1 = Main Campus (matches existing rows), anything
-        // else scopes this college/office to that other campus.
-        $campus_id = isset($data['campus_id']) && (int)$data['campus_id'] > 1 ? (int)$data['campus_id'] : null;
+        // Colleges/offices are global — not scoped to any campus.
         $rows = supabase()->insert('departments', [
             'type'         => $type,
             'abbreviation' => $data['abbreviation'],
             'full_name'    => $data['full_name'],
-            'campus_id'    => $campus_id,
             'is_default'   => false,
         ]);
-        // Department cache keys are per campus (departments_{type}_{campus_id});
-        // clear everything rather than trying to enumerate them all.
         clearDataCache();
     }
     return !empty($rows);
@@ -621,7 +627,6 @@ function dbAddCustomDepartment(string $type, array $data): bool {
 
 function dbDeleteCustomDepartment(string $type, string $abbreviation, ?int $campus_id = null): bool {
     $filter = 'type=eq.' . $type . '&abbreviation=eq.' . urlencode($abbreviation);
-    $filter .= ($campus_id === null || $campus_id === 1) ? '&or=(campus_id.is.null,campus_id.eq.1)' : '&campus_id=eq.' . $campus_id;
     $rows = supabase()->select('departments', $filter);
     if (empty($rows) || $rows[0]['is_default']) return false;
     supabase()->delete('departments', $filter);
@@ -629,11 +634,6 @@ function dbDeleteCustomDepartment(string $type, string $abbreviation, ?int $camp
     return true;
 }
 
-function dbDeleteCustomCampus(int $id): bool {
-    $campus = supabase()->find('campuses', $id);
-    if (!$campus || $campus['is_default']) return false;
-    supabase()->deleteById('campuses', $id);
-    clearDataCache('campuses');
-    return true;
-}
+// Campuses are departments rows (type='campus') now — deleting one goes
+// through dbDeleteCustomDepartment('campus', $abbreviation) like colleges/offices.
 ?>

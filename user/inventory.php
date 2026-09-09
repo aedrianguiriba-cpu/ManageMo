@@ -6,7 +6,6 @@ require_once dirname(__DIR__) . '/lib/qrcode.php';
 requireUser();
 
 $current_user = getCurrentUser();
-$campus_id = $current_user['campus_id'];
 $current_tab = $_GET['tab'] ?? 'available';
 $page = $_GET['page'] ?? 1;
 $search = $_GET['search'] ?? '';
@@ -18,26 +17,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
 <div class="main-wrapper">
 <?php
-// Get campus info
-$campus = getCampus($campus_id);
-
-// Build where clause
-$where = "campus_id = '$campus_id'";
-if ($search) {
-    $search_safe = sanitizeInput($search);
-    $where .= " AND (item_name LIKE '%$search_safe%' OR category LIKE '%$search_safe%' OR description LIKE '%$search_safe%')";
-}
-if ($category_filter) {
-    $category_filter_safe = sanitizeInput($category_filter);
-    $where .= " AND category = '$category_filter_safe'";
-}
-if ($status_filter) {
-    $status_filter_safe = sanitizeInput($status_filter);
-    $where .= " AND status = '$status_filter_safe'";
-}
-
-// Get all inventory for the user's campus
-$all_campus_inventory = filterByColumn(getInventory(), 'campus_id', $campus_id);
+// Inventory is a single global list — no more campus scoping.
+$all_campus_inventory = getInventory();
 
 // Stats
 $inv_total     = count($all_campus_inventory);
@@ -833,7 +814,7 @@ function showOwnedGroup(group) {
             (qr ? '<img src="' + qrApiBase + encodeURIComponent(qr) + '" alt="QR" style="width:48px;height:48px;border-radius:4px;flex-shrink:0;">'
                 : '<div style="width:48px;height:48px;background:#e5e7eb;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="fas fa-qrcode" style="color:#9ca3af;font-size:1.1rem;"></i></div>')
             + '<div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;">'
-            + '<span style="font-weight:700;color:#1a1d23;">Unit ' + (idx + 1)
+            + '<span style="font-weight:700;color:#1a1d23;">' + group.item_name + ' #' + (idx + 1)
             +   ' <span style="font-weight:400;color:rgba(0,0,0,0.50);font-size:0.78rem;">· ' + cond + '</span></span>'
             + '<span style="color:rgba(0,0,0,0.55);font-size:0.78rem;"><i class="fas fa-calendar" style="margin-right:4px;"></i>Year: ' + year + '</span>'
             + (qr ? '<span style="font-family:monospace;font-size:0.65rem;color:rgba(139,0,0,0.7);background:rgba(139,0,0,0.06);padding:2px 5px;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + qr + '</span>' : '')

@@ -48,9 +48,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?php echo $current_page === 'inventory-campus.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>admin/inventory-campus.php" title="By Campus">
+                <a class="nav-link <?php echo $current_page === 'inventory-campus.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>admin/inventory-campus.php" title="By Department">
                     <span class="nav-icon"><i class="fas fa-building"></i></span>
-                    <span class="nav-text">By Campus</span>
+                    <span class="nav-text">By Department</span>
                 </a>
             </li>
             <li class="nav-item">

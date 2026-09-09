@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email      = sanitizeInput($_POST['email'] ?? '');
         $phone      = sanitizeInput($_POST['phone'] ?? '');
         $role       = sanitizeInput($_POST['role'] ?? 'user');
-        $campus_id  = (int)($_POST['campus_id'] ?? 1);
+        $campus_id  = (int)($_POST['campus_id'] ?? 0) ?: 1;
         $college_id = sanitizeInput($_POST['college_id'] ?? '');
         $password   = $_POST['password'] ?? '';
         $confirm    = $_POST['confirm_password'] ?? '';
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email      = sanitizeInput($_POST['email'] ?? '');
         $phone      = sanitizeInput($_POST['phone'] ?? '');
         $role       = sanitizeInput($_POST['role'] ?? 'user');
-        $campus_id  = (int)($_POST['campus_id'] ?? 1);
+        $campus_id  = (int)($_POST['campus_id'] ?? 0) ?: 1;
         $college_id = sanitizeInput($_POST['college_id'] ?? '');
         $password   = $_POST['password'] ?? '';
         $confirm    = $_POST['confirm_password'] ?? '';
@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $all_users = getUsers();
-$campuses    = getCampuses();
+$campuses    = getAllCampuses();
 $colleges    = getMainCampusColleges();
 $offices     = getMainCampusOffices();
 
@@ -319,18 +319,18 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
                 <div class="col-md-6">
                     <label class="um-form-label">Role <span class="um-form-req">*</span></label>
-                    <select class="form-select" name="role" id="roleSelect" onchange="toggleCollegeField()">
+                    <select class="form-select" name="role" id="roleSelect">
                         <option value="user"  <?php echo (($_SESSION['user_form_data']['role'] ?? 'user') === 'user')  ? 'selected' : ''; ?>>Faculty / Staff</option>
                         <option value="admin" <?php echo (($_SESSION['user_form_data']['role'] ?? '') === 'admin') ? 'selected' : ''; ?>>Administrator</option>
                     </select>
                 </div>
             </div>
 
-            <div class="um-form-section mt-4"><i class="fas fa-building"></i> Campus & Department</div>
+            <div class="um-form-section mt-4"><i class="fas fa-building"></i> Campus &amp; Department</div>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="um-form-label">Campus <span class="um-form-req">*</span></label>
-                    <select class="form-select" name="campus_id" id="campusSelect" onchange="toggleCollegeField()">
+                    <select class="form-select" name="campus_id" required>
                         <?php foreach ($campuses as $c): ?>
                         <option value="<?php echo $c['id']; ?>"
                             <?php echo ((int)($_SESSION['user_form_data']['campus_id'] ?? 1) === $c['id']) ? 'selected' : ''; ?>>
@@ -343,22 +343,12 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <label class="um-form-label">Department / Office</label>
                     <select class="form-select" name="college_id">
                         <option value="">— None —</option>
-                        <optgroup label="Colleges">
-                            <?php foreach ($colleges as $code => $name): ?>
-                            <option value="<?php echo htmlspecialchars($code); ?>"
-                                <?php echo (($_SESSION['user_form_data']['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($name); ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </optgroup>
-                        <optgroup label="Offices">
-                            <?php foreach ($offices as $code => $name): ?>
-                            <option value="<?php echo htmlspecialchars($code); ?>"
-                                <?php echo (($_SESSION['user_form_data']['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($name); ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </optgroup>
+                        <?php foreach (array_merge($colleges, $offices) as $code => $name): ?>
+                        <option value="<?php echo htmlspecialchars($code); ?>"
+                            <?php echo (($_SESSION['user_form_data']['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($name); ?>
+                        </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
             </div>
@@ -405,7 +395,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </div>
             <div class="um-tip-item">
                 <div class="um-tip-dot"><i class="fas fa-building"></i></div>
-                <div>Department only applies to <strong>Main Campus</strong> users.</div>
+                <div>Department / Office applies to any user.</div>
             </div>
         </div>
     </div>
@@ -451,7 +441,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
                 <div class="col-md-6">
                     <label class="um-form-label">Role <span class="um-form-req">*</span></label>
-                    <select class="form-select" name="role" id="roleSelect" onchange="toggleCollegeField()"
+                    <select class="form-select" name="role" id="roleSelect"
                             <?php echo $edit_user['id'] === $current_user['id'] ? 'disabled' : ''; ?>>
                         <option value="user"  <?php echo (($fd['role'] ?? 'user') === 'user')  ? 'selected' : ''; ?>>Faculty / Staff</option>
                         <option value="admin" <?php echo (($fd['role'] ?? '') === 'admin') ? 'selected' : ''; ?>>Administrator</option>
@@ -463,11 +453,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
             </div>
 
-            <div class="um-form-section mt-4"><i class="fas fa-building"></i> Campus &amp; Department</div>
+            <div class="um-form-section mt-4"><i class="fas fa-building"></i> Department</div>
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="um-form-label">Campus <span class="um-form-req">*</span></label>
-                    <select class="form-select" name="campus_id" id="campusSelect" onchange="toggleCollegeField()">
+                    <select class="form-select" name="campus_id" required>
                         <?php foreach ($campuses as $c): ?>
                         <option value="<?php echo $c['id']; ?>"
                             <?php echo ((int)($fd['campus_id'] ?? 1) === $c['id']) ? 'selected' : ''; ?>>
@@ -480,22 +470,12 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <label class="um-form-label">Department / Office</label>
                     <select class="form-select" name="college_id">
                         <option value="">— None —</option>
-                        <optgroup label="Colleges">
-                            <?php foreach ($colleges as $code => $name): ?>
-                            <option value="<?php echo htmlspecialchars($code); ?>"
-                                <?php echo (($fd['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($name); ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </optgroup>
-                        <optgroup label="Offices">
-                            <?php foreach ($offices as $code => $name): ?>
-                            <option value="<?php echo htmlspecialchars($code); ?>"
-                                <?php echo (($fd['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($name); ?>
-                            </option>
-                            <?php endforeach; ?>
-                        </optgroup>
+                        <?php foreach (array_merge($colleges, $offices) as $code => $name): ?>
+                        <option value="<?php echo htmlspecialchars($code); ?>"
+                            <?php echo (($fd['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($name); ?>
+                        </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
             </div>
@@ -537,7 +517,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </div>
             <div class="um-tip-item">
                 <div class="um-tip-dot"><i class="fas fa-building"></i></div>
-                <div>Department only applies to <strong>Main Campus</strong> users.</div>
+                <div>Department / Office applies to any user.</div>
             </div>
         </div>
     </div>
@@ -592,8 +572,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     <?php foreach ($all_users as $u):
         $col      = $avatar_colors[($u['id'] - 1) % count($avatar_colors)];
         $initials = strtoupper(substr($u['full_name'], 0, 1));
-        $campus_name = '';
-        foreach ($campuses as $c) { if ($c['id'] == $u['campus_id']) { $campus_name = $c['name']; break; } }
         $dept_name = (!empty($u['college_id']) && isset($all_depts[$u['college_id']])) ? $u['college_id'] : '';
         $is_me = ($u['id'] === $current_user['id']);
     ?>
@@ -625,15 +603,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         <!-- Meta info -->
         <div class="um-card-meta">
             <div class="um-card-meta-item" style="width:100%;">
-                <i class="fas fa-building"></i>
-                <span><?php echo htmlspecialchars($campus_name ?: '—'); ?></span>
-            </div>
-            <?php if ($dept_name): ?>
-            <div class="um-card-meta-item" style="width:100%;">
                 <i class="fas fa-sitemap"></i>
-                <span><?php echo htmlspecialchars($dept_name); ?></span>
+                <span><?php echo htmlspecialchars($dept_name ?: '—'); ?></span>
             </div>
-            <?php endif; ?>
         </div>
 
         <!-- Footer: joined + actions -->
@@ -723,14 +695,5 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 </div>
 </div>
-
-<script>
-function toggleCollegeField() {
-    var campus = document.getElementById('campusSelect').value;
-    var wrap   = document.getElementById('collegeFieldWrap');
-    wrap.style.display = (campus === '1') ? 'block' : 'none';
-}
-document.addEventListener('DOMContentLoaded', toggleCollegeField);
-</script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>

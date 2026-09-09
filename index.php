@@ -364,7 +364,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_submit'])) {
             </div>
             <div class="login-left-bottom">
                 <div class="login-left-heading">Pampanga State<br>University</div>
-                <p class="login-left-sub">ManageMo tracks and manages all university assets across 8 PSU campuses with real-time updates and QR code generation.</p>
+                <p class="login-left-sub">ManageMo tracks and manages all university assets across every college and office with real-time updates and QR code generation.</p>
             </div>
         </div>
 

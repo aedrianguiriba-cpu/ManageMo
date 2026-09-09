@@ -308,11 +308,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <div class="as-profile-email"><?php echo htmlspecialchars($current_user['email']); ?></div>
             <hr class="as-profile-divider">
             <?php
-            $admin_campus_name = '';
-            if (!empty($current_user['campus_id'])) {
-                foreach (getCampuses() as $c) {
-                    if ($c['id'] == $current_user['campus_id']) { $admin_campus_name = $c['name']; break; }
-                }
+            $admin_dept_name = '';
+            if (!empty($current_user['college_id'])) {
+                $admin_departments = getMainCampusDepartments();
+                $admin_dept_name = $admin_departments[$current_user['college_id']] ?? $current_user['college_id'];
             }
             ?>
             <div class="as-profile-meta">
@@ -326,10 +325,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <span><?php echo htmlspecialchars($current_user['phone']); ?></span>
                 </div>
                 <?php endif; ?>
-                <?php if ($admin_campus_name): ?>
+                <?php if ($admin_dept_name): ?>
                 <div class="as-profile-meta-row">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span><?php echo htmlspecialchars($admin_campus_name); ?></span>
+                    <i class="fas fa-building"></i>
+                    <span><?php echo htmlspecialchars($admin_dept_name); ?></span>
                 </div>
                 <?php endif; ?>
             </div>
@@ -491,13 +490,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         <!-- System Settings Tab -->
         <div class="as-tab-pane" id="system-tab">
             <?php
-            $sys_campuses  = getAllCampuses();
+            $sys_departments = getMainCampusDepartments();
             $sys_users     = getUsers();
             $sys_inventory = getInventory();
             $sys_requests  = getRequests();
-            $default_campus = null;
-            foreach ($sys_campuses as $c) { if (!empty($c['is_default'])) { $default_campus = $c; break; } }
-            $institution_name = $default_campus ? $default_campus['name'] : ($sys_campuses[0]['name'] ?? 'N/A');
+            $institution_name = 'Pampanga State University';
             ?>
             <div class="as-card">
                 <div class="as-card-title"><i class="fas fa-server me-2" style="opacity:0.8;"></i>System Information</div>
@@ -519,8 +516,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="as-card-title"><i class="fas fa-chart-bar me-2" style="opacity:0.8;"></i>Live System Stats</div>
                 <div class="as-card-sub">Real-time counts from the database</div>
                 <div class="as-info-row">
-                    <span class="as-info-label"><i class="fas fa-map-marker-alt me-2"></i>Campuses</span>
-                    <span class="as-info-value"><?php echo count($sys_campuses); ?></span>
+                    <span class="as-info-label"><i class="fas fa-building me-2"></i>Colleges/Offices</span>
+                    <span class="as-info-value"><?php echo count($sys_departments); ?></span>
                 </div>
                 <div class="as-info-row">
                     <span class="as-info-label"><i class="fas fa-users me-2"></i>Registered Users</span>
@@ -536,15 +533,16 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
             </div>
             <div class="as-card">
-                <div class="as-card-title"><i class="fas fa-map-marker-alt me-2" style="opacity:0.8;"></i>Registered Campuses</div>
-                <div class="as-card-sub">All institution campuses in the system</div>
+                <div class="as-card-title"><i class="fas fa-building me-2" style="opacity:0.8;"></i>Registered Colleges/Offices</div>
+                <div class="as-card-sub">All colleges and offices in the system</div>
                 <table class="as-table">
-                    <thead><tr><th><i class="fas fa-building me-1"></i>Campus Name</th><th><i class="fas fa-map-pin me-1"></i>Location</th><th style="text-align:right;"><i class="fas fa-boxes me-1"></i>Items</th></tr></thead>
+                    <thead><tr><th><i class="fas fa-building me-1"></i>Name</th><th style="text-align:right;"><i class="fas fa-boxes me-1"></i>Items</th></tr></thead>
                     <tbody>
-                    <?php foreach ($sys_campuses as $campus): $item_count = getInventoryCount($campus['id']); ?>
+                    <?php foreach ($sys_departments as $abbr => $dept_name):
+                        $item_count = count(array_filter($sys_inventory, fn($i) => ($i['college_id'] ?? '') === $abbr));
+                    ?>
                     <tr>
-                        <td style="font-weight:700; color:#1a1d23;"><?php echo htmlspecialchars($campus['name']); ?></td>
-                        <td style="color:rgba(0,0,0,0.50);"><?php echo htmlspecialchars($campus['location']); ?></td>
+                        <td style="font-weight:700; color:#1a1d23;"><?php echo htmlspecialchars($dept_name); ?></td>
                         <td style="text-align:right;"><span class="as-badge as-badge-primary"><i class="fas fa-cube me-1"></i><?php echo $item_count; ?></span></td>
                     </tr>
                     <?php endforeach; ?>

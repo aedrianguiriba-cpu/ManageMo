@@ -4,7 +4,11 @@ require_once dirname(__DIR__) . '/config/functions.php';
 
 requireAdmin();
 
-$campus_id = $_GET['campus_id'] ?? '';
+// One combined "department" filter covers Campuses, Colleges, and Offices
+// together: value is "c:<campus id>" or "d:<college/office abbr>".
+$dept_id    = $_GET['dept_id'] ?? '';
+$campus_id  = str_starts_with($dept_id, 'c:') ? substr($dept_id, 2) : '';
+$college_id = str_starts_with($dept_id, 'd:') ? substr($dept_id, 2) : '';
 $date_from = $_GET['date_from'] ?? date('Y-m-d', strtotime('-30 days'));
 $date_to = $_GET['date_to'] ?? date('Y-m-d');
 
@@ -12,9 +16,6 @@ require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
 <div class="main-wrapper">
-<?php
-$campuses = getAllCampuses();
-?>
 
 <style>
 /* ===== ADMIN ANALYTICS ===== */
@@ -102,14 +103,23 @@ $campuses = getAllCampuses();
 <div class="an-filter-card">
     <form method="GET" class="d-flex align-items-end flex-wrap gap-3 w-100">
         <div>
-            <div class="an-filter-label">Campus</div>
-            <select class="form-select" name="campus_id" style="min-width:160px;">
-                <option value="">All Campuses</option>
-                <?php foreach ($campuses as $campus): ?>
-                <option value="<?php echo $campus['id']; ?>" <?php echo $campus_id==$campus['id']?'selected':''; ?>>
-                    <?php echo htmlspecialchars($campus['name']); ?>
+            <div class="an-filter-label">Campus / College / Office</div>
+            <select class="form-select" name="dept_id" style="min-width:180px;">
+                <option value="">All</option>
+                <optgroup label="Campuses">
+                <?php foreach (getAllCampuses() as $__c): ?>
+                <option value="c:<?php echo $__c['id']; ?>" <?php echo $dept_id==='c:'.$__c['id']?'selected':''; ?>>
+                    <?php echo htmlspecialchars($__c['name']); ?>
                 </option>
                 <?php endforeach; ?>
+                </optgroup>
+                <optgroup label="Colleges/Offices">
+                <?php foreach (getMainCampusDepartments() as $abbr => $fullname): ?>
+                <option value="d:<?php echo htmlspecialchars($abbr); ?>" <?php echo $dept_id==='d:'.$abbr?'selected':''; ?>>
+                    <?php echo htmlspecialchars($fullname); ?>
+                </option>
+                <?php endforeach; ?>
+                </optgroup>
             </select>
         </div>
         <div>
@@ -127,7 +137,8 @@ $campuses = getAllCampuses();
 <?php
 $all_inventory = getInventory();
 $all_requests  = getRequests();
-$filtered_inventory = $campus_id ? filterByColumn($all_inventory,'campus_id',(int)$campus_id) : $all_inventory;
+$filtered_inventory = $college_id ? filterByColumn($all_inventory,'college_id',$college_id) : $all_inventory;
+$filtered_inventory = $campus_id ? filterByColumn($filtered_inventory,'campus_id',(int)$campus_id) : $filtered_inventory;
 $filtered_requests = array_filter($all_requests, function($r) use ($date_from,$date_to){
     $d = substr($r['created_at'],0,10); return $d >= $date_from && $d <= $date_to;
 });
@@ -160,21 +171,7 @@ $category_counts = [];
 foreach ($filtered_inventory as $inv) $category_counts[$inv['category']] = ($category_counts[$inv['category']] ?? 0) + 1;
 arsort($category_counts);
 
-// Per-campus breakdown (always uses the full, unfiltered inventory — this IS the campus comparison view)
-$campus_breakdown = [];
-foreach ($campuses as $c) {
-    $c_items = filterByColumn($all_inventory, 'campus_id', (int)$c['id']);
-    $campus_breakdown[] = [
-        'name'        => $c['name'],
-        'total'       => count($c_items),
-        'available'   => count(filterByColumn($c_items, 'status', 'available')),
-        'borrowed'    => count(filterByColumn($c_items, 'status', 'borrowed')),
-        'maintenance' => count(filterByColumn($c_items, 'status', 'maintenance')),
-        'value'       => array_sum(array_column($c_items, 'cost')),
-    ];
-}
-
-// Per-college/office breakdown — only meaningful on Main Campus (college_id is only set there)
+// Per-college breakdown
 $college_breakdown = [];
 foreach (getMainCampusColleges() as $abbr => $fullname) {
     $co_items = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $abbr));
@@ -186,6 +183,19 @@ foreach (getMainCampusColleges() as $abbr => $fullname) {
     ];
 }
 usort($college_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
+
+// Per-office breakdown
+$office_breakdown = [];
+foreach (getMainCampusOffices() as $abbr => $fullname) {
+    $of_items = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $abbr));
+    if (empty($of_items)) continue;
+    $office_breakdown[] = [
+        'name'  => $fullname,
+        'total' => count($of_items),
+        'value' => array_sum(array_column($of_items, 'cost')),
+    ];
+}
+usort($office_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
 ?>
 
 <!-- Stat cards -->
@@ -328,26 +338,26 @@ usort($college_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
     </div>
 </div>
 
-<!-- Per-Campus / Per-College Breakdown -->
+<!-- Per-College / Per-Office Breakdown -->
 <div class="row g-3 mt-1">
     <div class="col-md-6">
         <div class="an-card">
             <div class="an-card-title">
-                <div class="an-card-icon"><i class="fas fa-map-marker-alt"></i></div>
-                Inventory by Campus <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
+                <div class="an-card-icon"><i class="fas fa-building-columns"></i></div>
+                Inventory by College <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
             </div>
             <table class="an-mini-table">
-                <thead><tr><th>Campus</th><th style="text-align:right;">Total</th><th style="text-align:right;">Available</th><th style="text-align:right;">Borrowed</th><th style="text-align:right;">Value</th></tr></thead>
+                <thead><tr><th>College</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
                 <tbody>
-                <?php foreach ($campus_breakdown as $cb): ?>
+                <?php if (!empty($college_breakdown)): foreach ($college_breakdown as $co): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($cb['name']); ?></td>
-                    <td style="text-align:right;"><span class="an-badge an-badge-primary"><?php echo $cb['total']; ?></span></td>
-                    <td style="text-align:right;color:#15803d;"><?php echo $cb['available']; ?></td>
-                    <td style="text-align:right;color:#b45309;"><?php echo $cb['borrowed']; ?></td>
-                    <td style="text-align:right;">&#8369;<?php echo number_format($cb['value'], 2); ?></td>
+                    <td><?php echo htmlspecialchars($co['name']); ?></td>
+                    <td style="text-align:right;"><span class="an-badge an-badge-primary"><?php echo $co['total']; ?></span></td>
+                    <td style="text-align:right;">&#8369;<?php echo number_format($co['value'], 2); ?></td>
                 </tr>
-                <?php endforeach; ?>
+                <?php endforeach; else: ?>
+                <tr><td colspan="3" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No items tagged with a college yet — set this when adding/editing an item.</td></tr>
+                <?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -355,20 +365,20 @@ usort($college_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
     <div class="col-md-6">
         <div class="an-card">
             <div class="an-card-title">
-                <div class="an-card-icon"><i class="fas fa-building-columns"></i></div>
-                Inventory by College / Office <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(Main Campus)</span>
+                <div class="an-card-icon"><i class="fas fa-building"></i></div>
+                Inventory by Office <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
             </div>
             <table class="an-mini-table">
-                <thead><tr><th>College / Office</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
+                <thead><tr><th>Office</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
                 <tbody>
-                <?php if (!empty($college_breakdown)): foreach ($college_breakdown as $co): ?>
+                <?php if (!empty($office_breakdown)): foreach ($office_breakdown as $of): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($co['name']); ?></td>
-                    <td style="text-align:right;"><span class="an-badge an-badge-info"><?php echo $co['total']; ?></span></td>
-                    <td style="text-align:right;">&#8369;<?php echo number_format($co['value'], 2); ?></td>
+                    <td><?php echo htmlspecialchars($of['name']); ?></td>
+                    <td style="text-align:right;"><span class="an-badge an-badge-info"><?php echo $of['total']; ?></span></td>
+                    <td style="text-align:right;">&#8369;<?php echo number_format($of['value'], 2); ?></td>
                 </tr>
                 <?php endforeach; else: ?>
-                <tr><td colspan="3" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No items tagged with a college/office yet — set this when adding/editing an item.</td></tr>
+                <tr><td colspan="3" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No items tagged with an office yet — set this when adding/editing an item.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>

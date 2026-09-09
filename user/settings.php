@@ -45,7 +45,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
 <div class="main-wrapper">
 <?php
-$campus = getCampus($current_user['campus_id']);
 $user_id = $current_user['id'];
 $departments = getMainCampusDepartments();
 $dept_name = !empty($current_user['college_id']) ? ($departments[$current_user['college_id']] ?? $current_user['college_id']) : '';
@@ -308,22 +307,12 @@ displayMessage();
                                     <i class="fas fa-graduation-cap st-input-icon"></i>
                                     <select class="form-control" name="college_id" style="padding-left:34px;">
                                         <option value="">-- Select Department / Office --</option>
-                                        <optgroup label="Colleges">
-                                        <?php foreach (getMainCampusColleges() as $abbr => $name): ?>
+                                        <?php foreach (getMainCampusDepartments() as $abbr => $name): ?>
                                         <option value="<?php echo htmlspecialchars($abbr); ?>"
                                             <?php echo (($current_user['college_id'] ?? '') === $abbr) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($name); ?>
                                         </option>
                                         <?php endforeach; ?>
-                                        </optgroup>
-                                        <optgroup label="Offices">
-                                        <?php foreach (getMainCampusOffices() as $abbr => $name): ?>
-                                        <option value="<?php echo htmlspecialchars($abbr); ?>"
-                                            <?php echo (($current_user['college_id'] ?? '') === $abbr) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($name); ?>
-                                        </option>
-                                        <?php endforeach; ?>
-                                        </optgroup>
                                     </select>
                                 </div>
                             </div>
@@ -400,17 +389,6 @@ displayMessage();
                             <div>
                                 <div class="st-info-label">Role</div>
                                 <span class="st-badge st-badge-role"><?php echo ucfirst($current_user['role']); ?></span>
-                            </div>
-                        </div>
-
-                        <div class="st-info-row">
-                            <div class="st-info-icon" style="color:#1d4ed8;">
-                                <i class="fas fa-building"></i>
-                            </div>
-                            <div>
-                                <div class="st-info-label">Campus</div>
-                                <div class="st-info-value"><?php echo htmlspecialchars($campus['name']); ?></div>
-                                <div style="font-size:0.79rem;color:rgba(0,0,0,0.40);"><?php echo htmlspecialchars($campus['location']); ?></div>
                             </div>
                         </div>
 

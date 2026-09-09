@@ -5,7 +5,6 @@ require_once dirname(__DIR__) . '/config/functions.php';
 requireUser();
 
 $current_user = getCurrentUser();
-$campus_id = $current_user['campus_id'];
 
 // Check if item_id is passed from inventory page
 $auto_fill_item = null;
@@ -173,7 +172,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 <div class="main-wrapper">
 <?php
 $all_inventory  = getInventory();
-$inventory_items = filterByColumn($all_inventory, 'campus_id', $campus_id);
+// Inventory is a single global list — no more campus scoping.
+$inventory_items = $all_inventory;
 usort($inventory_items, function($a, $b) { return strcmp($a['item_name'], $b['item_name']); });
 
 // Item request catalog — all inventory items, grouped
@@ -940,7 +940,7 @@ if (!empty($submit_error)): ?>
                     <i class="fas fa-hand-holding"></i>
                 </div>
                 <h6>Borrow Item</h6>
-                <p>Temporarily borrow an item from campus inventory</p>
+                <p>Temporarily borrow an item from inventory</p>
             </label>
             <label class="rq-type-card" onclick="selectType(this,'item')">
                 <input type="radio" name="_type_vis" value="item">

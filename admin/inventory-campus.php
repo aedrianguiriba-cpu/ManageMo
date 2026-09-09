@@ -1,5 +1,5 @@
 <?php
-$page_title = 'Campus Inventory';
+$page_title = 'Department Inventory';
 require_once dirname(__DIR__) . '/config/functions.php';
 
 requireAdmin();
@@ -10,13 +10,20 @@ $current_user = getCurrentUser();
 $dept_msg = '';
 $dept_err = '';
 
+// Plural UI type -> singular DB type. Colleges, offices, and campuses are all
+// rows in the same `departments` table now, distinguished by `type`.
+$dept_type_map = ['colleges' => 'college', 'offices' => 'office', 'campuses' => 'campus'];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
     $action = $_POST['dept_action'];
+    $type   = $_POST['dept_type'] ?? '';
+    $dbtype = $dept_type_map[$type] ?? '';
 
     if ($action === 'add') {
-        $type = $_POST['dept_type'] ?? '';
+        if ($dbtype === '') {
+            $dept_err = 'Invalid department type.';
 
-        if ($type === 'campuses') {
+        } elseif ($dbtype === 'campus') {
             $name     = trim($_POST['campus_name'] ?? '');
             $location = trim($_POST['campus_location'] ?? '');
             $desc     = trim($_POST['campus_desc'] ?? '');
@@ -27,40 +34,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
                 $dept_msg = $ok ? "Campus \"$name\" added successfully." : '';
                 if (!$ok) $dept_err = 'Failed to add campus. Please try again.';
             }
+
         } else {
             $abbr = strtoupper(trim($_POST['dept_abbr'] ?? ''));
             $name = trim($_POST['dept_name'] ?? '');
-            $dept_campus_id = (int)($_POST['dept_campus_id'] ?? 1) ?: 1;
-            $dbtype = rtrim($type, 's'); // 'colleges' -> 'college', 'offices' -> 'office'
-            if (!in_array($type, ['colleges', 'offices'])) {
-                $dept_err = 'Invalid department type.';
-            } elseif (!$abbr || !$name) {
+            if (!$abbr || !$name) {
                 $dept_err = 'Abbreviation and full name are required.';
-            } elseif (isset(getMainCampusColleges($dept_campus_id)[$abbr]) || isset(getMainCampusOffices($dept_campus_id)[$abbr])) {
-                $dept_err = "Abbreviation \"$abbr\" already exists for that campus.";
+            } elseif (isset(getMainCampusColleges()[$abbr]) || isset(getMainCampusOffices()[$abbr])) {
+                $dept_err = "Abbreviation \"$abbr\" already exists.";
             } else {
-                $ok = dbAddCustomDepartment($dbtype, ['abbreviation' => $abbr, 'full_name' => $name, 'campus_id' => $dept_campus_id]);
+                $ok = dbAddCustomDepartment($dbtype, ['abbreviation' => $abbr, 'full_name' => $name]);
                 $dept_msg = $ok ? ucfirst($dbtype) . " \"$abbr\" added successfully." : '';
                 if (!$ok) $dept_err = 'Failed to add entry. Please try again.';
             }
         }
 
     } elseif ($action === 'delete') {
-        $type = $_POST['dept_type'] ?? '';
-
-        if ($type === 'campuses') {
-            $del_id = (int)($_POST['campus_id'] ?? 0);
-            $ok = dbDeleteCustomCampus($del_id);
-            if ($ok) {
-                $dept_msg = "Campus removed successfully.";
-            } else {
-                $dept_err = "This campus cannot be deleted.";
-            }
+        if ($dbtype === 'campus') {
+            $abbr = $_POST['dept_abbr'] ?? '';
+            $ok = dbDeleteCustomDepartment('campus', $abbr);
+            $dept_msg = $ok ? 'Campus removed successfully.' : '';
+            if (!$ok) $dept_err = 'This campus cannot be deleted.';
         } else {
-            $abbr   = $_POST['dept_abbr'] ?? '';
-            $dbtype = rtrim($type, 's');
-            $del_campus_id = (int)($_POST['dept_campus_id'] ?? 1) ?: 1;
-            $ok = dbDeleteCustomDepartment($dbtype, $abbr, $del_campus_id);
+            $abbr = $_POST['dept_abbr'] ?? '';
+            $ok = dbDeleteCustomDepartment($dbtype, $abbr);
             if ($ok) {
                 $dept_msg = "\"$abbr\" removed successfully.";
             } else {
@@ -68,10 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dept_action'])) {
             }
         }
     }
-    // Redirect to avoid resubmit — keep the modal open on the same campus the change was made on.
-    $redirect_campus_id = (int)($_POST['dept_campus_id'] ?? 1) ?: 1;
+    // Redirect to avoid resubmit — keep the modal open after the change.
     $qs = $dept_msg ? '?msg=' . urlencode($dept_msg) : ($dept_err ? '?err=' . urlencode($dept_err) : '?');
-    $qs .= ($qs === '?' ? '' : '&') . 'openDeptModal=1&dept_campus_id=' . $redirect_campus_id;
+    $qs .= ($qs === '?' ? '' : '&') . 'openDeptModal=1';
     header('Location: inventory-campus.php' . $qs);
     exit;
 }
@@ -83,12 +79,15 @@ require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
 <div class="main-wrapper">
-<?php $campuses = getAllCampuses(); ?>
 
 <style>
-/* ===== CAMPUS INVENTORY ===== */
+/* ===== DEPARTMENT INVENTORY ===== */
 .ic-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18px; }
 @media(max-width:768px){ .ic-grid{ grid-template-columns:1fr; } }
+
+.ic-dept-grid { grid-template-columns:repeat(3,1fr); }
+@media(max-width:992px){ .ic-dept-grid{ grid-template-columns:repeat(2,1fr); } }
+@media(max-width:768px){ .ic-dept-grid{ grid-template-columns:1fr; } }
 
 .ic-campus-card {
     background:#fff;
@@ -126,24 +125,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     transition:opacity 0.15s !important;
 }
 .ic-btn-view:hover { color:#fff !important; opacity:0.88 !important; }
-
-.ic-main-campus { grid-column: 1 / -1; }
-.ic-college-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-@media(max-width:992px){ .ic-college-grid{ grid-template-columns:repeat(4,1fr); } }
-@media(max-width:768px){ .ic-college-grid{ grid-template-columns:repeat(2,1fr); } }
-@media(max-width:480px){ .ic-college-grid{ grid-template-columns:repeat(1,1fr); } }
-.ic-college-card {
-    background:#fff; border:1px solid #e5e7eb;
-    border-radius:8px; padding:14px 16px; transition:border-color 0.15s;
-}
-.ic-college-card:hover { border-color:rgba(139,0,0,0.20); }
-.ic-college-abbr { font-size:1.1rem; font-weight:900; color:#8B0000; line-height:1; }
-.ic-college-full { font-size:0.70rem; color:#999; margin-top:3px; line-height:1.3; margin-bottom:10px; }
-.ic-college-stats { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.ic-college-total { font-size:0.82rem; font-weight:800; color:#1a1d23; }
-.ic-college-avail { font-size:0.73rem; font-weight:600; color:#15803d; background:rgba(34,197,94,0.12); border-radius:4px; padding:1px 8px; }
-.ic-college-status-list { display:flex; flex-direction:column; gap:4px; }
-.ic-college-status-row { display:flex; align-items:center; justify-content:space-between; font-size:0.75rem; color:#555; font-weight:600; }
 
 /* Modal Styles */
 .ic-modal {
@@ -285,8 +266,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     <!-- Page header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
         <div>
-            <h5 style="font-weight:800;color:#111;margin:0;font-size:1.05rem;">Campus Inventory</h5>
-            <div style="font-size:.78rem;color:#999;margin-top:2px;">Overview of all PSU campus assets</div>
+            <h5 style="font-weight:800;color:#111;margin:0;font-size:1.05rem;">Department Inventory</h5>
+            <div style="font-size:.78rem;color:#999;margin-top:2px;">Overview of assets by college and office, and the university's campuses</div>
         </div>
         <button onclick="document.getElementById('deptModal').classList.add('active')"
                 style="background:#8B0000;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-size:.84rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;">
@@ -294,107 +275,119 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         </button>
     </div>
 
-    <div class="ic-grid">
-        <?php foreach ($campuses as $campus):
-            $campus_inv   = filterByColumn(getInventory(), 'campus_id', $campus['id']);
-            $status_counts = countByStatus($campus_inv);
+    <!-- Overview tabs: Colleges, Offices, Campuses — three independent lists,
+         each sourced straight from the departments table. -->
+    <div style="display:flex;gap:6px;margin-bottom:18px;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:420px;">
+        <button onclick="ovTab('colleges')" id="ov-tab-colleges" class="ov-tab ov-tab-active" style="flex:1;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;background:#fff;color:#8B0000;box-shadow:0 1px 4px rgba(0,0,0,.10);">Colleges</button>
+        <button onclick="ovTab('offices')" id="ov-tab-offices" class="ov-tab" style="flex:1;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;background:transparent;color:#555;">Offices</button>
+        <button onclick="ovTab('campuses')" id="ov-tab-campuses" class="ov-tab" style="flex:1;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;background:transparent;color:#555;">Campuses</button>
+    </div>
+
+    <!-- ── Colleges ── -->
+    <div id="ov-panel-colleges" class="ic-grid ic-dept-grid">
+        <?php foreach (getMainCampusColleges() as $abbr => $fullname):
+            $dept_items  = array_values(array_filter(getInventory(), fn($i) => ($i['college_id'] ?? '') === $abbr));
+            $dept_status = countByStatus($dept_items);
         ?>
-        <div class="ic-campus-card<?php echo $campus['id'] == 1 ? ' ic-main-campus' : ''; ?>">
+        <div class="ic-campus-card">
             <div class="ic-campus-header">
-                <div class="ic-campus-name"><?php echo htmlspecialchars($campus['name']); ?></div>
-                <div class="ic-campus-loc"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($campus['location']); ?></div>
+                <div class="ic-campus-name"><?php echo htmlspecialchars($abbr); ?></div>
+                <div class="ic-campus-loc"><?php echo htmlspecialchars($fullname); ?></div>
             </div>
-
-            <?php if ($campus['id'] == 1 && !empty($campus['colleges'])): ?>
-            <div>
-                <div style="font-size:0.70rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.36);margin-bottom:10px;">Colleges</div>
-                <?php
-                $college_stats = [];
-                foreach (getMainCampusColleges() as $abbr => $fullname) {
-                    $col_items  = array_values(array_filter($campus_inv, fn($i) => ($i['college_id'] ?? '') === $abbr));
-                    $col_status = countByStatus($col_items);
-                    $college_stats[] = [
-                        'abbr'        => $abbr,
-                        'name'        => $fullname,
-                        'owned'       => $col_status['available']   ?? 0,
-                        'borrowed'    => $col_status['borrowed']    ?? 0,
-                        'maintenance' => $col_status['maintenance'] ?? 0,
-                        'requested'   => $col_status['requested']   ?? 0,
-                    ];
-                }
-                ?>
-                <div class="ic-college-grid">
-                    <?php foreach ($college_stats as $cs): ?>
-                    <div class="ic-college-card">
-                        <div class="ic-college-abbr"><?php echo htmlspecialchars($cs['abbr']); ?></div>
-                        <div class="ic-college-full"><?php echo htmlspecialchars($cs['name']); ?></div>
-                        <div class="ic-college-status-list">
-                            <div class="ic-college-status-row"><span>Owned</span><span class="ic-badge ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $cs['owned']; ?></span></div>
-                            <div class="ic-college-status-row"><span>Borrowed</span><span class="ic-badge ic-badge-warning"><?php echo $cs['borrowed']; ?></span></div>
-                            <div class="ic-college-status-row"><span>Maintenance</span><span class="ic-badge ic-badge-info"><?php echo $cs['maintenance']; ?></span></div>
-                            <div class="ic-college-status-row"><span>Requested</span><span class="ic-badge ic-badge-secondary"><?php echo $cs['requested'] ?? 0; ?></span></div>
-                        </div>
-                        <button onclick="openInventoryModal(<?php echo $campus['id']; ?>, '<?php echo htmlspecialchars($cs['abbr']); ?>', '<?php echo htmlspecialchars($cs['name']); ?>')" style="background:rgba(139,0,0,0.12); border:1px solid rgba(139,0,0,0.2); border-radius:8px; padding:6px 12px; font-size:0.75rem; font-weight:600; color:#8B0000; cursor:pointer; transition:all 0.15s; margin-top:8px;" onmouseover="this.style.background='rgba(139,0,0,0.20)'" onmouseout="this.style.background='rgba(139,0,0,0.12)'"><i class="fas fa-eye" style="margin-right:4px;"></i>View</button>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-
-            <div style="margin-top:16px;">
-                <div style="font-size:0.70rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.36);margin-bottom:10px;">Offices</div>
-                <?php
-                $office_stats = [];
-                foreach (getMainCampusOffices() as $abbr => $fullname) {
-                    $off_items  = array_values(array_filter($campus_inv, fn($i) => ($i['college_id'] ?? '') === $abbr));
-                    $off_status = countByStatus($off_items);
-                    $office_stats[] = [
-                        'abbr'        => $abbr,
-                        'name'        => $fullname,
-                        'owned'       => $off_status['available']   ?? 0,
-                        'borrowed'    => $off_status['borrowed']    ?? 0,
-                        'maintenance' => $off_status['maintenance'] ?? 0,
-                        'requested'   => $off_status['requested']   ?? 0,
-                    ];
-                }
-                ?>
-                <div class="ic-college-grid">
-                    <?php foreach ($office_stats as $os): ?>
-                    <div class="ic-college-card">
-                        <div class="ic-college-abbr"><?php echo htmlspecialchars($os['abbr']); ?></div>
-                        <div class="ic-college-full"><?php echo htmlspecialchars($os['name']); ?></div>
-                        <div class="ic-college-status-list">
-                            <div class="ic-college-status-row"><span>Owned</span><span class="ic-badge ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $os['owned']; ?></span></div>
-                            <div class="ic-college-status-row"><span>Borrowed</span><span class="ic-badge ic-badge-warning"><?php echo $os['borrowed']; ?></span></div>
-                            <div class="ic-college-status-row"><span>Maintenance</span><span class="ic-badge ic-badge-info"><?php echo $os['maintenance']; ?></span></div>
-                            <div class="ic-college-status-row"><span>Requested</span><span class="ic-badge ic-badge-secondary"><?php echo $os['requested'] ?? 0; ?></span></div>
-                        </div>
-                        <button onclick="openInventoryModal(<?php echo $campus['id']; ?>, '<?php echo htmlspecialchars($os['abbr']); ?>', '<?php echo htmlspecialchars($os['name']); ?>')" style="background:rgba(139,0,0,0.12); border:1px solid rgba(139,0,0,0.2); border-radius:8px; padding:6px 12px; font-size:0.75rem; font-weight:600; color:#8B0000; cursor:pointer; transition:all 0.15s; margin-top:8px;" onmouseover="this.style.background='rgba(139,0,0,0.20)'" onmouseout="this.style.background='rgba(139,0,0,0.12)'"><i class="fas fa-eye" style="margin-right:4px;"></i>View</button>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-
             <div class="ic-status-list">
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Owned</span>
-                    <span class="ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $status_counts['available'] ?? 0; ?></span>
+                    <span class="ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $dept_status['available'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Borrowed</span>
-                    <span class="ic-badge ic-badge-warning"><?php echo $status_counts['borrowed'] ?? 0; ?></span>
+                    <span class="ic-badge ic-badge-warning"><?php echo $dept_status['borrowed'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Maintenance</span>
-                    <span class="ic-badge ic-badge-info"><?php echo $status_counts['maintenance'] ?? 0; ?></span>
+                    <span class="ic-badge ic-badge-info"><?php echo $dept_status['maintenance'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Requested</span>
-                    <span class="ic-badge ic-badge-secondary"><?php echo $status_counts['requested'] ?? 0; ?></span>
+                    <span class="ic-badge ic-badge-secondary"><?php echo $dept_status['requested'] ?? 0; ?></span>
                 </div>
             </div>
+            <button onclick="openDeptInventoryModal('<?php echo htmlspecialchars($abbr); ?>', '<?php echo htmlspecialchars($abbr . ' — ' . $fullname); ?>')" class="ic-btn-view">
+                <i class="fas fa-eye"></i> View Inventory
+            </button>
+        </div>
+        <?php endforeach; ?>
+    </div>
 
-            <button onclick="openInventoryModal(<?php echo $campus['id']; ?>, '', '<?php echo htmlspecialchars($campus['name']); ?>')" class="ic-btn-view" <?php echo $campus['id'] == 1 ? 'style="display:none;"' : ''; ?>>
+    <!-- ── Offices ── -->
+    <div id="ov-panel-offices" class="ic-grid ic-dept-grid" style="display:none;">
+        <?php foreach (getMainCampusOffices() as $abbr => $fullname):
+            $dept_items  = array_values(array_filter(getInventory(), fn($i) => ($i['college_id'] ?? '') === $abbr));
+            $dept_status = countByStatus($dept_items);
+        ?>
+        <div class="ic-campus-card">
+            <div class="ic-campus-header">
+                <div class="ic-campus-name"><?php echo htmlspecialchars($abbr); ?></div>
+                <div class="ic-campus-loc"><?php echo htmlspecialchars($fullname); ?></div>
+            </div>
+            <div class="ic-status-list">
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Owned</span>
+                    <span class="ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $dept_status['available'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Borrowed</span>
+                    <span class="ic-badge ic-badge-warning"><?php echo $dept_status['borrowed'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Maintenance</span>
+                    <span class="ic-badge ic-badge-info"><?php echo $dept_status['maintenance'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Requested</span>
+                    <span class="ic-badge ic-badge-secondary"><?php echo $dept_status['requested'] ?? 0; ?></span>
+                </div>
+            </div>
+            <button onclick="openDeptInventoryModal('<?php echo htmlspecialchars($abbr); ?>', '<?php echo htmlspecialchars($abbr . ' — ' . $fullname); ?>')" class="ic-btn-view">
+                <i class="fas fa-eye"></i> View Inventory
+            </button>
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <!-- ── Campuses ── -->
+    <div id="ov-panel-campuses" class="ic-grid ic-dept-grid" style="display:none;">
+        <?php foreach (getDepartmentCampuses() as $c):
+            $camp_items  = filterByColumn(getInventory(), 'campus_id', $c['id']);
+            $camp_status = countByStatus($camp_items);
+        ?>
+        <div class="ic-campus-card">
+            <div class="ic-campus-header">
+                <div class="ic-campus-name"><?php echo htmlspecialchars($c['name']); ?></div>
+                <div class="ic-campus-loc"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($c['location']); ?></div>
+            </div>
+            <?php if ($c['description']): ?>
+            <div style="font-size:.82rem;color:#555;line-height:1.5;"><?php echo htmlspecialchars($c['description']); ?></div>
+            <?php endif; ?>
+            <div class="ic-status-list">
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Owned</span>
+                    <span class="ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $camp_status['available'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Borrowed</span>
+                    <span class="ic-badge ic-badge-warning"><?php echo $camp_status['borrowed'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Maintenance</span>
+                    <span class="ic-badge ic-badge-info"><?php echo $camp_status['maintenance'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Requested</span>
+                    <span class="ic-badge ic-badge-secondary"><?php echo $camp_status['requested'] ?? 0; ?></span>
+                </div>
+            </div>
+            <button onclick="openInventoryModal(<?php echo $c['id']; ?>, '', '<?php echo htmlspecialchars($c['name']); ?>')" class="ic-btn-view">
                 <i class="fas fa-eye"></i> View Inventory
             </button>
         </div>
@@ -418,22 +411,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <button onclick="deptTab('offices')"  id="tab-offices"  class="dept-tab"              style="flex:1;padding:7px 0;border:none;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;background:transparent;color:#555;">Offices</button>
                 <button onclick="deptTab('campuses')" id="tab-campuses" class="dept-tab"              style="flex:1;padding:7px 0;border:none;border-radius:6px;font-size:.82rem;font-weight:700;cursor:pointer;background:transparent;color:#555;">Campuses</button>
             </div>
-            <div id="campuses-note" style="display:none;font-size:.76rem;color:#555;background:#f7f7f7;border:1px solid #e5e7eb;border-radius:5px;padding:6px 12px;margin-bottom:16px;">
-                <i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i> Manage all PSU campuses here.
-            </div>
-
-            <?php
-            // Which campus's colleges/offices are we viewing/editing? Defaults to Main Campus.
-            $dept_view_campus_id = (int)($_GET['dept_campus_id'] ?? 1) ?: 1;
-            ?>
-            <div id="dept-campus-picker" style="margin-bottom:14px;">
-                <label style="font-size:.78rem;font-weight:700;color:#333;display:block;margin-bottom:5px;">Campus</label>
-                <select id="deptCampusSelect" onchange="deptCampusChange(this.value)"
-                        style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:.85rem;outline:none;color:#111;">
-                    <?php foreach ($campuses as $c): ?>
-                    <option value="<?php echo $c['id']; ?>" <?php echo $c['id'] == $dept_view_campus_id ? 'selected' : ''; ?>><?php echo htmlspecialchars($c['name']); ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <div style="font-size:.76rem;color:#555;background:#f7f7f7;border:1px solid #e5e7eb;border-radius:5px;padding:6px 12px;margin-bottom:16px;">
+                <i class="fas fa-info-circle me-1" style="color:rgba(139,0,0,0.5);"></i> Colleges, offices, and campuses are managed as three independent lists in the same departments table.
             </div>
 
             <!-- ── Colleges panel ── -->
@@ -441,7 +420,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <form method="POST" style="background:#f7f7f7;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:18px;">
                     <input type="hidden" name="dept_action" value="add">
                     <input type="hidden" name="dept_type"   value="colleges">
-                    <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                     <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:10px;">Add College</div>
                     <div style="display:grid;grid-template-columns:120px 1fr 110px;gap:10px;align-items:end;">
                         <div>
@@ -463,8 +441,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </form>
                 <?php
                 $default_college_keys = ['CEA','COE','CCS','CBS','CAS','CIT','CHTM','CSSP'];
-                foreach (getMainCampusColleges($dept_view_campus_id) as $abbr => $name):
-                    $is_default = $dept_view_campus_id === 1 && in_array($abbr, $default_college_keys);
+                foreach (getMainCampusColleges() as $abbr => $name):
+                    $is_default = in_array($abbr, $default_college_keys);
                 ?>
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:6px;background:#fff;">
                     <div>
@@ -477,7 +455,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <input type="hidden" name="dept_action" value="delete">
                         <input type="hidden" name="dept_type" value="colleges">
                         <input type="hidden" name="dept_abbr" value="<?php echo htmlspecialchars($abbr); ?>">
-                        <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                         <button type="submit" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:#dc2626;border-radius:5px;padding:4px 10px;font-size:.75rem;cursor:pointer;"><i class="fas fa-trash"></i></button>
                     </form>
                     <?php endif; ?>
@@ -490,7 +467,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <form method="POST" style="background:#f7f7f7;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:18px;">
                     <input type="hidden" name="dept_action" value="add">
                     <input type="hidden" name="dept_type"   value="offices">
-                    <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                     <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:10px;">Add Office</div>
                     <div style="display:grid;grid-template-columns:120px 1fr 110px;gap:10px;align-items:end;">
                         <div>
@@ -512,8 +488,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </form>
                 <?php
                 $default_office_keys = ['OUP','OVPAA','OVPAF','OVPRDE','OUR','OSAS','HRMO','ICTO','FBO','PMO','PPMO','ULib','GCC','PDO'];
-                foreach (getMainCampusOffices($dept_view_campus_id) as $abbr => $name):
-                    $is_default = $dept_view_campus_id === 1 && in_array($abbr, $default_office_keys);
+                foreach (getMainCampusOffices() as $abbr => $name):
+                    $is_default = in_array($abbr, $default_office_keys);
                 ?>
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:6px;background:#fff;">
                     <div>
@@ -526,7 +502,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <input type="hidden" name="dept_action" value="delete">
                         <input type="hidden" name="dept_type" value="offices">
                         <input type="hidden" name="dept_abbr" value="<?php echo htmlspecialchars($abbr); ?>">
-                        <input type="hidden" name="dept_campus_id" value="<?php echo $dept_view_campus_id; ?>">
                         <button type="submit" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:#dc2626;border-radius:5px;padding:4px 10px;font-size:.75rem;cursor:pointer;"><i class="fas fa-trash"></i></button>
                     </form>
                     <?php endif; ?>
@@ -561,28 +536,22 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <i class="fas fa-plus me-1"></i> Add Campus
                     </button>
                 </form>
-                <?php
-                $default_campus_ids = [1,2,3,4,5,6,7,8];
-                foreach (getAllCampuses() as $campus):
-                    $is_default = in_array($campus['id'], $default_campus_ids);
-                ?>
+                <?php foreach (getDepartmentCampuses() as $c): ?>
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:6px;background:#fff;">
                     <div>
-                        <div style="font-weight:700;color:#111;font-size:.88rem;"><?php echo htmlspecialchars($campus['name']); ?></div>
-                        <div style="font-size:.76rem;color:#999;margin-top:1px;"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($campus['location']); ?></div>
+                        <div style="font-weight:700;color:#111;font-size:.88rem;"><?php echo htmlspecialchars($c['name']); ?>
+                            <?php if ($c['is_default']): ?><span style="font-size:.68rem;background:#f0f0f0;color:#999;border-radius:4px;padding:1px 6px;margin-left:6px;">default</span><?php endif; ?>
+                        </div>
+                        <div style="font-size:.76rem;color:#999;margin-top:1px;"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($c['location']); ?></div>
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <?php if ($is_default): ?>
-                        <span style="font-size:.68rem;background:#f0f0f0;color:#999;border-radius:4px;padding:2px 8px;">default</span>
-                        <?php else: ?>
-                        <form method="POST" onsubmit="return confirm('Delete this campus?')" style="margin:0;">
-                            <input type="hidden" name="dept_action" value="delete">
-                            <input type="hidden" name="dept_type"   value="campuses">
-                            <input type="hidden" name="campus_id"   value="<?php echo $campus['id']; ?>">
-                            <button type="submit" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:#dc2626;border-radius:5px;padding:4px 10px;font-size:.75rem;cursor:pointer;"><i class="fas fa-trash"></i></button>
-                        </form>
-                        <?php endif; ?>
-                    </div>
+                    <?php if (!$c['is_default']): ?>
+                    <form method="POST" onsubmit="return confirm('Delete <?php echo htmlspecialchars($c['name']); ?>?')" style="margin:0;">
+                        <input type="hidden" name="dept_action" value="delete">
+                        <input type="hidden" name="dept_type"   value="campuses">
+                        <input type="hidden" name="dept_abbr"   value="<?php echo htmlspecialchars($c['abbreviation']); ?>">
+                        <button type="submit" style="background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.2);color:#dc2626;border-radius:5px;padding:4px 10px;font-size:.75rem;cursor:pointer;"><i class="fas fa-trash"></i></button>
+                    </form>
+                    <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -610,8 +579,26 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 </div>
 
 <script>
+var icAllInventory = <?php echo json_encode(getInventory()); ?>;
 var icModalItems = [];      // this campus/college's raw item rows
 var icModalSortBy = 'name'; // 'name' | 'quantity' | 'status'
+
+// Overview tabs: Colleges, Offices — two independent lists.
+function ovTab(tab) {
+    ['colleges', 'offices', 'campuses'].forEach(function(t) {
+        document.getElementById('ov-panel-' + t).style.display = t === tab ? 'grid' : 'none';
+        var btn = document.getElementById('ov-tab-' + t);
+        if (t === tab) {
+            btn.style.background = '#fff';
+            btn.style.color = '#8B0000';
+            btn.style.boxShadow = '0 1px 4px rgba(0,0,0,.10)';
+        } else {
+            btn.style.background = 'transparent';
+            btn.style.color = '#555';
+            btn.style.boxShadow = 'none';
+        }
+    });
+}
 
 // Collapse individual unit rows into one entry per item_name (one row = one
 // physical unit in this model), so 5 "Network Server" rows show as a single
@@ -628,20 +615,28 @@ function icGroupItems(items) {
     return Object.values(groups);
 }
 
-function openInventoryModal(campusId, filterCode, filterName) {
+// Colleges/offices are global — this filters inventory by department abbreviation.
+function openDeptInventoryModal(deptCode, deptName) {
     const modal = document.getElementById('inventoryModal');
     const modalTitle = document.getElementById('modalTitle');
-    const modalContent = document.getElementById('modalContent');
 
-    modalTitle.textContent = filterName + ' - Inventory Items';
+    modalTitle.textContent = deptName + ' - Inventory Items';
     modal.classList.add('active');
 
-    const inventory = <?php echo json_encode(getInventory()); ?>;
-    let allCampusItems = inventory.filter(item => item.campus_id == campusId);
-    if (filterCode) {
-        allCampusItems = allCampusItems.filter(item => item.college_id === filterCode);
-    }
-    icModalItems = allCampusItems;
+    icModalItems = icAllInventory.filter(item => item.college_id === deptCode);
+    icModalSortBy = 'name';
+    renderInventoryModal('');
+}
+
+// Campuses tab — filters inventory by the (old, still-live) campus_id column.
+function openInventoryModal(campusId, filterCode, campusName) {
+    const modal = document.getElementById('inventoryModal');
+    const modalTitle = document.getElementById('modalTitle');
+
+    modalTitle.textContent = campusName + ' - Inventory Items';
+    modal.classList.add('active');
+
+    icModalItems = icAllInventory.filter(item => item.campus_id == campusId);
     icModalSortBy = 'name';
     renderInventoryModal('');
 }
@@ -744,16 +739,6 @@ function deptTab(tab) {
             btn.style.boxShadow = 'none';
         }
     });
-    document.getElementById('dept-campus-picker').style.display = (tab === 'campuses') ? 'none' : 'block';
-    document.getElementById('campuses-note').style.display      = (tab === 'campuses') ? 'flex' : 'none';
-}
-
-// Reload with the modal reopened, scoped to the chosen campus's colleges/offices
-function deptCampusChange(campusId) {
-    var url = new URL(window.location.href);
-    url.searchParams.set('dept_campus_id', campusId);
-    url.searchParams.set('openDeptModal', '1');
-    window.location.href = url.toString();
 }
 
 // Close dept modal on outside click
@@ -761,7 +746,7 @@ document.getElementById('deptModal').addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('active');
 });
 
-// Reopen the dept modal after a campus switch / add / delete redirect
+// Reopen the dept modal after an add / delete redirect
 <?php if (isset($_GET['openDeptModal'])): ?>
 document.getElementById('deptModal').classList.add('active');
 <?php endif; ?>

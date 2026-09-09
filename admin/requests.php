@@ -868,12 +868,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                                 <i class="fas fa-graduation-cap"></i> <?php echo htmlspecialchars($request['college_id']); ?>
                             </span>
                         </p>
-                        <?php elseif (!empty($request['campus_id'])): ?>
-                        <?php
-                        $detail_campus = 'Unknown Campus';
-                        foreach (getCampuses() as $c) { if ($c['id'] == $request['campus_id']) { $detail_campus = $c['name']; break; } }
-                        ?>
-                        <p><strong>Campus:</strong><?php echo htmlspecialchars($detail_campus); ?></p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -1206,12 +1200,15 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             var serial   = unit ? unit.serial   : '';
             var college  = unit ? unit.college  : '';
             var acquired = unit ? unit.acquired_at : '';
-            var itemName = (unit && unit.item_name) ? unit.item_name : _sd.item;
+            // The stored item_name may already carry a " Unit N" suffix from how multi-unit
+            // items are created — strip it so the sticker always shows the clean product name,
+            // with its own "#N" numbering appended below instead of a duplicated "Unit" label.
+            var itemName = ((unit && unit.item_name) ? unit.item_name : _sd.item).replace(/\s+Unit\s+\d+$/i, '');
             // The QR still encodes only the plain qr_code_id — that's the scannable lookup
             // key used by delivery confirmation (web + mobile). The extra asset details are
             // printed as human-readable text on the label, not packed into the QR itself.
             var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(qr);
-            var unitLabel = totalUnits > 1 ? ' (Unit ' + unitNum + ' of ' + totalUnits + ')' : '';
+            var unitLabel = totalUnits > 1 ? ' #' + unitNum : '';
             var loc_college = college ? (_esc(loc) + ' &middot; ' + _esc(college)) : _esc(loc);
             return '<div class="ar-sticker">'
                 + '<div class="ar-sticker-top">' + _sd.short + ' &mdash; Asset Label<span>' + _sd.institution + '</span></div>'
@@ -1411,9 +1408,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <span class="ar-badge" style="background:rgba(59,130,246,0.12);color:#1d4ed8;border:1px solid rgba(59,130,246,0.20);font-size:0.73rem;">
                             <i class="fas fa-graduation-cap me-1"></i><?php echo htmlspecialchars($req['college_id']); ?>
                         </span>
-                        <?php elseif (!empty($req['campus_id'])): ?>
-                        <?php $req_campus='Unknown'; foreach(getCampuses() as $c){if($c['id']==$req['campus_id']){$req_campus=$c['name'];break;}} ?>
-                        <span style="font-size:0.78rem;color:rgba(0,0,0,0.45);"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($req_campus); ?></span>
                         <?php else: ?><span style="font-size:0.78rem;color:rgba(0,0,0,0.30);">—</span><?php endif; ?>
                     </td>
                     <td data-label="Item">
@@ -1456,9 +1450,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <span class="ar-badge" style="background:rgba(59,130,246,0.12);color:#1d4ed8;border:1px solid rgba(59,130,246,0.20);font-size:0.73rem;">
                             <i class="fas fa-graduation-cap me-1"></i><?php echo htmlspecialchars($req['college_id']); ?>
                         </span>
-                        <?php elseif (!empty($req['campus_id'])): ?>
-                        <?php $req_campus='Unknown'; foreach(getCampuses() as $c){if($c['id']==$req['campus_id']){$req_campus=$c['name'];break;}} ?>
-                        <span style="font-size:0.78rem;color:rgba(0,0,0,0.45);"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($req_campus); ?></span>
                         <?php else: ?><span style="font-size:0.78rem;color:rgba(0,0,0,0.30);">—</span><?php endif; ?>
                     </td>
                     <td data-label="Service" style="max-width:260px;">
@@ -1498,12 +1489,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <span class="ar-badge" style="background:rgba(59,130,246,0.12);color:#1d4ed8;border:1px solid rgba(59,130,246,0.20);font-size:0.73rem;">
                             <i class="fas fa-graduation-cap me-1"></i><?php echo htmlspecialchars($req['college_id']); ?>
                         </span>
-                        <?php elseif (!empty($req['campus_id'])): ?>
-                        <?php
-                        $req_campus = 'Unknown Campus';
-                        foreach (getCampuses() as $c) { if ($c['id'] == $req['campus_id']) { $req_campus = $c['name']; break; } }
-                        ?>
-                        <span style="font-size:0.78rem;color:rgba(0,0,0,0.45);"><i class="fas fa-map-marker-alt me-1" style="color:rgba(139,0,0,0.5);"></i><?php echo htmlspecialchars($req_campus); ?></span>
                         <?php else: ?>
                         <span style="font-size:0.78rem;color:rgba(0,0,0,0.30);">—</span>
                         <?php endif; ?>

@@ -619,7 +619,7 @@ displayMessage();
         <?php if ($delivery_status === 'out_for_delivery'): ?>
         <div class="mrt-notes" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.20);color:#1d4ed8;margin-bottom:16px;">
             <i class="fas fa-truck fa-bounce" style="margin-top:2px;flex-shrink:0;"></i>
-            <div><strong>Your item is on the way!</strong> It has been dispatched and is currently out for delivery to your campus.</div>
+            <div><strong>Your item is on the way!</strong> It has been dispatched and is currently out for delivery to you.</div>
         </div>
         <?php elseif ($delivery_status === 'delivered'): ?>
         <div class="mrt-notes" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.20);color:#15803d;margin-bottom:16px;">

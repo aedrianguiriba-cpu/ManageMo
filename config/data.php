@@ -62,20 +62,14 @@ function clearDataCache(string ...$keys): void {
     }
 }
 
-// ── Colleges / Offices (Main Campus by default; pass a campus_id for others) ──
-// campus_id is nullable on the departments row — NULL (or 1) means Main Campus,
-// preserving pre-existing behavior for every no-arg call site.
+// ── Colleges / Offices ────────────────────────────────────────────────────────
+// Colleges and offices are global lists, independent of any campus — not scoped
+// or nested under a "Main Campus". A $campus_id argument is still accepted so
+// existing call sites keep working, but it no longer affects the result.
 
-function _departmentsByType(string $type, ?int $campus_id = null): array {
-    $cache_key = $campus_id === null || $campus_id === 1
-        ? "departments_{$type}_1"
-        : "departments_{$type}_{$campus_id}";
-    return _dbCache($cache_key, function () use ($type, $campus_id) {
-        $qs = "type=eq.$type&order=abbreviation.asc&";
-        $qs .= ($campus_id === null || $campus_id === 1)
-            ? 'or=(campus_id.is.null,campus_id.eq.1)'
-            : 'campus_id=eq.' . $campus_id;
-        $rows = supabase()->select('departments', $qs);
+function _departmentsByType(string $type): array {
+    return _dbCache("departments_{$type}", function () use ($type) {
+        $rows = supabase()->select('departments', "type=eq.$type&order=abbreviation.asc");
         $out = [];
         foreach ($rows as $r) $out[$r['abbreviation']] = $r['full_name'];
         return $out;
@@ -83,17 +77,35 @@ function _departmentsByType(string $type, ?int $campus_id = null): array {
 }
 
 function getMainCampusColleges(?int $campus_id = null): array {
-    return _departmentsByType('college', $campus_id);
+    return _departmentsByType('college');
 }
 
 function getMainCampusOffices(?int $campus_id = null): array {
-    return _departmentsByType('office', $campus_id);
+    return _departmentsByType('office');
 }
 
 // ── Combined departments ──────────────────────────────────────────────────────
 
 function getMainCampusDepartments(?int $campus_id = null): array {
-    return array_merge(getMainCampusColleges($campus_id), getMainCampusOffices($campus_id));
+    return array_merge(getMainCampusColleges(), getMainCampusOffices());
+}
+
+// ── Campuses (also a departments-table entry, type='campus') ───────────────────
+// Unlike colleges/offices, a campus carries a location/description, so it needs
+// its own richer shape instead of the flat abbreviation => full_name map above.
+
+function getDepartmentCampuses(): array {
+    return _dbCache('departments_campus', function () {
+        $rows = supabase()->select('departments', 'type=eq.campus&order=full_name.asc');
+        return array_map(fn($r) => [
+            'id'           => (int)$r['id'],
+            'abbreviation' => $r['abbreviation'] ?? '',
+            'name'         => $r['full_name'],
+            'location'     => $r['location'] ?? '',
+            'description'  => $r['description'] ?? '',
+            'is_default'   => (bool)$r['is_default'],
+        ], $rows);
+    });
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
@@ -106,19 +118,12 @@ function getUsers(): array {
 }
 
 // ── Campuses ──────────────────────────────────────────────────────────────────
+// Campuses are departments-table rows (type='campus') — same table and
+// mechanism as colleges/offices, not the old standalone `campuses` table.
+// `campus_id` on users/inventory/user_owned_items now means departments.id.
 
 function getCampuses(): array {
-    return _dbCache('campuses', function () {
-        $rows = supabase()->select('campuses', 'order=id.asc');
-        return array_map(fn($r) => [
-            'id'          => (int)$r['id'],
-            'name'        => $r['name'],
-            'location'    => $r['location'] ?? '',
-            'description' => $r['description'] ?? '',
-            'is_default'  => (bool)$r['is_default'],
-            'colleges'    => (int)$r['id'] === 1 ? array_values(getMainCampusColleges()) : [],
-        ], $rows);
-    });
+    return getDepartmentCampuses();
 }
 
 // ── Inventory ─────────────────────────────────────────────────────────────────

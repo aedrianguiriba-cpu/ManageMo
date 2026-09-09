@@ -8,7 +8,11 @@ $current_user = getCurrentUser();
 
 // Filters
 $report_type = sanitizeInput($_GET['type']   ?? 'inventory');
-$campus_id   = isset($_GET['campus_id']) ? (int)$_GET['campus_id'] : 0;
+// One combined "department" filter covers Campuses, Colleges, and Offices
+// together: value is "c:<campus id>" or "d:<college/office abbr>".
+$dept_id     = sanitizeInput($_GET['dept_id'] ?? '');
+$campus_id   = str_starts_with($dept_id, 'c:') ? substr($dept_id, 2) : '';
+$college_id  = str_starts_with($dept_id, 'd:') ? substr($dept_id, 2) : '';
 $date_from   = sanitizeInput($_GET['date_from'] ?? date('Y-m-d', strtotime('-30 days')));
 $date_to     = sanitizeInput($_GET['date_to']   ?? date('Y-m-d'));
 $status_f    = sanitizeInput($_GET['status']    ?? '');
@@ -19,13 +23,14 @@ $per_page    = 15;
 $all_inventory = getInventory();
 $all_requests  = getRequests();
 $all_users = getUsers();
-$campuses  = getCampuses();
+$all_campuses = getAllCampuses();
 $colleges  = getMainCampusColleges();
 $offices   = getMainCampusOffices();
 $all_depts = array_merge($colleges, $offices);
 
 // --- Filtered inventory ---
-$inv_data = $campus_id ? filterByColumn($all_inventory, 'campus_id', $campus_id) : $all_inventory;
+$inv_data = $college_id ? filterByColumn($all_inventory, 'college_id', $college_id) : $all_inventory;
+if ($campus_id) $inv_data = filterByColumn($inv_data, 'campus_id', (int)$campus_id);
 if ($status_f) $inv_data = filterByColumn($inv_data, 'status', $status_f);
 $inv_value = array_sum(array_column($inv_data, 'cost'));
 
@@ -35,20 +40,26 @@ $req_data = array_values(array_filter($all_requests, function($r) use ($date_fro
     return $d >= $date_from && $d <= $date_to;
 }));
 if ($status_f) $req_data = array_values(filterByColumn($req_data, 'status', $status_f));
+if ($college_id) {
+    // Filter by requester's college/office
+    $dept_user_ids = array_column(filterByColumn($all_users, 'college_id', $college_id), 'id');
+    $req_data = array_values(array_filter($req_data, fn($r) => in_array($r['user_id'], $dept_user_ids)));
+}
 if ($campus_id) {
-    // Filter by requester campus
-    $campus_user_ids = array_column(filterByColumn($all_users, 'campus_id', $campus_id), 'id');
+    // Filter by requester's campus
+    $campus_user_ids = array_column(filterByColumn($all_users, 'campus_id', (int)$campus_id), 'id');
     $req_data = array_values(array_filter($req_data, fn($r) => in_array($r['user_id'], $campus_user_ids)));
 }
 // --- Filtered users ---
-$usr_data = $campus_id ? filterByColumn($all_users, 'campus_id', $campus_id) : $all_users;
+$usr_data = $college_id ? filterByColumn($all_users, 'college_id', $college_id) : $all_users;
+if ($campus_id) $usr_data = filterByColumn($usr_data, 'campus_id', (int)$campus_id);
 if ($status_f === 'active')   $usr_data = array_values(array_filter($usr_data, fn($u) => $u['is_active']));
 if ($status_f === 'inactive') $usr_data = array_values(array_filter($usr_data, fn($u) => !$u['is_active']));
 
 // Helpers
-function campusName($campuses, $id) {
-    foreach ($campuses as $c) { if ($c['id'] == $id) return $c['name']; }
-    return '—';
+function deptName($all_depts, $code) {
+    if (!$code) return '—';
+    return $all_depts[$code] ?? $code;
 }
 function reqUserName($all_users, $uid) {
     foreach ($all_users as $u) { if ($u['id'] == $uid) return $u['full_name']; }
@@ -64,10 +75,10 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     fprintf($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens ₱/special chars correctly
 
     if ($report_type === 'inventory') {
-        fputcsv($out, ['QR Code', 'Item Name', 'Category', 'Campus', 'Location', 'Quantity', 'Condition', 'Status', 'Cost', 'Purchase Date']);
+        fputcsv($out, ['QR Code', 'Item Name', 'Category', 'College/Office', 'Location', 'Quantity', 'Condition', 'Status', 'Cost', 'Purchase Date']);
         foreach ($inv_data as $i) {
             fputcsv($out, [
-                $i['qr_code_id'], $i['item_name'], $i['category'], campusName($campuses, $i['campus_id']),
+                $i['qr_code_id'], $i['item_name'], $i['category'], deptName($all_depts, $i['college_id'] ?? ''),
                 $i['location'], $i['quantity'], $i['condition'], $i['status'],
                 number_format((float)($i['cost'] ?? 0), 2), $i['purchase_date'] ?? '',
             ]);
@@ -83,11 +94,11 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
             ]);
         }
     } else { // users
-        fputcsv($out, ['Full Name', 'Email', 'Phone', 'Role', 'Campus', 'Department', 'Status', 'Joined']);
+        fputcsv($out, ['Full Name', 'Email', 'Phone', 'Role', 'Department', 'Status', 'Joined']);
         foreach ($usr_data as $u) {
             fputcsv($out, [
                 $u['full_name'], $u['email'], $u['phone'] ?? '', ucfirst($u['role']),
-                campusName($campuses, $u['campus_id']), $all_depts[$u['college_id'] ?? ''] ?? ($u['college_id'] ?? ''),
+                deptName($all_depts, $u['college_id'] ?? ''),
                 $u['is_active'] ? 'Active' : 'Inactive', substr($u['created_at'], 0, 10),
             ]);
         }
@@ -266,7 +277,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <span><strong>Report Type:</strong>
                 <?php echo ['inventory'=>'Inventory Report','requests'=>'Requests Report','users'=>'User Accounts Report'][$report_type] ?? 'Report'; ?>
             </span>
-            <span><strong>Campus:</strong> <?php echo $campus_id ? htmlspecialchars(campusName($campuses, $campus_id)) : 'All Campuses'; ?></span>
+            <span><strong>Campus/College/Office:</strong> <?php
+                if ($campus_id) echo htmlspecialchars(deptName(array_column($all_campuses, 'name', 'id'), (int)$campus_id));
+                elseif ($college_id) echo htmlspecialchars(deptName($all_depts, $college_id));
+                else echo 'All';
+            ?></span>
             <?php if ($report_type !== 'inventory'): ?>
             <span><strong>Period:</strong> <?php echo $date_from; ?> to <?php echo $date_to; ?></span>
             <?php endif; ?>
@@ -277,15 +292,15 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         <div class="rp-no-print">
             <!-- Type tabs -->
             <div class="rp-type-tabs">
-                <a href="?type=inventory&campus_id=<?php echo $campus_id; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>"
+                <a href="?type=inventory&dept_id=<?php echo urlencode($dept_id); ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>"
                    class="rp-type-tab <?php echo $report_type==='inventory'?'active':''; ?>">
                     <i class="fas fa-warehouse"></i> Inventory
                 </a>
-                <a href="?type=requests&campus_id=<?php echo $campus_id; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>"
+                <a href="?type=requests&dept_id=<?php echo urlencode($dept_id); ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>"
                    class="rp-type-tab <?php echo $report_type==='requests'?'active':''; ?>">
                     <i class="fas fa-clipboard-list"></i> Requests
                 </a>
-                <a href="?type=users&campus_id=<?php echo $campus_id; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>"
+                <a href="?type=users&dept_id=<?php echo urlencode($dept_id); ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>"
                    class="rp-type-tab <?php echo $report_type==='users'?'active':''; ?>">
                     <i class="fas fa-users"></i> Users
                 </a>
@@ -296,14 +311,23 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <form method="GET" class="d-flex align-items-end flex-wrap gap-3">
                     <input type="hidden" name="type" value="<?php echo htmlspecialchars($report_type); ?>">
                     <div>
-                        <div class="rp-filter-label">Campus</div>
-                        <select class="form-select" name="campus_id" style="min-width:160px;">
-                            <option value="0">All Campuses</option>
-                            <?php foreach ($campuses as $c): ?>
-                            <option value="<?php echo $c['id']; ?>" <?php echo $campus_id==$c['id']?'selected':''; ?>>
+                        <div class="rp-filter-label">Campus / College / Office</div>
+                        <select class="form-select" name="dept_id" style="min-width:180px;">
+                            <option value="">All</option>
+                            <optgroup label="Campuses">
+                            <?php foreach ($all_campuses as $c): ?>
+                            <option value="c:<?php echo $c['id']; ?>" <?php echo $dept_id==='c:'.$c['id']?'selected':''; ?>>
                                 <?php echo htmlspecialchars($c['name']); ?>
                             </option>
                             <?php endforeach; ?>
+                            </optgroup>
+                            <optgroup label="Colleges/Offices">
+                            <?php foreach ($all_depts as $code => $name): ?>
+                            <option value="d:<?php echo htmlspecialchars($code); ?>" <?php echo $dept_id==='d:'.$code?'selected':''; ?>>
+                                <?php echo htmlspecialchars($name); ?>
+                            </option>
+                            <?php endforeach; ?>
+                            </optgroup>
                         </select>
                     </div>
                     <?php if ($report_type !== 'inventory'): ?>
@@ -424,7 +448,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <th>QR Code</th>
                         <th>Item Name</th>
                         <th>Category</th>
-                        <th>Campus</th>
+                        <th>College/Office</th>
                         <th>Location</th>
                         <th>Qty</th>
                         <th>Condition</th>
@@ -440,7 +464,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <td><span style="font-family:monospace;font-size:0.76rem;color:#8B0000;background:rgba(139,0,0,0.06);border-radius:4px;padding:1px 5px;"><?php echo htmlspecialchars($item['qr_code_id']); ?></span></td>
                     <td style="font-weight:700;"><?php echo htmlspecialchars($item['item_name']); ?></td>
                     <td><?php echo htmlspecialchars($item['category']); ?></td>
-                    <td><?php echo htmlspecialchars(campusName($campuses, $item['campus_id'])); ?></td>
+                    <td><?php echo htmlspecialchars(deptName($all_depts, $item['college_id'] ?? '')); ?></td>
                     <td style="font-size:0.80rem;color:rgba(0,0,0,0.55);"><?php echo htmlspecialchars($item['location']); ?></td>
                     <td style="text-align:center;font-weight:700;"><?php echo (int)$item['quantity']; ?></td>
                     <td><?php echo ucfirst(htmlspecialchars($item['condition'])); ?></td>
@@ -463,7 +487,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
                 <div style="display:flex; gap:8px;">
                     <?php for ($p = 1; $p <= min($total_pages, 5); $p++): ?>
-                    <a href="?type=<?php echo $report_type; ?>&campus_id=<?php echo $campus_id; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $p; ?>"
+                    <a href="?type=<?php echo $report_type; ?>&dept_id=<?php echo urlencode($dept_id); ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $p; ?>"
                        style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; font-size:0.85rem; font-weight:700; text-decoration:none; 
                               background:<?php echo $p === $page ? '#8B0000' : '#f7f7f7'; ?>;
                               color:<?php echo $p === $page ? '#fff' : '#555'; ?>;
@@ -473,7 +497,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <?php endfor; ?>
                     <?php if ($total_pages > 5): ?>
                     <span style="padding:0 8px; color:rgba(0,0,0,0.35);">...</span>
-                    <a href="?type=<?php echo $report_type; ?>&campus_id=<?php echo $campus_id; ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $total_pages; ?>"
+                    <a href="?type=<?php echo $report_type; ?>&dept_id=<?php echo urlencode($dept_id); ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $total_pages; ?>"
                        style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:6px; font-size:0.85rem; font-weight:700; text-decoration:none; background:#f7f7f7; color:#555; border:1px solid #e5e7eb;">
                         <?php echo $total_pages; ?>
                     </a>
@@ -605,7 +629,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Role</th>
-                        <th>Campus</th>
                         <th>Department</th>
                         <th>Status</th>
                         <th>Joined</th>
@@ -613,8 +636,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </thead>
                 <tbody>
                 <?php foreach ($usr_data as $i => $u):
-                    $cname = campusName($campuses, $u['campus_id']);
-                    $dname = (!empty($u['college_id']) && isset($all_depts[$u['college_id']])) ? $u['college_id'] : '—';
+                    $dname = deptName($all_depts, $u['college_id'] ?? '');
                 ?>
                 <tr>
                     <td style="color:rgba(0,0,0,0.35);font-size:0.75rem;"><?php echo $i+1; ?></td>
@@ -622,14 +644,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <td style="font-size:0.82rem;"><?php echo htmlspecialchars($u['email']); ?></td>
                     <td style="font-size:0.82rem;color:rgba(0,0,0,0.55);"><?php echo htmlspecialchars($u['phone'] ?? '—'); ?></td>
                     <td><span class="rp-badge rp-badge-<?php echo $u['role']; ?>"><?php echo $u['role'] === 'admin' ? 'Administrator' : 'Faculty/Staff'; ?></span></td>
-                    <td style="font-size:0.82rem;"><?php echo htmlspecialchars($cname); ?></td>
                     <td><?php echo htmlspecialchars($dname); ?></td>
                     <td><span class="rp-badge <?php echo $u['is_active'] ? 'rp-badge-active' : 'rp-badge-inactive'; ?>"><?php echo $u['is_active'] ? 'Active' : 'Inactive'; ?></span></td>
                     <td style="font-size:0.79rem;color:rgba(0,0,0,0.50);"><?php echo date('M d, Y', strtotime($u['created_at'])); ?></td>
                 </tr>
                 <?php endforeach; ?>
                 <?php if (empty($usr_data)): ?>
-                <tr><td colspan="9" style="text-align:center;padding:28px;color:rgba(0,0,0,0.35);">No users match the selected filters.</td></tr>
+                <tr><td colspan="8" style="text-align:center;padding:28px;color:rgba(0,0,0,0.35);">No users match the selected filters.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
