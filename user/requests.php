@@ -194,14 +194,18 @@ foreach (groupInventoryItems($all_sorted) as $group) {
 $borrow_records_all = getBorrowRecords();
 $item_avail_data = [];
 
-// Return dates from active/overdue borrow records (already delivered)
+// Return dates from active/overdue borrow records (already delivered). "Overdue" is
+// computed from the date itself (expected_return_date already passed, still not
+// returned) rather than trusted from the status column, which nothing ever flips
+// to 'overdue' automatically.
+$__today_str = date('Y-m-d');
 foreach ($borrow_records_all as $br) {
     if (in_array($br['status'], ['active', 'overdue']) && empty($br['actual_return_date'])) {
         $iid = $br['inventory_id'];
         if (!isset($item_avail_data[$iid])) $item_avail_data[$iid] = [];
         $item_avail_data[$iid][] = [
             'return_date' => $br['expected_return_date'],
-            'is_overdue'  => $br['status'] === 'overdue',
+            'is_overdue'  => !empty($br['expected_return_date']) && $br['expected_return_date'] < $__today_str,
         ];
     }
 }
@@ -563,10 +567,20 @@ if (!empty($submit_error)): ?>
     padding: 2px 9px;
     white-space: nowrap;
 }
+.iac-ret-chip.iac-ret-chip-overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #f87171;
+}
 .iac-bar-borrowed {
     background: linear-gradient(135deg, #fff8ed 0%, #fff3e0 100%);
     color: #7c4a00;
     border-bottom: 1px solid #fde68a;
+}
+.iac-bar-overdue {
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    color: #7f1d1d;
+    border-bottom: 1px solid #fca5a5;
 }
 .iac-cal-header {
     display: flex;
@@ -665,6 +679,31 @@ if (!empty($submit_error)): ?>
     line-height: 1;
     color: #d97706;
     margin-top: 1px;
+}
+.iac-cell.iac-overdue {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    color: #991b1b;
+    font-weight: 700;
+    border: 1px solid #f87171;
+    box-shadow: 0 1px 3px rgba(248,113,113,0.35);
+    position: relative;
+}
+.iac-cell.iac-overdue::after {
+    content: '!';
+    display: block;
+    font-size: 0.58rem;
+    line-height: 1;
+    color: #b91c1c;
+    margin-top: 1px;
+    font-weight: 900;
+}
+.iac-cell.iac-today.iac-overdue {
+    background: #dc2626;
+    color: #fff;
+    outline-color: #dc2626;
+}
+.iac-cell.iac-today.iac-overdue::after {
+    color: #fff;
 }
 .iac-cell.iac-avail {
     background: #dcfce7;
@@ -1489,6 +1528,7 @@ if (!empty($submit_error)): ?>
                 <div class="iac-legend">
                     <span class="iac-leg-item"><span class="iac-leg-dot" style="background:#fee2e2;border:1px solid #fca5a5;"></span>Unavailable</span>
                     <span class="iac-leg-item"><span class="iac-leg-dot" style="background:#fef3c7;border:1px solid #fbbf24;"></span>Returns</span>
+                    <span class="iac-leg-item"><span class="iac-leg-dot" style="background:#fecaca;border:1px solid #f87171;"></span>Overdue</span>
                     <span class="iac-leg-item"><span class="iac-leg-dot" style="background:#dcfce7;border:1px solid #86efac;"></span>Available</span>
                 </div>
             </div>
@@ -1680,17 +1720,21 @@ function renderItemAvailCal(select) {
         bar.className = 'iac-bar';
         iacViewDate = new Date(); iacViewDate.setDate(1);
     } else {
+        var overdueCount = records.filter(function(r) { return r.is_overdue; }).length;
         var retChips = records.map(function(r) {
             var d = new Date(r.return_date + 'T00:00:00');
             var lbl = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
-            return '<span class="iac-ret-chip">' + lbl + '</span>';
+            var cls = 'iac-ret-chip' + (r.is_overdue ? ' iac-ret-chip-overdue' : '');
+            return '<span class="' + cls + '">' + lbl + (r.is_overdue ? ' — Overdue' : '') + '</span>';
         }).join('');
         bar.innerHTML = '<div class="iac-bar-top">'
-                      + '<i class="fas fa-clock"></i>'
-                      + '<span><strong>' + records.length + ' of ' + totalQty + ' units requested or borrowed</strong></span>'
+                      + '<i class="fas ' + (overdueCount ? 'fa-triangle-exclamation' : 'fa-clock') + '"></i>'
+                      + '<span><strong>' + records.length + ' of ' + totalQty + ' units requested or borrowed</strong>'
+                      + (overdueCount ? ' <span style="color:#b91c1c;">— ' + overdueCount + ' overdue</span>' : '')
+                      + '</span>'
                       + '</div>'
                       + '<div class="iac-bar-chips"><span class="iac-bar-chips-label">Expected returns:</span>' + retChips + '</div>';
-        bar.className = 'iac-bar iac-bar-borrowed';
+        bar.className = 'iac-bar iac-bar-borrowed' + (overdueCount ? ' iac-bar-overdue' : '');
 
         // Navigate to the month of the earliest return
         var earliest = new Date(records[0].return_date + 'T00:00:00');
@@ -1710,11 +1754,14 @@ function renderIacGrid(records) {
     var firstDay = new Date(y, m, 1).getDay();
     var daysInMo = new Date(y, m+1, 0).getDate();
 
-    // Build a Set of all return date strings
+    // Build a Set of all return date strings, and which of those are overdue
+    // (expected return date already passed, still not returned).
     var retStrSet = {};
+    var overdueStrSet = {};
     var lastRetDate = null;
     (records || []).forEach(function(r) {
         retStrSet[r.return_date] = true;
+        if (r.is_overdue) overdueStrSet[r.return_date] = true;
         var d = new Date(r.return_date + 'T00:00:00');
         if (!lastRetDate || d > lastRetDate) lastRetDate = d;
     });
@@ -1735,7 +1782,9 @@ function renderIacGrid(records) {
         var isPast   = cellDate < todayMid;
         var cls      = 'iac-cell';
 
-        if (retStrSet[ds]) {
+        if (overdueStrSet[ds]) {
+            cls += ' iac-overdue';
+        } else if (retStrSet[ds]) {
             cls += ' iac-returns';
         } else if (isPast) {
             cls += ' iac-past';

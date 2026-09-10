@@ -22,7 +22,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 <?php
 // Inventory is a single global list — no more campus scoping. Condemned/disposed
 // units are retired stock and never shown to users, in any tab.
-$all_campus_inventory = array_values(array_filter(getInventory(), fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
+$all_campus_inventory = array_values(array_filter(getInventory(), fn($i) => !in_array($i['status'], ['condemned', 'disposed', 'owned'])));
 
 // Stats
 $inv_total     = count($all_campus_inventory);

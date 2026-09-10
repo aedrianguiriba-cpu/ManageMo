@@ -89,6 +89,22 @@ function arRenderTrackerRow(array $req, string $rowId, int $colspan): void {
     <?php
 }
 
+// A request is archived once it's no longer actionable and has aged out of the
+// main list: rejected (disapproved) requests archive immediately — there's
+// nothing left to do with them — while delivered/completed ones archive after
+// REQUESTS_ARCHIVE_AFTER_DAYS so recently-finished requests stay visible for a
+// while first.
+define('REQUESTS_ARCHIVE_AFTER_DAYS', 30);
+function arIsArchived(array $r): bool {
+    $status = $r['status'] ?? '';
+    if ($status === 'disapproved') return true;
+    if (in_array($status, ['delivered', 'completed'], true)) {
+        $ts = strtotime($r['updated_at'] ?? $r['created_at'] ?? '');
+        return $ts !== false && $ts < strtotime('-' . REQUESTS_ARCHIVE_AFTER_DAYS . ' days');
+    }
+    return false;
+}
+
 // Attributes to make a table row itself the tracker toggle — click anywhere on
 // the row (except a link/button) to expand/collapse its tracker row below it.
 function arRowToggleAttrs(string $rowId): string {
@@ -209,8 +225,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $__reqnum = $gid ?? $trigger_req['request_number'];
             $stage = ($recv_method === 'pickup') ? 'pickup_ready' : 'out_for_delivery';
             $__dateNote = $scheduled_date ? ' Expected ' . ($recv_method === 'pickup' ? 'pickup' : 'delivery') . ': ' . formatDate($scheduled_date, 'M d, Y') . '.' : '';
+            // Full itemized list for the email — every unit in this request group,
+            // resolved the same way the QR sticker sheet resolves them.
+            $__email_items = [];
+            foreach ($group_reqs as $__gr) {
+                $__gr_inv = !empty($__gr['inventory_id']) ? findById(getInventory(), (int)$__gr['inventory_id']) : null;
+                $__email_items[] = [
+                    'name'     => $__gr_inv['item_name'] ?? ($__gr['service_description'] ?? 'Item'),
+                    'qty'      => (int)($__gr['quantity_requested'] ?? 1),
+                    'category' => $__gr_inv['category'] ?? null,
+                    'qr'       => $__gr['qr_code_id'] ?? ($__gr_inv['qr_code_id'] ?? null),
+                    'condition'=> $__gr_inv['condition'] ?? null,
+                ];
+            }
             sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, $stage,
-                ['scheduled_date' => $scheduled_date ? formatDate($scheduled_date, 'M d, Y') : null]);
+                [
+                    'scheduled_date' => $scheduled_date ? formatDate($scheduled_date, 'M d, Y') : null,
+                    'items'          => $__email_items,
+                    'receiving_method' => $recv_method,
+                ]);
             notifyUser((int)$notif_user['id'],
                 $recv_method === 'pickup' ? 'Ready for pickup' : 'Out for delivery',
                 "Request ($__reqnum) is " . ($recv_method === 'pickup' ? 'ready for pickup.' : 'out for delivery.') . $__dateNote,
@@ -223,35 +256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $req_user = findById(getUsers(), (int)($trigger_req['user_id'] ?? 0));
         foreach ($group_reqs as $gr) {
             dbUpdateRequest((int)$gr['id'], ['delivery_status' => 'delivered', 'status' => 'delivered']);
-            if ($gr['request_type'] === 'borrow' && !empty($gr['inventory_id'])) {
-                dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'borrowed']);
-                dbCreateBorrowRecord([
-                    'user_id'              => (int)$gr['user_id'],
-                    'inventory_id'         => (int)$gr['inventory_id'],
-                    'request_id'           => (int)$gr['id'],
-                    'borrow_date'          => date('Y-m-d'),
-                    'expected_return_date' => $gr['expected_return_date'] ?? null,
-                    'status'               => 'active',
-                    'notes'                => $gr['reason_for_request'] ?? null,
-                ]);
-            } elseif ($gr['request_type'] === 'item' && !empty($gr['inventory_id'])) {
-                // Transfer ownership: mark inventory disposed, create user_owned_items record
-                $inv_item = findById(getInventory(), (int)$gr['inventory_id']);
-                dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'disposed']);
-                dbCreateUserOwnedItem([
-                    'user_id'    => (int)$gr['user_id'],
-                    'qr_code_id' => $gr['qr_code_id'] ?? ($inv_item['qr_code_id'] ?? null),
-                    'item_name'  => $inv_item['item_name']  ?? 'Unknown Item',
-                    'category'   => $inv_item['category']   ?? 'General',
-                    'description'=> $inv_item['description'] ?? null,
-                    'year_owned' => (int)date('Y'),
-                    'college_id' => $req_user['college_id'] ?? $inv_item['college_id'] ?? null,
-                    'quantity'   => 1,
-                    'condition'  => $inv_item['condition'] ?? null,
-                    'notes'      => $gr['reason_for_request'] ?? null,
-                    'group_id'   => $gr['group_id'] ?? null,
-                ]);
-            }
+            processDeliveredRequestUnit($gr, $req_user);
         }
         logActivity($current_user['id'], 'UPDATE', "Delivered group $gid", 'requests', $request_id);
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
@@ -283,12 +288,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Items returned and request completed.', 'success');
 
     } elseif ($action_type === 'mark_completed') {
+        $req_user = findById(getUsers(), (int)($trigger_req['user_id'] ?? 0));
         foreach ($group_reqs as $gr) {
-            // Item requests already transferred ownership to the requester at delivery
-            // (inventory marked disposed, a user_owned_items record created) — completing
-            // them here must not undo that by resetting the item back to available.
-            // Only service requests use this branch to release the item after maintenance.
-            if ($gr['request_type'] !== 'item' && !empty($gr['inventory_id'])) {
+            if ($gr['request_type'] === 'item') {
+                // Ownership normally already transferred at delivery (via the mobile
+                // app's QR scan — see api/notify_delivered.php). This is a safety net
+                // for the rare case a delivery was never scanned: guarantees the
+                // transfer happens by the time the request is completed, without
+                // redoing it if it already has (processDeliveredRequestUnit() checks
+                // for an existing user_owned_items row first).
+                processDeliveredRequestUnit($gr, $req_user);
+            } elseif (!empty($gr['inventory_id'])) {
+                // Only service requests reach here — release the item after maintenance.
                 dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available', 'college_id' => null]);
             }
             dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
@@ -1148,6 +1159,16 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <?php endif; ?>
 
         <?php
+        // Delivery confirmation ("Mark as Delivered") is done exclusively via the
+        // mobile app's QR scanner — see api/notify_delivered.php, which the app
+        // calls right after writing delivery_status/status='delivered' directly
+        // to Supabase. That's also where the borrow record opens / item ownership
+        // transfers to Owned Items (processDeliveredRequestUnit()). No web button
+        // for this step on purpose — a "Mark Completed" safety net below still
+        // guarantees the transfer even if a delivery was never scanned.
+        ?>
+
+        <?php
         // Mark Returned — borrow requests that have been delivered
         if ($request['request_type'] === 'borrow' && $request['status'] === 'delivered'):
         ?>
@@ -1311,12 +1332,17 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <!-- List Requests -->
         <?php
         $active_tab  = $_GET['tab']  ?? 'all';
-        // Count per tab (using all requests, not paginated)
-        $all_reqs_raw  = getRequests();
-        $count_all     = count($all_reqs_raw);
-        $count_item    = count(array_filter($all_reqs_raw, fn($r) => $r['request_type'] === 'item'));
-        $count_borrow  = count(array_filter($all_reqs_raw, fn($r) => $r['request_type'] === 'borrow'));
-        $count_service = count(array_filter($all_reqs_raw, fn($r) => $r['request_type'] === 'service'));
+        // Count per tab (using all requests, not paginated). Archived requests
+        // (rejected, or delivered/completed long enough ago) are pulled out of
+        // the main tabs entirely and only shown under the Archived tab.
+        $all_reqs_raw      = getRequests();
+        $archived_reqs_raw = array_values(array_filter($all_reqs_raw, 'arIsArchived'));
+        $active_reqs_raw   = array_values(array_filter($all_reqs_raw, fn($r) => !arIsArchived($r)));
+        $count_all      = count($active_reqs_raw);
+        $count_item     = count(array_filter($active_reqs_raw, fn($r) => $r['request_type'] === 'item'));
+        $count_borrow   = count(array_filter($active_reqs_raw, fn($r) => $r['request_type'] === 'borrow'));
+        $count_service  = count(array_filter($active_reqs_raw, fn($r) => $r['request_type'] === 'service'));
+        $count_archived = count($archived_reqs_raw);
         ?>
         <!-- Type tabs -->
         <div class="ar-type-tabs">
@@ -1332,11 +1358,14 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             <a class="ar-type-tab <?php echo $active_tab==='service'?'active':''; ?>" href="requests.php?tab=service<?php echo $status_filter?'&status='.$status_filter:''; ?>">
                 <i class="fas fa-tools"></i> Service Requests <span class="ar-tab-count"><?php echo $count_service; ?></span>
             </a>
+            <a class="ar-type-tab <?php echo $active_tab==='archived'?'active':''; ?>" href="requests.php?tab=archived">
+                <i class="fas fa-box-archive"></i> Archived <span class="ar-tab-count"><?php echo $count_archived; ?></span>
+            </a>
         </div>
         <?php
         // Re-apply filters with tab-forced type
-        $filtered_requests = $all_reqs_raw;
-        if ($status_filter) {
+        $filtered_requests = $active_tab === 'archived' ? $archived_reqs_raw : $active_reqs_raw;
+        if ($status_filter && $active_tab !== 'archived') {
             $filtered_requests = filterByColumn($filtered_requests, 'status', $status_filter);
         }
         if ($active_tab === 'item') {
@@ -1381,6 +1410,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             ]);
         }
         ?>
+        <?php if ($active_tab === 'archived'): ?>
+        <div class="ar-filter-card" style="font-size:.83rem;color:rgba(0,0,0,.55);">
+            <i class="fas fa-box-archive me-1" style="color:rgba(139,0,0,.5);"></i>
+            Requests that were rejected, or delivered/completed more than <?php echo REQUESTS_ARCHIVE_AFTER_DAYS; ?> days ago — kept for record, out of the main tabs.
+        </div>
+        <?php else: ?>
         <div class="ar-filter-card">
             <form method="GET" action="" class="d-flex align-items-end flex-wrap gap-3 w-100">
                 <input type="hidden" name="tab" value="<?php echo htmlspecialchars($active_tab); ?>">
@@ -1406,6 +1441,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 <?php endif; ?>
             </form>
         </div>
+        <?php endif; ?>
 
         <?php
         $status_colors  = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'success'];

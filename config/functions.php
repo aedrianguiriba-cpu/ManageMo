@@ -255,9 +255,16 @@ function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $ex
 
     $m       = $messages[$stage];
     $subject = '[ManageMo] ' . $m['subject'] . ' – ' . $request_number;
-    $text    = "Dear $to_name,\n\n" . $m['headline'] . " ($request_number).\n" . strip_tags($m['detail'])
-             . "\n\n– ManageMo System, Pampanga State University";
-    $html    = buildStatusEmailHtml($to_name, $request_number, $m);
+    $items   = $extra['items'] ?? [];
+    $text    = "Dear $to_name,\n\n" . $m['headline'] . " ($request_number).\n" . strip_tags($m['detail']);
+    if ($items) {
+        $text .= "\n\nItems:\n";
+        foreach ($items as $it) {
+            $text .= '- ' . ($it['name'] ?? 'Item') . ' (Qty: ' . ($it['qty'] ?? 1) . ")\n";
+        }
+    }
+    $text   .= "\n\n– ManageMo System, Pampanga State University";
+    $html    = buildStatusEmailHtml($to_name, $request_number, $m, $extra);
 
     try {
         return $mailer->sendHtml($to_email, $to_name, $subject, $html, $text);
@@ -269,7 +276,7 @@ function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $ex
 
 // Renders the branded HTML shell used by sendStatusEmail(). Inline CSS only —
 // email clients strip <style> blocks and external stylesheets.
-function buildStatusEmailHtml($to_name, $request_number, array $m) {
+function buildStatusEmailHtml($to_name, $request_number, array $m, array $extra = []) {
     $safeName   = htmlspecialchars($to_name);
     $safeReqNum = htmlspecialchars($request_number);
     $safeHead   = htmlspecialchars($m['headline']);
@@ -278,32 +285,92 @@ function buildStatusEmailHtml($to_name, $request_number, array $m) {
     $bg         = $m['bg'];
     $icon       = $m['icon'];
 
+    // ── Request summary strip — always shown, so every email carries the basics
+    // (request #, when, method) even without an itemized list.
+    $summary_rows = '';
+    $summary_rows .= '<tr>'
+        . '<td style="padding:7px 0;font-size:12.5px;color:#6b7280;width:140px;">Reference No.</td>'
+        . '<td style="padding:7px 0;font-size:13px;color:#1a1d23;font-weight:700;font-family:Consolas,Menlo,monospace;">' . $safeReqNum . '</td>'
+        . '</tr>';
+    if (!empty($extra['receiving_method'])) {
+        $summary_rows .= '<tr>'
+            . '<td style="padding:7px 0;font-size:12.5px;color:#6b7280;">Receiving Method</td>'
+            . '<td style="padding:7px 0;font-size:13px;color:#1a1d23;font-weight:600;">' . htmlspecialchars(ucfirst($extra['receiving_method'])) . '</td>'
+            . '</tr>';
+    }
+    if (!empty($extra['scheduled_date'])) {
+        $summary_rows .= '<tr>'
+            . '<td style="padding:7px 0;font-size:12.5px;color:#6b7280;">Scheduled Date</td>'
+            . '<td style="padding:7px 0;font-size:13px;color:#1a1d23;font-weight:600;">' . htmlspecialchars($extra['scheduled_date']) . '</td>'
+            . '</tr>';
+    }
+    $summary_block = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px;background:#f9fafb;border:1px solid #eef0f3;border-radius:10px;">'
+        . '<tr><td style="padding:14px 18px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' . $summary_rows . '</table></td></tr>'
+        . '</table>';
+
+    // ── Itemized list — populated for stages that pass $extra['items'] (e.g.
+    // out for delivery), so the recipient sees exactly what to expect.
+    $items_block = '';
+    $items = $extra['items'] ?? [];
+    if (!empty($items)) {
+        $item_rows = '';
+        foreach ($items as $it) {
+            $name = htmlspecialchars($it['name'] ?? 'Item');
+            $qty  = (int)($it['qty'] ?? 1);
+            $meta = array_filter([
+                !empty($it['category'])  ? htmlspecialchars($it['category'])         : null,
+                !empty($it['condition']) ? ucfirst(htmlspecialchars($it['condition'])) . ' condition' : null,
+                !empty($it['qr'])        ? 'QR: ' . htmlspecialchars($it['qr'])       : null,
+            ]);
+            $meta_line = $meta ? '<div style="font-size:11.5px;color:#9ca3af;margin-top:2px;">' . implode(' &bull; ', $meta) . '</div>' : '';
+            $item_rows .= '<tr>'
+                . '<td style="padding:11px 14px;border-bottom:1px solid #f0f0f0;font-size:13.5px;color:#1a1d23;font-weight:600;">' . $name . $meta_line . '</td>'
+                . '<td style="padding:11px 14px;border-bottom:1px solid #f0f0f0;font-size:13.5px;color:#374151;text-align:center;white-space:nowrap;">x' . $qty . '</td>'
+                . '</tr>';
+        }
+        $items_block = '<div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B0000;margin:22px 0 8px;">Items in This Request (' . count($items) . ')</div>'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eef0f3;border-radius:10px;overflow:hidden;">'
+            . '<tr style="background:#faf5f5;">'
+            . '<td style="padding:9px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#8B0000;">Item</td>'
+            . '<td style="padding:9px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#8B0000;text-align:center;">Qty</td>'
+            . '</tr>'
+            . $item_rows
+            . '</table>';
+    }
+
+    $year = date('Y');
+
     return <<<HTML
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 16px;">
+<body style="margin:0;padding:0;background:#eef0f3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f3;padding:40px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,0.06),0 4px 16px rgba(16,24,40,0.08);">
   <tr>
-    <td style="background:#8B0000;padding:22px 28px;">
-      <span style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:0.3px;">ManageMo</span>
-      <div style="color:rgba(255,255,255,0.75);font-size:12px;margin-top:2px;">Pampanga State University</div>
+    <td style="background:#8B0000;padding:26px 32px;">
+      <span style="color:#ffffff;font-size:19px;font-weight:800;letter-spacing:0.3px;">ManageMo</span>
+      <div style="color:rgba(255,255,255,0.78);font-size:12px;margin-top:3px;letter-spacing:0.2px;">Pampanga State University &mdash; Inventory &amp; Asset Management</div>
     </td>
   </tr>
   <tr>
-    <td style="padding:32px 28px 8px;">
-      <div style="display:inline-block;width:52px;height:52px;line-height:52px;text-align:center;border-radius:50%;background:{$bg};color:{$color};font-size:24px;margin-bottom:18px;">{$icon}</div>
-      <div style="font-size:20px;font-weight:800;color:#1a1d23;margin-bottom:6px;">Dear {$safeName},</div>
-      <div style="font-size:17px;font-weight:700;color:{$color};margin-bottom:14px;">{$safeHead}</div>
-      <div style="display:inline-block;font-family:monospace;font-size:13px;font-weight:700;color:#8B0000;background:rgba(139,0,0,0.08);border-radius:6px;padding:4px 10px;margin-bottom:16px;">{$safeReqNum}</div>
-      <p style="font-size:14.5px;line-height:1.6;color:#374151;margin:0 0 8px;">{$safeDetail}</p>
+    <td style="padding:0;background:{$color};height:4px;line-height:4px;font-size:0;">&nbsp;</td>
+  </tr>
+  <tr>
+    <td style="padding:34px 32px 8px;">
+      <div style="display:inline-block;width:54px;height:54px;line-height:54px;text-align:center;border-radius:50%;background:{$bg};color:{$color};font-size:25px;margin-bottom:20px;">{$icon}</div>
+      <div style="font-size:15px;color:#6b7280;margin-bottom:4px;">Dear {$safeName},</div>
+      <div style="font-size:20px;font-weight:800;color:#1a1d23;margin-bottom:16px;line-height:1.35;">{$safeHead}</div>
+      <p style="font-size:14.5px;line-height:1.65;color:#374151;margin:0;">{$safeDetail}</p>
+      {$summary_block}
+      {$items_block}
     </td>
   </tr>
   <tr>
-    <td style="padding:20px 28px 28px;">
-      <div style="border-top:1px solid #e5e7eb;padding-top:16px;font-size:12px;color:#9ca3af;line-height:1.6;">
-        This is an automated message from the ManageMo inventory system. Please do not reply directly to this email — for questions, contact the property custodian's office.
+    <td style="padding:28px 32px 30px;">
+      <div style="border-top:1px solid #eef0f3;padding-top:18px;font-size:11.5px;color:#9ca3af;line-height:1.7;">
+        This is an automated message from the ManageMo inventory system &mdash; please do not reply directly to this email. For questions about this request, contact the property custodian's office.
+        <div style="margin-top:10px;color:#c1c5cc;">&copy; {$year} Pampanga State University &bull; ManageMo</div>
       </div>
     </td>
   </tr>
@@ -616,6 +683,12 @@ function dbCreateBorrowRecord(array $data): ?array {
     return $rows[0] ?? null;
 }
 
+function dbUpdateBorrowRecord(int $id, array $data): bool {
+    $rows = supabase()->updateById('borrow_records', $id, $data);
+    clearDataCache('borrow_records');
+    return !empty($rows);
+}
+
 function dbCreateUserOwnedItem(array $data): ?array {
     $rows = supabase()->insert('user_owned_items', $data);
     clearDataCache('user_owned_items');
@@ -626,6 +699,68 @@ function dbUpdateUserOwnedItem(int $id, array $data): bool {
     $rows = supabase()->updateById('user_owned_items', $id, $data);
     clearDataCache('user_owned_items');
     return !empty($rows);
+}
+
+// Runs the per-unit "delivered" side effects for one request row: for a borrow
+// request, flips the inventory unit to 'borrowed' and opens a borrow_records
+// row; for an item (acquire) request, transfers ownership — flips the unit to
+// 'disposed' and creates its user_owned_items row. Does NOT touch the request's
+// own status/delivery_status — callers are responsible for that.
+//
+// Shared by admin/requests.php's "Mark Delivered" button and
+// api/notify_delivered.php (the mobile app confirms delivery by writing
+// straight to Supabase, then only calls that API to trigger the notification —
+// without this shared function that path never created the borrow record or
+// transferred item ownership). Safe to call more than once for the same
+// row — it checks for an existing borrow_records row / already-disposed unit
+// first, so it won't create duplicates if both paths ever fire for the same request.
+function processDeliveredRequestUnit(array $gr, ?array $req_user = null): void {
+    if ($gr['request_type'] === 'borrow' && !empty($gr['inventory_id'])) {
+        $already = array_filter(getBorrowRecords(), fn($b) => (int)($b['request_id'] ?? 0) === (int)$gr['id']);
+        if (!empty($already)) return;
+        dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'borrowed']);
+        dbCreateBorrowRecord([
+            'user_id'              => (int)$gr['user_id'],
+            'inventory_id'         => (int)$gr['inventory_id'],
+            'request_id'           => (int)$gr['id'],
+            'borrow_date'          => date('Y-m-d'),
+            'expected_return_date' => $gr['expected_return_date'] ?? null,
+            'status'               => 'active',
+            'notes'                => $gr['reason_for_request'] ?? null,
+        ]);
+    } elseif ($gr['request_type'] === 'item' && !empty($gr['inventory_id'])) {
+        $inv_item = findById(getInventory(), (int)$gr['inventory_id']);
+        if (!$inv_item) return;
+        // "Already transferred" means an owned_items row actually exists for this
+        // unit's QR — NOT just that inventory is 'disposed'. A unit can end up
+        // disposed with no owned_items row if a prior attempt got this far and
+        // then failed (e.g. a schema mismatch on the insert); checking status
+        // alone would wrongly treat that half-done state as complete forever.
+        $qr = $gr['qr_code_id'] ?? $inv_item['qr_code_id'] ?? null;
+        if ($qr) {
+            $already = array_filter(getUserOwnedItems(), fn($o) => ($o['qr_code_id'] ?? null) === $qr);
+            if (!empty($already)) return;
+        }
+        // 'owned' — NOT 'disposed' — the unit still physically exists, it's just
+        // permanently transferred to this user rather than in the shared pool.
+        // Using 'disposed' here used to make acquired items show up in
+        // Condemnation & Disposal's Disposed tab, which only means "condemned
+        // and thrown away/sold/donated" — a completely different thing.
+        dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'owned']);
+        dbCreateUserOwnedItem([
+            'user_id'     => (int)$gr['user_id'],
+            'qr_code_id'  => $gr['qr_code_id'] ?? ($inv_item['qr_code_id'] ?? null),
+            'item_name'   => $inv_item['item_name']  ?? 'Unknown Item',
+            'category'    => $inv_item['category']   ?? 'General',
+            'description' => $inv_item['description'] ?? null,
+            'year_owned'  => (int)date('Y'),
+            'college_id'  => $req_user['college_id'] ?? $inv_item['college_id'] ?? null,
+            'quantity'    => 1,
+            'condition'   => $inv_item['condition'] ?? null,
+            'notes'       => $gr['reason_for_request'] ?? null,
+            'group_id'    => $gr['group_id'] ?? null,
+        ]);
+    }
 }
 
 function dbAddCustomDepartment(string $type, array $data): bool {

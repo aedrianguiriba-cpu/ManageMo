@@ -128,7 +128,12 @@ CREATE TABLE IF NOT EXISTS inventory (
     college_id           TEXT,
     quantity             INT  NOT NULL DEFAULT 1,
     status               TEXT NOT NULL DEFAULT 'available'
-                             CHECK (status IN ('available','borrowed','requested','maintenance','damaged','condemned','disposed')),
+                             -- 'owned' = unit permanently transferred to a user's ownership via an
+                             -- acquire ("item") request — see processDeliveredRequestUnit(). Distinct
+                             -- from 'disposed', which means an admin condemned AND disposed of the
+                             -- unit (junked/sold/donated) — the two are not interchangeable even
+                             -- though both take the unit out of circulation.
+                             CHECK (status IN ('available','borrowed','requested','maintenance','damaged','condemned','disposed','owned')),
     location             TEXT,
     purchase_date        DATE,
     cost                 NUMERIC(12,2),

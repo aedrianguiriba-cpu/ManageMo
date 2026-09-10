@@ -92,33 +92,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'RESTORE', "Restored inventory item #$item_id from condemnation", 'inventory', $item_id);
         redirectWithMessage('condemnation.php?tab=evaluate', 'Item restored to evaluation list.', 'info');
 
-    } elseif ($action_type === 'approve_condemn_request') {
-        $req_id = (int)($_POST['request_id'] ?? 0);
-        $req = $req_id ? findById(getRequests(), $req_id) : null;
-        if ($req && $req['request_type'] === 'condemnation' && $req['status'] === 'pending') {
-            $item_at_condemn = !empty($req['inventory_id']) ? findById(getInventory(), (int)$req['inventory_id']) : null;
-            if ($item_at_condemn) {
-                dbUpdateInventory((int)$req['inventory_id'], [
-                    'status'              => 'condemned',
-                    'condemnation_reason' => $req['reason_for_request'] ?? 'User-requested condemnation',
-                    'condemned_at'        => date('Y-m-d H:i:s'),
-                    'condemned_by'        => $current_user['id'],
-                    'condemned_condition' => $item_at_condemn['condition'] ?? null,
-                ]);
-            }
-            dbUpdateRequest($req_id, ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
-            logActivity($current_user['id'], 'CONDEMN', "Approved user condemnation request #$req_id", 'requests', $req_id);
-        }
-        redirectWithMessage('condemnation.php?tab=requested', 'Condemnation request approved — item condemned.', 'success');
-
-    } elseif ($action_type === 'disapprove_condemn_request') {
-        $req_id = (int)($_POST['request_id'] ?? 0);
-        $req = $req_id ? findById(getRequests(), $req_id) : null;
-        if ($req && $req['request_type'] === 'condemnation' && $req['status'] === 'pending') {
-            dbUpdateRequest($req_id, ['status' => 'disapproved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
-            logActivity($current_user['id'], 'DISAPPROVE', "Disapproved user condemnation request #$req_id", 'requests', $req_id);
-        }
-        redirectWithMessage('condemnation.php?tab=requested', 'Condemnation request disapproved.', 'info');
     }
 }
 
@@ -140,22 +113,21 @@ $all_users      = getUsers();
 // "Evaluate" includes every item not already condemned/disposed, so admins can condemn any item, not just damaged/maintenance ones.
 // Items currently out on a request/borrow are mid-use and shouldn't be condemnable
 // until they're back in the admin's hands (available/maintenance/damaged, etc.).
-$evaluate_items  = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed', 'requested', 'borrowed'])));
+// 'owned' units (transferred to a user via an acquire request) are excluded
+// too — they're not up for condemnation, they belong to someone now (see the
+// Owned Items tab in Inventory instead).
+$evaluate_items  = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed', 'requested', 'borrowed', 'owned'])));
 $condemned_items = array_values(array_filter($all_inventory, fn($i) => $i['status'] === 'condemned'));
 $disposed_items  = array_values(array_filter($all_inventory, fn($i) => $i['status'] === 'disposed'));
 
-// User-submitted "please condemn this" requests awaiting admin review (see user/borrow-records.php)
-$requested_condemnations = array_values(array_filter(getRequests(), fn($r) => $r['request_type'] === 'condemnation' && $r['status'] === 'pending'));
-
 // Active tab
 $active_tab = $_GET['tab'] ?? 'evaluate';
-if (!in_array($active_tab, ['evaluate', 'requested', 'condemned', 'disposed'])) {
+if (!in_array($active_tab, ['evaluate', 'condemned', 'disposed'])) {
     $active_tab = 'evaluate';
 }
 
 // KPI values
 $evaluate_count   = count($evaluate_items);
-$requested_count  = count($requested_condemnations);
 $condemned_count  = count($condemned_items);
 $disposed_count   = count($disposed_items);
 $value_at_risk    = array_sum(array_column($evaluate_items, 'cost'));
@@ -197,6 +169,14 @@ if ($active_tab === 'evaluate') {
 } else {
     $display_items = cdApplyFilters($disposed_items, $filter_college, $filter_category, $filter_search);
 }
+
+// Pagination — each tab keeps its own page number so switching tabs doesn't
+// reset another tab's page.
+$cd_items_per_page = 10;
+$cd_current_page = max(1, (int)($_GET['page'] ?? 1));
+$cd_total_pages = max(1, (int)ceil(count($display_items) / $cd_items_per_page));
+$cd_current_page = min($cd_current_page, $cd_total_pages);
+$display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_items_per_page, $cd_items_per_page);
 ?>
 
 <style>
@@ -393,15 +373,6 @@ if ($active_tab === 'evaluate') {
             </div>
         </div>
         <div class="cd-kpi-card">
-            <div class="cd-kpi-icon" style="background:rgba(59,130,246,0.10);">
-                <i class="fas fa-inbox" style="color:#1d4ed8;"></i>
-            </div>
-            <div>
-                <div class="cd-kpi-val" style="color:#1d4ed8;"><?php echo $requested_count; ?></div>
-                <div class="cd-kpi-lbl">User Requested</div>
-            </div>
-        </div>
-        <div class="cd-kpi-card">
             <div class="cd-kpi-icon" style="background:rgba(139,0,0,0.10);">
                 <i class="fas fa-ban" style="color:#8B0000;"></i>
             </div>
@@ -437,10 +408,6 @@ if ($active_tab === 'evaluate') {
         <a href="condemnation.php?tab=evaluate" class="cd-tab-btn <?php echo $active_tab==='evaluate'?'active':''; ?>">
             <i class="fas fa-search"></i> For Evaluation
             <span class="cd-tab-count"><?php echo $evaluate_count; ?></span>
-        </a>
-        <a href="condemnation.php?tab=requested" class="cd-tab-btn <?php echo $active_tab==='requested'?'active':''; ?>">
-            <i class="fas fa-inbox"></i> Requested
-            <span class="cd-tab-count"><?php echo $requested_count; ?></span>
         </a>
         <a href="condemnation.php?tab=condemned" class="cd-tab-btn <?php echo $active_tab==='condemned'?'active':''; ?>">
             <i class="fas fa-ban"></i> Condemned
@@ -510,58 +477,6 @@ if ($active_tab === 'evaluate') {
         </div>
     </form>
 
-    <?php if ($active_tab === 'requested'): ?>
-    <!-- User-requested condemnations, pending review -->
-    <div class="cd-table-card">
-        <?php if (count($requested_condemnations) > 0): ?>
-        <div style="overflow-x:auto;">
-        <table class="cd-table">
-            <thead>
-                <tr>
-                    <th>Item</th><th>Requested By</th><th>Reason</th><th>Submitted</th><th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($requested_condemnations as $req):
-                $req_item = !empty($req['inventory_id']) ? findById($all_inventory, (int)$req['inventory_id']) : null;
-                $req_user = findById($all_users, (int)$req['user_id']);
-            ?>
-                <tr>
-                    <td>
-                        <div style="font-weight:700;font-size:0.88rem;color:#1a1d23;"><?php echo htmlspecialchars($req_item['item_name'] ?? 'Unknown item'); ?></div>
-                        <?php if ($req_item && !empty($req_item['qr_code_id'])): ?>
-                        <div style="font-size:0.72rem;font-family:monospace;color:rgba(139,0,0,0.65);margin-top:2px;"><?php echo htmlspecialchars($req_item['qr_code_id']); ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td style="font-size:0.83rem;color:rgba(0,0,0,0.55);"><?php echo htmlspecialchars($req_user['full_name'] ?? 'Unknown user'); ?></td>
-                    <td style="max-width:260px;font-size:0.83rem;color:#374151;"><?php echo htmlspecialchars($req['reason_for_request'] ?? ''); ?></td>
-                    <td style="font-size:0.80rem;color:rgba(0,0,0,0.45);"><?php echo !empty($req['created_at']) ? formatDate($req['created_at'], 'M d, Y') : '—'; ?></td>
-                    <td style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <form method="POST" action="condemnation.php" style="display:inline;">
-                            <input type="hidden" name="action" value="approve_condemn_request">
-                            <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
-                            <button type="submit" class="cd-btn-condemn" onclick="return confirm('Condemn this item?')"><i class="fas fa-ban"></i> Approve &amp; Condemn</button>
-                        </form>
-                        <form method="POST" action="condemnation.php" style="display:inline;">
-                            <input type="hidden" name="action" value="disapprove_condemn_request">
-                            <input type="hidden" name="request_id" value="<?php echo $req['id']; ?>">
-                            <button type="submit" class="cd-btn-restore"><i class="fas fa-times"></i> Disapprove</button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-        </div>
-        <?php else: ?>
-        <div class="cd-empty-state">
-            <i class="fas fa-inbox"></i>
-            <p>No pending condemnation requests</p>
-            <small>Requests users submit from their borrowed items will appear here</small>
-        </div>
-        <?php endif; ?>
-    </div>
-    <?php else: ?>
     <!-- Item Table -->
     <div class="cd-table-card">
         <?php if (count($display_items) > 0): ?>
@@ -577,6 +492,9 @@ if ($active_tab === 'evaluate') {
                     <th>Purchase Date</th>
                     <th>Cost</th>
                     <th>Status</th>
+                    <?php if ($active_tab === 'disposed'): ?>
+                    <th>Disposal Date</th>
+                    <?php endif; ?>
                     <?php if ($active_tab === 'condemned' || $active_tab === 'disposed'): ?>
                     <th><?php echo $active_tab === 'condemned' ? 'Condemnation Record' : 'Disposal Record'; ?></th>
                     <?php endif; ?>
@@ -586,7 +504,7 @@ if ($active_tab === 'evaluate') {
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($display_items as $row):
+            <?php foreach ($display_items_page as $row):
                 $dept_name = !empty($row['college_id']) ? ($all_department_names[$row['college_id']] ?? $row['college_id']) : '—';
 
                 $condition_badge = match($row['condition'] ?? '') {
@@ -647,12 +565,13 @@ if ($active_tab === 'evaluate') {
                         <div style="font-size:0.70rem;color:#aaa;margin-top:3px;">
                             <?php echo htmlspecialchars(formatDate($row['condemned_at'], 'M d, Y')); ?>
                         </div>
-                        <?php elseif ($active_tab === 'disposed' && !empty($row['disposed_at'])): ?>
-                        <div style="font-size:0.70rem;color:#aaa;margin-top:3px;">
-                            <?php echo htmlspecialchars(formatDate($row['disposed_at'], 'M d, Y')); ?>
-                        </div>
                         <?php endif; ?>
                     </td>
+                    <?php if ($active_tab === 'disposed'): ?>
+                    <td style="font-size:0.83rem;color:rgba(0,0,0,0.55);">
+                        <?php echo !empty($row['disposed_at']) ? htmlspecialchars(formatDate($row['disposed_at'], 'M d, Y')) : '—'; ?>
+                    </td>
+                    <?php endif; ?>
                     <?php if ($active_tab === 'condemned'):
                         $condemner = !empty($row['condemned_by']) ? findById($all_users, (int)$row['condemned_by']) : null;
                     ?>
@@ -708,6 +627,16 @@ if ($active_tab === 'evaluate') {
             </tbody>
         </table>
         </div>
+        <?php if ($cd_total_pages > 1): ?>
+        <div style="display:flex;justify-content:center;gap:8px;padding:16px;border-top:1px solid #e5e7eb;">
+            <?php for ($i = 1; $i <= $cd_total_pages; $i++): ?>
+            <a href="condemnation.php?tab=<?php echo htmlspecialchars($active_tab); ?>&page=<?php echo $i; ?><?php echo $filter_dept ? '&dept=' . urlencode($filter_dept) : ''; ?><?php echo $filter_category ? '&category=' . urlencode($filter_category) : ''; ?><?php echo $filter_search ? '&search=' . urlencode($filter_search) : ''; ?>"
+               style="min-width:38px;<?php echo $i === $cd_current_page ? 'background:#8B0000;color:#fff;border:1px solid #8B0000;' : 'background:#f7f7f7;color:#555;border:1px solid #e5e7eb;'; ?>font-weight:700;text-align:center;border-radius:6px;padding:6px 0;font-size:0.83rem;text-decoration:none;">
+                <?php echo $i; ?>
+            </a>
+            <?php endfor; ?>
+        </div>
+        <?php endif; ?>
         <?php else: ?>
             <div class="cd-empty-state">
                 <?php if ($active_tab === 'evaluate'): ?>
@@ -726,7 +655,6 @@ if ($active_tab === 'evaluate') {
             </div>
         <?php endif; ?>
     </div>
-    <?php endif; ?>
 
 </div><!-- /.container-fluid -->
 </div><!-- /.main-wrapper -->

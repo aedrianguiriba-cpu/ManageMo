@@ -187,6 +187,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'UPDATE', "Updated inventory item: $item_name", 'inventory', $inventory_id);
         redirectWithMessage('inventory.php', 'Item updated successfully!', 'success');
 
+    } elseif ($action === 'mark_returned') {
+        $unit_id = (int)($_POST['unit_id'] ?? 0);
+        $unit    = $unit_id ? findById(getInventory(), $unit_id) : null;
+        if (!$unit || $unit['status'] !== 'borrowed') {
+            redirectWithMessage('inventory.php?tab=borrowed', 'That item is not currently borrowed.', 'danger');
+        }
+
+        // Close out whichever open borrow_records row (active/overdue) belongs to
+        // this unit, if any — the unit can still be marked returned even without
+        // one (e.g. legacy/manually-borrowed rows), it just skips this step.
+        $open_borrow = null;
+        foreach (getBorrowRecords() as $br) {
+            if ((int)$br['inventory_id'] === $unit_id && in_array($br['status'], ['active', 'overdue'])) {
+                $open_borrow = $br;
+                break;
+            }
+        }
+        if ($open_borrow) {
+            dbUpdateBorrowRecord((int)$open_borrow['id'], [
+                'status'             => 'returned',
+                'actual_return_date' => date('Y-m-d'),
+            ]);
+        }
+
+        dbUpdateInventory($unit_id, ['status' => 'available']);
+        logActivity($current_user['id'], 'UPDATE', "Marked '{$unit['item_name']}' (unit #$unit_id) as returned", 'inventory', $unit_id);
+        redirectWithMessage('inventory.php?tab=borrowed', "'{$unit['item_name']}' marked as returned.", 'success');
+
     }
 }
 
@@ -761,23 +789,79 @@ displayMessage();
     };
 
     // Separate items by status
-    $all_active_items  = array_values(array_filter($all_items, fn($i) => !in_array($i['status'], ['condemned','disposed'])));
+    // 'owned' units live in the Owned Items tab (via user_owned_items), not here.
+    $all_active_items  = array_values(array_filter($all_items, fn($i) => !in_array($i['status'], ['condemned','disposed','owned'])));
     $available_items   = filterByColumn($all_items, 'status', 'available');
     $requested_items   = filterByColumn($all_items, 'status', 'requested');
     $borrowed_items     = filterByColumn($all_items, 'status', 'borrowed');
 
+    // The filter/search bar applies to every tab, not just All Items/Available —
+    // each tab's data shape differs (raw inventory rows vs. owned_items rows vs.
+    // borrow_records history vs. service request tickets), so each gets its own
+    // filter pass below rather than reusing $applyInventoryFilters verbatim
+    // everywhere (acquisition_mode in particular only makes sense for inventory).
     $all_active_items = $applyInventoryFilters($all_active_items);
     $available_items  = $applyInventoryFilters($available_items);
+    $requested_items  = $applyInventoryFilters($requested_items);
+    $borrowed_items    = $applyInventoryFilters($borrowed_items);
 
-    // Get user owned items
-    $owned_items = getUserOwnedItems();
+    // Get user owned items — same field names as inventory rows (item_name,
+    // category, college_id, qr_code_id) but no acquisition_mode, so filter
+    // everything except the acq sub-tab.
+    $owned_items = array_values(array_filter(getUserOwnedItems(), function($i) use ($filter_search, $filter_college_id, $filter_category) {
+        if ($filter_college_id !== '' && ($i['college_id'] ?? '') !== $filter_college_id) return false;
+        if ($filter_category !== '' && ($i['category'] ?? '') !== $filter_category) return false;
+        if ($filter_search !== '') {
+            $hay = strtolower(($i['item_name'] ?? '') . ' ' . ($i['qr_code_id'] ?? '') . ' ' . ($i['category'] ?? ''));
+            if (strpos($hay, strtolower($filter_search)) === false) return false;
+        }
+        return true;
+    }));
+
+    // Borrowed tab: map each currently-borrowed unit to its open borrow_records row
+    // (active/overdue), so "Mark as Returned" knows which record to close out.
+    $__active_borrows_by_unit = [];
+    // Borrowed tab, "Returned" sub-tab: once a unit is returned its inventory
+    // status flips back to 'available' and it leaves the live Borrowed list
+    // entirely — so this history has to come from borrow_records directly,
+    // enriched with the item/borrower it belonged to at the time. Filtered via
+    // the inventory unit each record belonged to, since the record itself
+    // doesn't carry item_name/category/college_id.
+    $returned_borrows = [];
+    foreach (getBorrowRecords() as $__br) {
+        if (in_array($__br['status'], ['active', 'overdue'])) {
+            $__active_borrows_by_unit[(int)$__br['inventory_id']] = $__br;
+        } elseif ($__br['status'] === 'returned') {
+            $__rb_item = findById($all_items, (int)$__br['inventory_id']);
+            if ($filter_college_id !== '' && ($__rb_item['college_id'] ?? '') !== $filter_college_id) continue;
+            if ($filter_category !== '' && ($__rb_item['category'] ?? '') !== $filter_category) continue;
+            if ($filter_search !== '') {
+                $hay = strtolower(($__rb_item['item_name'] ?? '') . ' ' . ($__rb_item['qr_code_id'] ?? '') . ' ' . ($__rb_item['category'] ?? ''));
+                if (strpos($hay, strtolower($filter_search)) === false) continue;
+            }
+            $returned_borrows[] = $__br;
+        }
+    }
+    usort($returned_borrows, fn($a, $b) => strcmp($b['actual_return_date'] ?? $b['created_at'], $a['actual_return_date'] ?? $a['created_at']));
 
     // Maintenance tab: service requests are pure free-text tickets with no catalog
     // item attached (see user/requests.php), so there's no inventory row to filter
-    // by status here. Instead, list the open service tickets themselves.
+    // by status here. Instead, list the open service tickets themselves. They have
+    // no category, so the category filter doesn't apply to this tab — only search
+    // (item_name/service_description/request_number) and department (requester's
+    // college_id) do.
     $all_users_by_id = array_column(getUsers(), null, 'id');
-    $maintenance_requests = array_values(array_filter(getRequests(), function($r) {
-        return $r['request_type'] === 'service' && in_array($r['status'], ['pending', 'approved']);
+    $maintenance_requests = array_values(array_filter(getRequests(), function($r) use ($all_users_by_id, $filter_search, $filter_college_id) {
+        if ($r['request_type'] !== 'service' || !in_array($r['status'], ['pending', 'approved'])) return false;
+        if ($filter_college_id !== '') {
+            $__requester = $all_users_by_id[$r['user_id']] ?? null;
+            if (($__requester['college_id'] ?? '') !== $filter_college_id) return false;
+        }
+        if ($filter_search !== '') {
+            $hay = strtolower(($r['item_name'] ?? '') . ' ' . ($r['service_description'] ?? '') . ' ' . ($r['request_number'] ?? ''));
+            if (strpos($hay, strtolower($filter_search)) === false) return false;
+        }
+        return true;
     }));
     usort($maintenance_requests, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
 
@@ -803,8 +887,12 @@ displayMessage();
     $current_page_requested = isset($_GET['page_requested']) ? (int)$_GET['page_requested'] : 1;
     $current_page_maintenance = isset($_GET['page_maintenance']) ? (int)$_GET['page_maintenance'] : 1;
     $current_page_borrowed = isset($_GET['page_borrowed']) ? (int)$_GET['page_borrowed'] : 1;
+    $current_page_returned = isset($_GET['page_returned']) ? (int)$_GET['page_returned'] : 1;
     $current_page_owned = isset($_GET['page_owned']) ? (int)$_GET['page_owned'] : 1;
     $current_tab = isset($_GET['tab']) ? $_GET['tab'] : 'all';
+    // Borrowed tab sub-tab: 'not_returned' (default, currently held units) or 'returned' (history).
+    $filter_borrow = $_GET['fborrow'] ?? 'not_returned';
+    if (!in_array($filter_borrow, ['not_returned', 'returned'], true)) $filter_borrow = 'not_returned';
 
     // Tab badges count units; pagination is over groups
     $total_all = count($all_active_items);
@@ -819,6 +907,7 @@ displayMessage();
     $pages_requested = ceil(count($grouped_requested) / $items_per_page);
     $pages_maintenance = ceil(count($maintenance_requests) / $items_per_page);
     $pages_borrowed = ceil(count($grouped_borrowed) / $items_per_page);
+    $pages_returned = ceil(count($returned_borrows) / $items_per_page);
     $pages_owned = ceil(count($grouped_owned) / $items_per_page);
 
     $offset_all = ($current_page_all - 1) * $items_per_page;
@@ -826,6 +915,7 @@ displayMessage();
     $offset_requested = ($current_page_requested - 1) * $items_per_page;
     $offset_maintenance = ($current_page_maintenance - 1) * $items_per_page;
     $offset_borrowed = ($current_page_borrowed - 1) * $items_per_page;
+    $offset_returned = ($current_page_returned - 1) * $items_per_page;
     $offset_owned = ($current_page_owned - 1) * $items_per_page;
 
     $all_items_page          = array_slice($grouped_all, $offset_all, $items_per_page);
@@ -833,10 +923,12 @@ displayMessage();
     $requested_items_page   = array_slice($grouped_requested, $offset_requested, $items_per_page);
     $maintenance_items_page = array_slice($maintenance_requests, $offset_maintenance, $items_per_page);
     $borrowed_items_page    = array_slice($grouped_borrowed, $offset_borrowed, $items_per_page);
+    $returned_borrows_page  = array_slice($returned_borrows, $offset_returned, $items_per_page);
     $owned_items_page       = array_slice($grouped_owned, $offset_owned, $items_per_page);
     ?>
 
-    <!-- FILTER / SEARCH BAR (applies to All Items and Available tabs) -->
+    <!-- FILTER / SEARCH BAR (applies to every tab — search/department/category
+         each apply their own filter pass per tab's data shape; see PHP above) -->
     <form method="GET" action="inventory.php" class="ai-filter-card">
         <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
         <input type="hidden" name="facq" value="<?php echo htmlspecialchars($filter_acq); ?>">
@@ -1154,6 +1246,20 @@ displayMessage();
 
     <!-- BORROWED ITEMS TAB -->
     <div id="tab-borrowed" style="display: <?php echo $current_tab === 'borrowed' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
+        <?php $__borrow_tabs = ['not_returned' => 'Not Returned', 'returned' => 'Returned']; ?>
+        <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:280px;">
+            <?php foreach ($__borrow_tabs as $__bval => $__blabel): ?>
+            <a href="inventory.php?tab=borrowed&fborrow=<?php echo $__bval; ?>"
+               style="flex:1;text-align:center;padding:7px 0;border-radius:6px;font-size:.82rem;font-weight:700;text-decoration:none;
+                      background:<?php echo $filter_borrow === $__bval ? '#fff' : 'transparent'; ?>;
+                      color:<?php echo $filter_borrow === $__bval ? '#8B0000' : '#555'; ?>;
+                      box-shadow:<?php echo $filter_borrow === $__bval ? '0 1px 4px rgba(0,0,0,.10)' : 'none'; ?>;">
+                <?php echo $__blabel; ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
+
+        <?php if ($filter_borrow === 'not_returned'): ?>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($borrowed_items_page) > 0):
                 foreach ($borrowed_items_page as $group):
@@ -1192,14 +1298,32 @@ displayMessage();
                     </div>
                 </div>
             </div>
-            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px;min-height:22px;">
-                <?php foreach (array_slice($group['units'], 0, 2) as $u): ?>
-                <span class="ai-qr-chip" style="font-size:0.68rem;"><?php echo htmlspecialchars($u['qr_code_id']); ?></span>
+            <!-- One row per borrowed unit — each has its own borrower/borrow record, so
+                 "Mark as Returned" needs to act per-unit rather than on the whole group. -->
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:auto;">
+                <?php foreach ($group['units'] as $u):
+                    $__br = $__active_borrows_by_unit[(int)$u['id']] ?? null;
+                    $__borrower = $__br ? ($all_users_by_id[$__br['user_id']]['full_name'] ?? 'Unknown user') : null;
+                ?>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:7px 10px;">
+                    <div style="min-width:0;">
+                        <div style="font-size:0.72rem;font-weight:700;color:#b45309;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars($u['qr_code_id']); ?></div>
+                        <?php if ($__borrower): ?>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.55);"><i class="fas fa-user me-1"></i><?php echo htmlspecialchars($__borrower); ?></div>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($u['status'] === 'borrowed'): ?>
+                    <form method="POST" action="?action=mark_returned" onsubmit="return confirm('Mark this unit as returned?')" style="margin:0;flex-shrink:0;">
+                        <input type="hidden" name="unit_id" value="<?php echo (int)$u['id']; ?>">
+                        <button type="submit" class="ai-btn-sm" style="background:rgba(239,68,68,0.12);color:#dc2626;border:none;border-radius:6px;white-space:nowrap;" title="Click to mark as returned">
+                            <i class="fas fa-times"></i> Not Returned
+                        </button>
+                    </form>
+                    <?php else: ?>
+                    <span class="ai-badge ai-badge-success" style="white-space:nowrap;"><i class="fas fa-check"></i> Returned</span>
+                    <?php endif; ?>
+                </div>
                 <?php endforeach; ?>
-                <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
-            </div>
-            <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;margin-top:auto;">
-                <i class="fas fa-hand-holding-heart"></i> Currently Borrowed
             </div>
         </div>
         <?php endforeach; else: ?>
@@ -1211,11 +1335,71 @@ displayMessage();
         <?php if ($pages_borrowed > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_borrowed; $i++): ?>
-                <a href="inventory.php?tab=borrowed&page_borrowed=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_borrowed ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=borrowed&fborrow=not_returned&page_borrowed=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_borrowed ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
         </nav>
+        <?php endif; ?>
+
+        <?php else: ?>
+        <!-- Returned sub-tab: history from borrow_records (status='returned') — the
+             unit itself is back in 'available' status by now, so it can't be found
+             by filtering live inventory the way the Not Returned list is. -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <?php if (count($returned_borrows_page) > 0): foreach ($returned_borrows_page as $__rb):
+                $__rb_inv = findById($all_items, (int)$__rb['inventory_id']);
+                $__rb_user = $all_users_by_id[$__rb['user_id']] ?? null;
+                $__rb_depts = getAllDepartmentNames();
+                $__rb_dept_name = ($__rb_inv['college_id'] ?? null) && isset($__rb_depts[$__rb_inv['college_id']])
+                    ? $__rb_depts[$__rb_inv['college_id']] : null;
+            ?>
+            <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
+                    <div>
+                        <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
+                            <?php echo htmlspecialchars($__rb_inv['item_name'] ?? 'Unknown item'); ?>
+                        </div>
+                        <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
+                            <?php echo htmlspecialchars($__rb_inv['category'] ?? ''); ?>
+                        </div>
+                    </div>
+                    <span class="ai-badge ai-badge-success" style="white-space:nowrap;"><i class="fas fa-check"></i> Returned</span>
+                </div>
+                <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div>
+                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">College/Office</div>
+                            <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($__rb_dept_name ?? '—'); ?></div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Returned</div>
+                            <div style="font-weight:600;color:#1a1d23;"><?php echo !empty($__rb['actual_return_date']) ? formatDate($__rb['actual_return_date'], 'M d, Y') : '—'; ?></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;padding:7px 10px;margin-top:auto;">
+                    <div style="min-width:0;">
+                        <div style="font-size:0.72rem;font-weight:700;color:#15803d;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars($__rb_inv['qr_code_id'] ?? ''); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.55);"><i class="fas fa-user me-1"></i><?php echo htmlspecialchars($__rb_user['full_name'] ?? 'Unknown user'); ?></div>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; else: ?>
+            <div class="ai-empty" style="grid-column:1/-1;"><i class="fas fa-undo"></i>No returned items yet</div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Pagination for Returned Items -->
+        <?php if ($pages_returned > 1): ?>
+        <nav style="display: flex; justify-content: center; gap: 8px;">
+            <?php for ($i = 1; $i <= $pages_returned; $i++): ?>
+                <a href="inventory.php?tab=borrowed&fborrow=returned&page_returned=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_returned ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                    <?php echo $i; ?>
+                </a>
+            <?php endfor; ?>
+        </nav>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
 
@@ -1539,7 +1723,7 @@ function openGroupModal(group) {
             + '<span class="ai-badge ai-badge-' + sc + '" style="font-size:0.7rem;margin-bottom:8px;">' + unit.status + '</span>'
             + '<div style="display:flex;gap:4px;justify-content:center;margin-top:6px;">'
             + '<a href="inventory.php?action=edit&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit"><i class="fas fa-edit"></i></a>'
-            + (['condemned', 'disposed', 'requested', 'borrowed'].indexOf(unit.status) === -1
+            + (['condemned', 'disposed', 'requested', 'borrowed', 'owned'].indexOf(unit.status) === -1
                 ? '<a href="condemnation.php?tab=evaluate&condemn=' + unit.id + '" class="ai-btn-sm" style="background:rgba(139,0,0,0.10);color:#8B0000;" title="Condemn this unit"><i class="fas fa-ban"></i></a>'
                 : '')
             + '</div>'
@@ -1575,6 +1759,15 @@ function setTab(tabName) {
     // Show selected content tab
     document.getElementById('tab-' + tabName).style.display = 'block';
     
+    // Keep the filter form's hidden "tab" field in sync — otherwise submitting
+    // a search/filter after switching tabs client-side (no page reload happens
+    // here) silently re-submits against whatever tab was active at the last
+    // real page load, which looks exactly like "the filter isn't working".
+    var tabField = document.querySelector('.ai-filter-card input[name="tab"]');
+    if (tabField) {
+        tabField.value = tabName;
+    }
+
     // Update URL without reload
     window.history.pushState({tab: tabName}, '', 'inventory.php?tab=' + tabName);
 }
