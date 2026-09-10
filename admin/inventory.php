@@ -926,6 +926,14 @@ displayMessage();
                     $__all_grp_depts = getAllDepartmentNames();
                     $__all_grp_dept_name = ($group['college_id'] ?? null) && isset($__all_grp_depts[$group['college_id']])
                         ? $__all_grp_depts[$group['college_id']] : null;
+                    // Requested/borrowed units are mid-use and condemnation.php itself
+                    // refuses to condemn them — so only offer the button when at least
+                    // one unit in this group is actually condemnable, and point it at
+                    // that unit rather than blindly at units[0].
+                    $__all_condemnable_unit = null;
+                    foreach ($group['units'] as $__u) {
+                        if (!in_array($__u['status'], ['requested', 'borrowed'])) { $__all_condemnable_unit = $__u; break; }
+                    }
         ?>
         <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
@@ -960,9 +968,11 @@ displayMessage();
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
                     <i class="fas fa-eye"></i> View &amp; Manage
                 </button>
-                <a href="condemnation.php?tab=evaluate&condemn=<?php echo $group['units'][0]['id']; ?>" class="ai-btn-sm" style="background:rgba(139,0,0,0.10);color:#8B0000;border:none;border-radius:8px;white-space:nowrap;" title="Condemn first unit">
+                <?php if ($__all_condemnable_unit): ?>
+                <a href="condemnation.php?tab=evaluate&condemn=<?php echo $__all_condemnable_unit['id']; ?>" class="ai-btn-sm" style="background:rgba(139,0,0,0.10);color:#8B0000;border:none;border-radius:8px;white-space:nowrap;" title="Condemn this unit">
                     <i class="fas fa-ban"></i> Condemn
                 </a>
+                <?php endif; ?>
             </div>
         </div>
         <?php endforeach; else: ?>
@@ -1508,7 +1518,7 @@ function openGroupModal(group) {
             + '<span class="ai-badge ai-badge-' + sc + '" style="font-size:0.7rem;margin-bottom:8px;">' + unit.status + '</span>'
             + '<div style="display:flex;gap:4px;justify-content:center;margin-top:6px;">'
             + '<a href="inventory.php?action=edit&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit"><i class="fas fa-edit"></i></a>'
-            + (unit.status !== 'condemned' && unit.status !== 'disposed'
+            + (['condemned', 'disposed', 'requested', 'borrowed'].indexOf(unit.status) === -1
                 ? '<a href="condemnation.php?tab=evaluate&condemn=' + unit.id + '" class="ai-btn-sm" style="background:rgba(139,0,0,0.10);color:#8B0000;" title="Condemn this unit"><i class="fas fa-ban"></i></a>'
                 : '')
             + '</div>'
