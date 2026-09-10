@@ -558,7 +558,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 .ar-step-lbl.l-rejected { color: #b91c1c; }
 .ar-step-line {
     flex: 1; height: 2px; background: #e5e7eb;
-    margin: 0 -2px; margin-top: -19px; position: relative; z-index: 1;
+    margin: 0 -2px; margin-top: 17px; position: relative; z-index: 1;
 }
 .ar-step-line.l-done { background: #22c55e; }
 
@@ -571,7 +571,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 .ar-row-open .ar-row-chevron { transform: rotate(180deg); color: #8B0000; }
 .ar-mini-steps .ar-step-dot { width: 26px; height: 26px; font-size: 0.62rem; }
 .ar-mini-steps .ar-step-lbl { font-size: 0.58rem; max-width: 56px; margin-top: 5px; }
-.ar-mini-steps .ar-step-line { margin-top: -14px; }
+.ar-mini-steps .ar-step-line { margin-top: 12px; }
 
 /* Request type tabs */
 .ar-type-tabs {
@@ -722,7 +722,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     .ar-steps { gap: 0; }
     .ar-step-dot { width: 26px; height: 26px; font-size: 0.58rem; }
     .ar-step-lbl { font-size: 0.54rem; max-width: 44px; margin-top: 5px; }
-    .ar-step-line { margin-top: -14px; }
+    .ar-step-line { margin-top: 12px; }
 
     /* Detail view header */
     .ar-mob-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
