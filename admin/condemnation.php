@@ -21,8 +21,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirectWithMessage('condemnation.php?tab=evaluate', 'This item is currently requested or borrowed and cannot be condemned.', 'danger');
         }
 
-        $batch_qty   = (int)($item_at_condemn['quantity'] ?? 1);
-        $condemn_qty = max(1, min($batch_qty, (int)($_POST['condemn_qty'] ?? $batch_qty)));
+        $batch_qty = (int)($item_at_condemn['quantity'] ?? 1);
+        // Selecting specific units in the modal posts one unit_slot[] entry per
+        // checked box — the units themselves are just numbered placeholders (this
+        // inventory row has no per-unit identity yet), so all that ultimately
+        // matters is how many were selected.
+        $selected_units = isset($_POST['unit_slot']) && is_array($_POST['unit_slot']) ? count($_POST['unit_slot']) : $batch_qty;
+        $condemn_qty    = max(1, min($batch_qty, $selected_units));
 
         $condemn_fields = [
             'status'                => 'condemned',
@@ -729,12 +734,16 @@ if ($active_tab === 'evaluate') {
             <input type="hidden" name="item_id" id="condemnItemId" value="">
             <div class="mb-3" id="condemnQtyWrap" style="display:none;">
                 <label class="form-label" style="font-size:0.85rem;font-weight:700;">
-                    Quantity to Condemn
-                    <span style="font-weight:400;color:#999;">(<span id="condemnQtyAvail">1</span> available in this record)</span>
+                    Select Which Units to Condemn
+                    <span style="font-weight:400;color:#999;">(<span id="condemnQtySelected">0</span> of <span id="condemnQtyAvail">1</span> selected)</span>
                 </label>
-                <input type="number" class="form-control" name="condemn_qty" id="condemnQty" min="1" value="1" style="font-size:0.87rem;">
-                <div style="font-size:0.75rem;color:#999;margin-top:4px;">
-                    <i class="fas fa-info-circle me-1"></i>Condemning fewer than the full quantity splits that amount into its own condemned record — the rest stays available.
+                <div style="display:flex;gap:10px;margin-bottom:6px;">
+                    <button type="button" class="btn" style="font-size:0.76rem;padding:3px 10px;background:#f7f7f7;border:1px solid #e5e7eb;" onclick="condemnSelectAllUnits(true)">Select All</button>
+                    <button type="button" class="btn" style="font-size:0.76rem;padding:3px 10px;background:#f7f7f7;border:1px solid #e5e7eb;" onclick="condemnSelectAllUnits(false)">Deselect All</button>
+                </div>
+                <div id="condemnUnitList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;max-height:160px;overflow-y:auto;padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;"></div>
+                <div style="font-size:0.75rem;color:#999;margin-top:6px;">
+                    <i class="fas fa-info-circle me-1"></i>These units share one inventory record with no individual identity yet — condemning fewer than all of them splits the selected count into its own new condemned record, leaving the rest untouched.
                 </div>
             </div>
             <div class="mb-3">
@@ -791,21 +800,34 @@ if ($active_tab === 'evaluate') {
 </div>
 
 <script>
+function condemnUpdateSelectedCount() {
+    var checked = document.querySelectorAll('#condemnUnitList input[type="checkbox"]:checked').length;
+    document.getElementById('condemnQtySelected').textContent = checked;
+}
+function condemnSelectAllUnits(select) {
+    document.querySelectorAll('#condemnUnitList input[type="checkbox"]').forEach(function(cb) { cb.checked = select; });
+    condemnUpdateSelectedCount();
+}
 function openCondemnModal(itemId, itemName, qty) {
     qty = qty || 1;
     document.getElementById('condemnItemId').value = itemId;
     document.getElementById('condemnItemName').textContent = itemName;
     document.getElementById('condemnReason').value = '';
     var qtyWrap = document.getElementById('condemnQtyWrap');
-    var qtyInput = document.getElementById('condemnQty');
+    var unitList = document.getElementById('condemnUnitList');
+    unitList.innerHTML = '';
     if (qty > 1) {
         qtyWrap.style.display = 'block';
-        qtyInput.max = qty;
-        qtyInput.value = qty;
         document.getElementById('condemnQtyAvail').textContent = qty;
+        for (var i = 1; i <= qty; i++) {
+            var label = document.createElement('label');
+            label.style.cssText = 'display:flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:5px;background:#fff;font-size:0.8rem;cursor:pointer;';
+            label.innerHTML = '<input type="checkbox" name="unit_slot[]" value="' + i + '" checked onchange="condemnUpdateSelectedCount()"> Unit ' + i;
+            unitList.appendChild(label);
+        }
+        condemnUpdateSelectedCount();
     } else {
         qtyWrap.style.display = 'none';
-        qtyInput.value = 1;
     }
     document.getElementById('condemnModal').classList.add('open');
 }
