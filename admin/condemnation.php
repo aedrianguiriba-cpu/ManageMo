@@ -350,6 +350,7 @@ if ($active_tab === 'evaluate') {
     width: 100%; max-width: 460px;
     padding: 28px 30px;
 }
+.cd-modal-wide { max-width: 680px; }
 .cd-modal-title {
     font-size: 1.02rem; font-weight: 800; color: #1a1d23;
     margin-bottom: 4px;
@@ -675,7 +676,14 @@ if ($active_tab === 'evaluate') {
                     <?php if ($active_tab === 'evaluate'): ?>
                     <td>
                         <button type="button" class="cd-btn-condemn"
-                            onclick="openCondemnModal(<?php echo $row['id']; ?>, <?php echo htmlspecialchars(json_encode($row['item_name'])); ?>, <?php echo (int)($row['quantity'] ?? 1); ?>)">
+                            onclick='openCondemnModal(<?php echo $row["id"]; ?>, <?php echo (int)($row["quantity"] ?? 1); ?>, <?php echo json_encode([
+                                "item_name" => $row["item_name"],
+                                "qr_code_id" => $row["qr_code_id"] ?? "",
+                                "category" => $row["category"] ?? "",
+                                "condition" => $row["condition"] ?? "",
+                                "cost" => (float)($row["cost"] ?? 0),
+                                "location" => $row["location"] ?? "",
+                            ]); ?>)'>
                             <i class="fas fa-ban"></i> Condemn
                         </button>
                     </td>
@@ -725,7 +733,7 @@ if ($active_tab === 'evaluate') {
 
 <!-- ===== CONDEMN MODAL ===== -->
 <div class="cd-modal-overlay" id="condemnModal">
-    <div class="cd-modal">
+    <div class="cd-modal cd-modal-wide">
         <div class="cd-modal-title"><i class="fas fa-ban me-2" style="color:#8B0000;"></i>Condemn Item</div>
         <div class="cd-modal-sub">This will flag the item as condemned and remove it from active inventory.</div>
         <div class="cd-modal-item-name" id="condemnItemName">—</div>
@@ -741,7 +749,22 @@ if ($active_tab === 'evaluate') {
                     <button type="button" class="btn" style="font-size:0.76rem;padding:3px 10px;background:#f7f7f7;border:1px solid #e5e7eb;" onclick="condemnSelectAllUnits(true)">Select All</button>
                     <button type="button" class="btn" style="font-size:0.76rem;padding:3px 10px;background:#f7f7f7;border:1px solid #e5e7eb;" onclick="condemnSelectAllUnits(false)">Deselect All</button>
                 </div>
-                <div id="condemnUnitList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;max-height:160px;overflow-y:auto;padding:8px;border:1px solid #e5e7eb;border-radius:6px;background:#fafafa;"></div>
+                <div style="max-height:220px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.80rem;">
+                        <thead>
+                            <tr style="background:#f7f7f7;position:sticky;top:0;">
+                                <th style="padding:6px 8px;text-align:left;"></th>
+                                <th style="padding:6px 8px;text-align:left;">Unit</th>
+                                <th style="padding:6px 8px;text-align:left;">QR Code</th>
+                                <th style="padding:6px 8px;text-align:left;">Category</th>
+                                <th style="padding:6px 8px;text-align:left;">Condition</th>
+                                <th style="padding:6px 8px;text-align:left;">Location</th>
+                                <th style="padding:6px 8px;text-align:right;">Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="condemnUnitList"></tbody>
+                    </table>
+                </div>
                 <div style="font-size:0.75rem;color:#999;margin-top:6px;">
                     <i class="fas fa-info-circle me-1"></i>These units share one inventory record with no individual identity yet — condemning fewer than all of them splits the selected count into its own new condemned record, leaving the rest untouched.
                 </div>
@@ -800,6 +823,11 @@ if ($active_tab === 'evaluate') {
 </div>
 
 <script>
+function _cdEsc(str) {
+    var d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+}
 function condemnUpdateSelectedCount() {
     var checked = document.querySelectorAll('#condemnUnitList input[type="checkbox"]:checked').length;
     document.getElementById('condemnQtySelected').textContent = checked;
@@ -808,10 +836,11 @@ function condemnSelectAllUnits(select) {
     document.querySelectorAll('#condemnUnitList input[type="checkbox"]').forEach(function(cb) { cb.checked = select; });
     condemnUpdateSelectedCount();
 }
-function openCondemnModal(itemId, itemName, qty) {
+function openCondemnModal(itemId, qty, details) {
     qty = qty || 1;
+    details = details || {};
     document.getElementById('condemnItemId').value = itemId;
-    document.getElementById('condemnItemName').textContent = itemName;
+    document.getElementById('condemnItemName').textContent = details.item_name || '—';
     document.getElementById('condemnReason').value = '';
     var qtyWrap = document.getElementById('condemnQtyWrap');
     var unitList = document.getElementById('condemnUnitList');
@@ -819,11 +848,22 @@ function openCondemnModal(itemId, itemName, qty) {
     if (qty > 1) {
         qtyWrap.style.display = 'block';
         document.getElementById('condemnQtyAvail').textContent = qty;
+        // All units on this record share one QR code, condition, location, etc. —
+        // there's no per-unit identity yet, so every row shows the same underlying
+        // details; the "Unit #" is just a selection label, not a distinct identity.
+        var costFmt = (details.cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         for (var i = 1; i <= qty; i++) {
-            var label = document.createElement('label');
-            label.style.cssText = 'display:flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:5px;background:#fff;font-size:0.8rem;cursor:pointer;';
-            label.innerHTML = '<input type="checkbox" name="unit_slot[]" value="' + i + '" checked onchange="condemnUpdateSelectedCount()"> Unit ' + i;
-            unitList.appendChild(label);
+            var tr = document.createElement('tr');
+            tr.style.borderTop = '1px solid #f0f0f0';
+            tr.innerHTML =
+                '<td style="padding:5px 8px;"><input type="checkbox" name="unit_slot[]" value="' + i + '" checked onchange="condemnUpdateSelectedCount()"></td>' +
+                '<td style="padding:5px 8px;font-weight:700;">Unit ' + i + '</td>' +
+                '<td style="padding:5px 8px;font-family:monospace;color:#8B0000;">' + _cdEsc(details.qr_code_id || '—') + '</td>' +
+                '<td style="padding:5px 8px;">' + _cdEsc(details.category || '—') + '</td>' +
+                '<td style="padding:5px 8px;">' + _cdEsc(details.condition ? details.condition.charAt(0).toUpperCase() + details.condition.slice(1) : '—') + '</td>' +
+                '<td style="padding:5px 8px;">' + _cdEsc(details.location || '—') + '</td>' +
+                '<td style="padding:5px 8px;text-align:right;">₱' + costFmt + '</td>';
+            unitList.appendChild(tr);
         }
         condemnUpdateSelectedCount();
     } else {
@@ -859,7 +899,14 @@ document.addEventListener('keydown', function(e) {
     if ($__condemn_item):
 ?>
 // Deep-linked from Inventory's "Condemn" quick action
-openCondemnModal(<?php echo (int)$__condemn_item['id']; ?>, <?php echo json_encode($__condemn_item['item_name']); ?>, <?php echo (int)($__condemn_item['quantity'] ?? 1); ?>);
+openCondemnModal(<?php echo (int)$__condemn_item['id']; ?>, <?php echo (int)($__condemn_item['quantity'] ?? 1); ?>, <?php echo json_encode([
+    'item_name'  => $__condemn_item['item_name'],
+    'qr_code_id' => $__condemn_item['qr_code_id'] ?? '',
+    'category'   => $__condemn_item['category'] ?? '',
+    'condition'  => $__condemn_item['condition'] ?? '',
+    'cost'       => (float)($__condemn_item['cost'] ?? 0),
+    'location'   => $__condemn_item['location'] ?? '',
+]); ?>);
 <?php endif; endif; ?>
 </script>
 
