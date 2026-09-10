@@ -1001,7 +1001,7 @@ displayMessage();
                     $conditions = array_unique(array_column($group['units'], 'condition'));
                     $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
                     <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
@@ -1042,7 +1042,7 @@ displayMessage();
                 <?php endforeach; ?>
                 <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
             </div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;margin-top:auto;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
                     <i class="fas fa-eye"></i> View &amp; Manage
@@ -1079,7 +1079,7 @@ displayMessage();
                     $conditions = array_unique(array_column($group['units'], 'condition'));
                     $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
                     <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
@@ -1110,7 +1110,7 @@ displayMessage();
                     </div>
                 </div>
             </div>
-            <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;">
+            <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;margin-top:auto;">
                 <i class="fas fa-hourglass-half"></i> Pending Approval — reviewed in Requests
             </div>
         </div>
@@ -1140,7 +1140,7 @@ displayMessage();
                     $conditions = array_unique(array_column($group['units'], 'condition'));
                     $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
                     <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
@@ -1177,7 +1177,7 @@ displayMessage();
                 <?php endforeach; ?>
                 <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
             </div>
-            <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;">
+            <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;margin-top:auto;">
                 <i class="fas fa-hand-holding-heart"></i> Currently Borrowed
             </div>
         </div>
@@ -1212,7 +1212,7 @@ displayMessage();
                         ? $__depts[$__requester['college_id']] : null;
                     $__is_approved = $req['status'] === 'approved';
         ?>
-        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
                     <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
@@ -1243,7 +1243,7 @@ displayMessage();
                 <?php echo htmlspecialchars($req['service_description']); ?>
             </div>
             <?php endif; ?>
-            <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;">
+            <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;margin-top:auto;">
                 <i class="fas fa-tools"></i>
                 <a href="requests.php?action=view&id=<?php echo (int)$req['id']; ?>" style="color:inherit;text-decoration:underline;">View request</a>
             </div>
@@ -1279,7 +1279,7 @@ displayMessage();
                     $conditions  = array_unique(array_column($group['units'], 'condition'));
                     $cond_label  = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
         ?>
-        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
                     <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
@@ -1315,7 +1315,7 @@ displayMessage();
                     </div>
                 </div>
             </div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;margin-top:auto;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;cursor:pointer;"
                     onclick="openOwnedGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>, '<?php echo $owner_name; ?>')">
                     <i class="fas fa-info-circle"></i> View Units
