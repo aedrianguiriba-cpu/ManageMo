@@ -89,14 +89,10 @@ function arRenderTrackerRow(array $req, string $rowId, int $colspan): void {
     <?php
 }
 
-function arTrackerToggleCell(string $rowId): void {
-    ?>
-    <td class="ar-td-tracker" style="padding:8px 10px;text-align:center;">
-        <button type="button" class="ar-unit-tracker-toggle" onclick="toggleUnitTracker('<?php echo $rowId; ?>', this)" aria-expanded="false">
-            <i class="fas fa-chevron-down"></i>
-        </button>
-    </td>
-    <?php
+// Attributes to make a table row itself the tracker toggle — click anywhere on
+// the row (except a link/button) to expand/collapse its tracker row below it.
+function arRowToggleAttrs(string $rowId): string {
+    return 'class="ar-clickable-row" onclick="toggleUnitTracker(\'' . $rowId . '\', this, event)"';
 }
 
 // Handle request actions
@@ -566,17 +562,13 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 }
 .ar-step-line.l-done { background: #22c55e; }
 
-/* Per-unit tracker dropdown (Units table) */
-.ar-unit-tracker-toggle {
-    border: 1px solid #e5e7eb; background: #fff; color: #999;
-    width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
+/* Whole row is the tracker toggle (Units table + list tables) */
+.ar-clickable-row { cursor: pointer; }
+.ar-row-chevron {
+    display: inline-flex; color: #bbb; margin-left: 6px;
+    font-size: 0.7rem; transition: transform 0.15s, color 0.15s;
 }
-.ar-unit-tracker-toggle:hover { border-color: rgba(139,0,0,.25); color: #8B0000; }
-.ar-unit-tracker-toggle i { transition: transform 0.15s; }
-.ar-unit-tracker-toggle.open { border-color: #8B0000; color: #8B0000; background: rgba(139,0,0,.06); }
-.ar-unit-tracker-toggle.open i { transform: rotate(180deg); }
+.ar-row-open .ar-row-chevron { transform: rotate(180deg); color: #8B0000; }
 .ar-mini-steps .ar-step-dot { width: 26px; height: 26px; font-size: 0.62rem; }
 .ar-mini-steps .ar-step-lbl { font-size: 0.58rem; max-width: 56px; margin-top: 5px; }
 .ar-mini-steps .ar-step-line { margin-top: -14px; }
@@ -717,13 +709,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         width: 100%; justify-content: center;
         padding: 8px 12px; font-size: 0.84rem;
     }
-    /* Tracker toggle cell: full-width, centered */
-    .ar-table td.ar-td-tracker {
-        display: block !important;
-        position: static !important;
-        text-align: center; padding: 8px 14px;
-    }
-    .ar-table td.ar-td-tracker::before { display: none; }
     /* Expandable tracker row: full-width block, no data-label gutter */
     .ar-table tr.ar-unit-tracker-row td {
         display: block !important;
@@ -1038,22 +1023,21 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php if (!$__pending): ?>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Status</th>
                         <?php endif; ?>
-                        <th style="padding:7px 10px;text-align:center;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Tracker</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php
-                $__unit_cols = ($__pending ? 1 : 0) + 2 + ($request['request_type'] !== 'service' ? 2 : 0) + (!$__pending ? 1 : 0) + 1;
+                $__unit_cols = ($__pending ? 1 : 0) + 2 + ($request['request_type'] !== 'service' ? 2 : 0) + (!$__pending ? 1 : 0);
                 foreach ($detail_units as $di_idx => $di):
                     $__uid = 'unit-' . $di_idx;
                     [$u_si, $u_sl, $u_sd, $u_ld, $u_ln] = arComputeTrackerSteps($is_service, $di['status'] ?? 'pending', $di['delivery_status'] ?? null);
                 ?>
-                    <tr style="border-bottom:1px solid #f0f0f0;">
+                    <tr style="border-bottom:1px solid #f0f0f0;" <?php echo arRowToggleAttrs($__uid); ?>>
                         <?php if ($__pending): ?>
                         <td style="padding:8px 10px;"><input type="checkbox" class="unit-check" name="unit_ids[]" value="<?php echo (int)$di['id']; ?>" checked></td>
                         <?php endif; ?>
                         <td style="padding:8px 10px;color:#999;font-size:.75rem;"><?php echo $di_idx + 1; ?></td>
-                        <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?></td>
+                        <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?> <i class="fas fa-chevron-down ar-row-chevron"></i></td>
                         <?php if ($request['request_type'] !== 'service'): ?>
                         <td style="padding:8px 10px;">
                             <?php if (!empty($di['qr_code_id'])): ?>
@@ -1067,11 +1051,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php if (!$__pending): ?>
                         <td style="padding:8px 10px;"><span class="ar-badge ar-badge-<?php echo $status_colors[$di['status']] ?? 'secondary'; ?>" style="font-size:.72rem;"><?php echo ucfirst($di['status']); ?></span></td>
                         <?php endif; ?>
-                        <td style="padding:8px 10px;text-align:center;">
-                            <button type="button" class="ar-unit-tracker-toggle" onclick="toggleUnitTracker('<?php echo $__uid; ?>', this)" aria-expanded="false">
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                        </td>
                     </tr>
                     <tr id="row-<?php echo $__uid; ?>" class="ar-unit-tracker-row" style="display:none;">
                         <td colspan="<?php echo $__unit_cols; ?>" style="padding:14px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0;">
@@ -1452,12 +1431,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-item">
                 <thead><tr>
-                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item Requested</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th><th style="text-align:center;">Tracker</th>
+                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item Requested</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($requests) > 0): foreach ($requests as $req): $__rid = 'item-' . $req['id']; ?>
-                <tr>
-                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
+                <tr <?php echo arRowToggleAttrs($__rid); ?>>
+                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span><i class="fas fa-chevron-down ar-row-chevron"></i></td>
                     <td data-label="Requester">
                         <div style="font-weight:700;font-size:0.87rem;"><?php echo htmlspecialchars($req['full_name']); ?></div>
                         <div style="font-size:0.76rem;color:rgba(0,0,0,0.45);"><?php echo htmlspecialchars($req['email']); ?></div>
@@ -1482,11 +1461,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php $view_href_item = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']).'&tab=item' : 'requests.php?action=view&id='.$req['id'].'&tab=item'; ?>
                         <a href="<?php echo $view_href_item; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
                     </td>
-                    <?php arTrackerToggleCell($__rid); ?>
                 </tr>
-                <?php arRenderTrackerRow($req, $__rid, 9); ?>
+                <?php arRenderTrackerRow($req, $__rid, 8); ?>
                 <?php endforeach; else: ?>
-                <tr><td colspan="9"><div class="ar-empty"><i class="fas fa-box-open"></i>No item requests found</div></td></tr>
+                <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-box-open"></i>No item requests found</div></td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1496,12 +1474,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-service">
                 <thead><tr>
-                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Service Description</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th><th style="text-align:center;">Tracker</th>
+                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Service Description</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($requests) > 0): foreach ($requests as $req): $__rid = 'svc-' . $req['id']; ?>
-                <tr>
-                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
+                <tr <?php echo arRowToggleAttrs($__rid); ?>>
+                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span><i class="fas fa-chevron-down ar-row-chevron"></i></td>
                     <td data-label="Requester">
                         <div style="font-weight:700;font-size:0.87rem;"><?php echo htmlspecialchars($req['full_name']); ?></div>
                         <div style="font-size:0.76rem;color:rgba(0,0,0,0.45);"><?php echo htmlspecialchars($req['email']); ?></div>
@@ -1522,11 +1500,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
                     <td data-label="Date" style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
                     <td class="ar-td-actions"><a href="requests.php?action=view&id=<?php echo $req['id']; ?>&tab=service" class="ar-btn-view"><i class="fas fa-eye"></i> View</a></td>
-                    <?php arTrackerToggleCell($__rid); ?>
                 </tr>
-                <?php arRenderTrackerRow($req, $__rid, 9); ?>
+                <?php arRenderTrackerRow($req, $__rid, 8); ?>
                 <?php endforeach; else: ?>
-                <tr><td colspan="9"><div class="ar-empty"><i class="fas fa-tools"></i>No service requests found</div></td></tr>
+                <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-tools"></i>No service requests found</div></td></tr>
 
                 <?php endif; ?>
                 </tbody>
@@ -1536,13 +1513,13 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-all">
                 <thead><tr>
-                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th><th style="text-align:center;">Tracker</th>
+                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($requests) > 0):
                     foreach ($requests as $req): $__rid = 'all-' . $req['id']; ?>
-                <tr>
-                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
+                <tr <?php echo arRowToggleAttrs($__rid); ?>>
+                    <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span><i class="fas fa-chevron-down ar-row-chevron"></i></td>
                     <td data-label="Requester">
                         <div style="font-weight:700;font-size:0.87rem;"><?php echo htmlspecialchars($req['full_name']); ?></div>
                         <div style="font-size:0.76rem;color:rgba(0,0,0,0.45);"><?php echo htmlspecialchars($req['email']); ?></div>
@@ -1569,11 +1546,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php $view_href_all = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']) : 'requests.php?action=view&id='.$req['id']; ?>
                         <a href="<?php echo $view_href_all; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
                     </td>
-                    <?php arTrackerToggleCell($__rid); ?>
                 </tr>
-                <?php arRenderTrackerRow($req, $__rid, 10); ?>
+                <?php arRenderTrackerRow($req, $__rid, 9); ?>
                 <?php endforeach; else: ?>
-                <tr><td colspan="10"><div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div></td></tr>
+                <tr><td colspan="9"><div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div></td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1596,7 +1572,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 </div>
 
 <script>
-function toggleUnitTracker(uid, btn) {
+function toggleUnitTracker(uid, trigger, evt) {
+    // Ignore clicks that landed on a link/button inside the row (e.g. "View")
+    // so the row-click toggle doesn't hijack normal navigation.
+    if (evt && evt.target.closest('a, button, input, label')) return;
     var row = document.getElementById('row-' + uid);
     if (!row) return;
     var open = row.style.display !== 'none';
@@ -1604,8 +1583,7 @@ function toggleUnitTracker(uid, btn) {
     // (table-row on desktop, block when the mobile card-stack layout applies)
     // instead of hardcoding one, which would fight the responsive layout.
     row.style.display = open ? 'none' : '';
-    btn.setAttribute('aria-expanded', String(!open));
-    btn.classList.toggle('open', !open);
+    if (trigger) trigger.classList.toggle('ar-row-open', !open);
 }
 </script>
 
