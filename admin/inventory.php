@@ -935,7 +935,7 @@ displayMessage();
                         if (!in_array($__u['status'], ['requested', 'borrowed'])) { $__all_condemnable_unit = $__u; break; }
                     }
         ?>
-        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
                     <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
@@ -963,7 +963,7 @@ displayMessage();
                     </div>
                 </div>
             </div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;margin-top:auto;">
                 <button type="button" class="ai-btn-sm" style="background:rgba(59,130,246,0.10);color:#1d4ed8;flex:1;border:none;border-radius:8px;"
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
                     <i class="fas fa-eye"></i> View &amp; Manage
