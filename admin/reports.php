@@ -80,7 +80,7 @@ function rpInventoryRow($item, $rownum, $all_depts) {
         <td style="text-align:center;font-weight:700;"><?php echo (int)$item['quantity']; ?></td>
         <td><?php echo ucfirst(htmlspecialchars($item['condition'] ?? '')); ?></td>
         <td><span class="rp-badge rp-badge-<?php echo $item['status']; ?>"><?php echo ucfirst($item['status']); ?></span></td>
-        <td style="text-align:right;"><?php echo number_format($item['cost'], 2); ?></td>
+        <td style="text-align:right;"><?php echo number_format((float)($item['cost'] ?? 0), 2); ?></td>
         <td style="font-size:0.79rem;color:rgba(0,0,0,0.50);"><?php echo $item['purchase_date'] ? date('M d, Y', strtotime($item['purchase_date'])) : '—'; ?></td>
     </tr>
     <?php
