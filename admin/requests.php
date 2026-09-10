@@ -67,6 +67,38 @@ function arComputeTrackerSteps(bool $isService, ?string $status, ?string $delive
     return [$si, $sl, $sd, $ld, $ln];
 }
 
+// Renders the hidden, expandable tracker row shown under a list-table row when
+// its dropdown toggle is clicked. $rowId must be unique within the page.
+function arRenderTrackerRow(array $req, string $rowId, int $colspan): void {
+    $isService = ($req['request_type'] === 'service');
+    [$si, $sl, $sd, $ld, $ln] = arComputeTrackerSteps($isService, $req['status'] ?? 'pending', $req['delivery_status'] ?? null);
+    ?>
+    <tr id="row-<?php echo $rowId; ?>" class="ar-unit-tracker-row" style="display:none;">
+        <td colspan="<?php echo $colspan; ?>" style="padding:14px 16px;background:#fafafa;">
+            <div class="ar-steps ar-mini-steps">
+                <?php for ($i = 1; $i <= 5; $i++): ?>
+                <div class="ar-step">
+                    <div class="ar-step-dot <?php echo $sd[$i]; ?>"><i class="<?php echo $si[$i]; ?>"></i></div>
+                    <div class="ar-step-lbl <?php echo $ld[$i]; ?>"><?php echo $sl[$i]; ?></div>
+                </div>
+                <?php if ($i < 5): ?><div class="ar-step-line <?php echo $ln[$i]; ?>"></div><?php endif; ?>
+                <?php endfor; ?>
+            </div>
+        </td>
+    </tr>
+    <?php
+}
+
+function arTrackerToggleCell(string $rowId): void {
+    ?>
+    <td class="ar-td-tracker" style="padding:8px 10px;text-align:center;">
+        <button type="button" class="ar-unit-tracker-toggle" onclick="toggleUnitTracker('<?php echo $rowId; ?>', this)" aria-expanded="false">
+            <i class="fas fa-chevron-down"></i>
+        </button>
+    </td>
+    <?php
+}
+
 // Handle request actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $request_id  = (int)sanitizeInput($_POST['request_id']);
@@ -469,14 +501,14 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 }
 .ar-table tr:last-child td { border-bottom:none; }
 .ar-table tr:hover td { background:#f7f7f7; }
-/* Sticky Actions column on mobile */
-.ar-table th:last-child,
-.ar-table td:last-child {
+/* Sticky Actions column on horizontal scroll */
+.ar-table th.ar-th-actions,
+.ar-table td.ar-td-actions {
     position:sticky; right:0; z-index:2;
     background:#f7f7f7;
 }
-.ar-table td:last-child { background:#fff; }
-.ar-table tr:hover td:last-child { background:#f7f7f7; }
+.ar-table td.ar-td-actions { background:#fff; }
+.ar-table tr:hover td.ar-td-actions { background:#f7f7f7; }
 
 .ar-badge {
     display:inline-flex; align-items:center;
@@ -674,17 +706,31 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         color: #bbb; padding-top: 2px; line-height: 1.4;
     }
     /* Actions cell: full-width */
-    .ar-table td:last-child {
+    .ar-table td.ar-td-actions {
         display: block !important;
         position: static !important;
         background: #f7f7f7 !important;
         text-align: center; padding: 10px 14px;
     }
-    .ar-table td:last-child::before { display: none; }
+    .ar-table td.ar-td-actions::before { display: none; }
     .ar-btn-view {
         width: 100%; justify-content: center;
         padding: 8px 12px; font-size: 0.84rem;
     }
+    /* Tracker toggle cell: full-width, centered */
+    .ar-table td.ar-td-tracker {
+        display: block !important;
+        position: static !important;
+        text-align: center; padding: 8px 14px;
+    }
+    .ar-table td.ar-td-tracker::before { display: none; }
+    /* Expandable tracker row: full-width block, no data-label gutter */
+    .ar-table tr.ar-unit-tracker-row td {
+        display: block !important;
+        padding: 12px 8px;
+    }
+    .ar-table tr.ar-unit-tracker-row td::before { display: none; }
+    .ar-mini-steps .ar-step-lbl { max-width: 100%; }
 
     /* Compact stepper */
     .ar-stepper-wrap { padding: 14px 10px; }
@@ -1266,14 +1312,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             _renderStickers();
             document.getElementById('arStickerPrint').classList.add('open');
         }
-        function toggleUnitTracker(uid, btn) {
-            var row = document.getElementById('row-' + uid);
-            if (!row) return;
-            var open = row.style.display !== 'none';
-            row.style.display = open ? 'none' : 'table-row';
-            btn.setAttribute('aria-expanded', String(!open));
-            btn.classList.toggle('open', !open);
-        }
         function printStickerWindow() {
             var grid = document.getElementById('stickerGrid').innerHTML;
             var win = window.open('', '_blank', 'width=850,height=700,scrollbars=yes');
@@ -1414,10 +1452,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-item">
                 <thead><tr>
-                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item Requested</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
+                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item Requested</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th><th style="text-align:center;">Tracker</th>
                 </tr></thead>
                 <tbody>
-                <?php if (count($requests) > 0): foreach ($requests as $req): ?>
+                <?php if (count($requests) > 0): foreach ($requests as $req): $__rid = 'item-' . $req['id']; ?>
                 <tr>
                     <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
                     <td data-label="Requester">
@@ -1440,13 +1478,15 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     <td data-label="Urgency"><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
                     <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
                     <td data-label="Date" style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
-                    <td>
+                    <td class="ar-td-actions">
                         <?php $view_href_item = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']).'&tab=item' : 'requests.php?action=view&id='.$req['id'].'&tab=item'; ?>
                         <a href="<?php echo $view_href_item; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
                     </td>
+                    <?php arTrackerToggleCell($__rid); ?>
                 </tr>
+                <?php arRenderTrackerRow($req, $__rid, 9); ?>
                 <?php endforeach; else: ?>
-                <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-box-open"></i>No item requests found</div></td></tr>
+                <tr><td colspan="9"><div class="ar-empty"><i class="fas fa-box-open"></i>No item requests found</div></td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1456,10 +1496,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-service">
                 <thead><tr>
-                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Service Description</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
+                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Service Description</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th><th style="text-align:center;">Tracker</th>
                 </tr></thead>
                 <tbody>
-                <?php if (count($requests) > 0): foreach ($requests as $req): ?>
+                <?php if (count($requests) > 0): foreach ($requests as $req): $__rid = 'svc-' . $req['id']; ?>
                 <tr>
                     <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
                     <td data-label="Requester">
@@ -1481,10 +1521,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     <td data-label="Urgency"><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
                     <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
                     <td data-label="Date" style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
-                    <td><a href="requests.php?action=view&id=<?php echo $req['id']; ?>&tab=service" class="ar-btn-view"><i class="fas fa-eye"></i> View</a></td>
+                    <td class="ar-td-actions"><a href="requests.php?action=view&id=<?php echo $req['id']; ?>&tab=service" class="ar-btn-view"><i class="fas fa-eye"></i> View</a></td>
+                    <?php arTrackerToggleCell($__rid); ?>
                 </tr>
+                <?php arRenderTrackerRow($req, $__rid, 9); ?>
                 <?php endforeach; else: ?>
-                <tr><td colspan="8"><div class="ar-empty"><i class="fas fa-tools"></i>No service requests found</div></td></tr>
+                <tr><td colspan="9"><div class="ar-empty"><i class="fas fa-tools"></i>No service requests found</div></td></tr>
 
                 <?php endif; ?>
                 </tbody>
@@ -1494,11 +1536,11 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-all">
                 <thead><tr>
-                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
+                    <th>Request ID</th><th>Requester</th><th>Department</th><th>Item</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th class="ar-th-actions">Actions</th><th style="text-align:center;">Tracker</th>
                 </tr></thead>
                 <tbody>
                 <?php if (count($requests) > 0):
-                    foreach ($requests as $req): ?>
+                    foreach ($requests as $req): $__rid = 'all-' . $req['id']; ?>
                 <tr>
                     <td data-label="Request ID"><span class="ar-req-id"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
                     <td data-label="Requester">
@@ -1523,13 +1565,15 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     <td data-label="Urgency"><span class="ar-badge ar-badge-<?php echo $urgency_colors[$req['urgency']] ?? 'secondary'; ?>"><?php echo ucfirst($req['urgency']); ?></span></td>
                     <td data-label="Status"><span class="ar-badge ar-badge-<?php echo $status_colors[$req['status']] ?? 'secondary'; ?>"><?php echo ucfirst($req['status']); ?></span></td>
                     <td data-label="Date" style="color:rgba(0,0,0,0.50);font-size:0.81rem;"><?php echo formatDate($req['created_at'], 'M d, Y'); ?></td>
-                    <td>
+                    <td class="ar-td-actions">
                         <?php $view_href_all = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']) : 'requests.php?action=view&id='.$req['id']; ?>
                         <a href="<?php echo $view_href_all; ?>" class="ar-btn-view"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count']; ?></span><?php endif; ?></a>
                     </td>
+                    <?php arTrackerToggleCell($__rid); ?>
                 </tr>
+                <?php arRenderTrackerRow($req, $__rid, 10); ?>
                 <?php endforeach; else: ?>
-                <tr><td colspan="9"><div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div></td></tr>
+                <tr><td colspan="10"><div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div></td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1550,5 +1594,19 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     <?php endif; ?>
 </div>
 </div>
+
+<script>
+function toggleUnitTracker(uid, btn) {
+    var row = document.getElementById('row-' + uid);
+    if (!row) return;
+    var open = row.style.display !== 'none';
+    // Clear the inline style to fall back to the stylesheet's own display value
+    // (table-row on desktop, block when the mobile card-stack layout applies)
+    // instead of hardcoding one, which would fight the responsive layout.
+    row.style.display = open ? 'none' : '';
+    btn.setAttribute('aria-expanded', String(!open));
+    btn.classList.toggle('open', !open);
+}
+</script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
