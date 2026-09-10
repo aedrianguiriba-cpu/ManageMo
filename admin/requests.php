@@ -284,7 +284,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action_type === 'mark_completed') {
         foreach ($group_reqs as $gr) {
-            if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available', 'college_id' => null]);
+            // Item requests already transferred ownership to the requester at delivery
+            // (inventory marked disposed, a user_owned_items record created) — completing
+            // them here must not undo that by resetting the item back to available.
+            // Only service requests use this branch to release the item after maintenance.
+            if ($gr['request_type'] !== 'item' && !empty($gr['inventory_id'])) {
+                dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available', 'college_id' => null]);
+            }
             dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
         }
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
