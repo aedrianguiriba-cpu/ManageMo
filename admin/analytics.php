@@ -137,8 +137,18 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 <?php
 $all_inventory = getInventory();
 $all_requests  = getRequests();
-$filtered_inventory = $college_id ? filterByColumn($all_inventory,'college_id',$college_id) : $all_inventory;
-$filtered_inventory = $campus_id ? filterByColumn($filtered_inventory,'campus_id',(int)$campus_id) : $filtered_inventory;
+
+// A campus "owns" inventory the same way a college/office does — via its
+// abbreviation stored in inventory.college_id (the legacy numeric campus_id
+// column is no longer populated), so resolve the picked campus id to its
+// abbreviation before filtering.
+$campus_abbr = '';
+if ($campus_id) {
+    $campus_row  = findById(getDepartmentCampuses(), (int)$campus_id);
+    $campus_abbr = $campus_row['abbreviation'] ?? '';
+}
+$owner_code = $college_id ?: $campus_abbr;
+$filtered_inventory = $owner_code ? filterByColumn($all_inventory,'college_id',$owner_code) : $all_inventory;
 $filtered_requests = array_filter($all_requests, function($r) use ($date_from,$date_to){
     $d = substr($r['created_at'],0,10); return $d >= $date_from && $d <= $date_to;
 });
@@ -196,6 +206,20 @@ foreach (getMainCampusOffices() as $abbr => $fullname) {
     ];
 }
 usort($office_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
+
+// Per-campus breakdown
+$campus_breakdown = [];
+foreach (getDepartmentCampuses() as $campus) {
+    if ($campus['abbreviation'] === '') continue;
+    $ca_items = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $campus['abbreviation']));
+    if (empty($ca_items)) continue;
+    $campus_breakdown[] = [
+        'name'  => $campus['name'],
+        'total' => count($ca_items),
+        'value' => array_sum(array_column($ca_items, 'cost')),
+    ];
+}
+usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
 ?>
 
 <!-- Stat cards -->
@@ -338,9 +362,9 @@ usort($office_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
     </div>
 </div>
 
-<!-- Per-College / Per-Office Breakdown -->
+<!-- Per-College / Per-Office / Per-Campus Breakdown -->
 <div class="row g-3 mt-1">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="an-card">
             <div class="an-card-title">
                 <div class="an-card-icon"><i class="fas fa-building-columns"></i></div>
@@ -362,7 +386,7 @@ usort($office_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
             </table>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="an-card">
             <div class="an-card-title">
                 <div class="an-card-icon"><i class="fas fa-building"></i></div>
@@ -379,6 +403,28 @@ usort($office_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
                 </tr>
                 <?php endforeach; else: ?>
                 <tr><td colspan="3" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No items tagged with an office yet — set this when adding/editing an item.</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="an-card">
+            <div class="an-card-title">
+                <div class="an-card-icon" style="color:#7c3aed;"><i class="fas fa-map-marker-alt"></i></div>
+                Inventory by Campus <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
+            </div>
+            <table class="an-mini-table">
+                <thead><tr><th>Campus</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
+                <tbody>
+                <?php if (!empty($campus_breakdown)): foreach ($campus_breakdown as $ca): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($ca['name']); ?></td>
+                    <td style="text-align:right;"><span class="an-badge" style="background:rgba(124,58,237,.10);color:#7c3aed;"><?php echo $ca['total']; ?></span></td>
+                    <td style="text-align:right;">&#8369;<?php echo number_format($ca['value'], 2); ?></td>
+                </tr>
+                <?php endforeach; else: ?>
+                <tr><td colspan="3" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No items tagged with a campus yet — set this when adding/editing an item.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
