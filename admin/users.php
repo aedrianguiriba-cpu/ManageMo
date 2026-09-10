@@ -17,7 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email      = sanitizeInput($_POST['email'] ?? '');
         $phone      = sanitizeInput($_POST['phone'] ?? '');
         $role       = sanitizeInput($_POST['role'] ?? 'user');
-        $campus_id  = (int)($_POST['campus_id'] ?? 0) ?: 1;
+        // The merged Campus/College/Office picker writes its value to college_id.
+        // campus_id no longer exists as a column at all — don't send it.
         $college_id = sanitizeInput($_POST['college_id'] ?? '');
         $password   = $_POST['password'] ?? '';
         $confirm    = $_POST['confirm_password'] ?? '';
@@ -41,7 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'password'   => hashPassword($password),
                 'full_name'  => $full_name,
                 'role'       => in_array($role, ['admin','user']) ? $role : 'user',
-                'campus_id'  => $campus_id,
                 'college_id' => $college_id ?: null,
                 'phone'      => $phone,
                 'is_active'  => 1,
@@ -74,7 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email      = sanitizeInput($_POST['email'] ?? '');
         $phone      = sanitizeInput($_POST['phone'] ?? '');
         $role       = sanitizeInput($_POST['role'] ?? 'user');
-        $campus_id  = (int)($_POST['campus_id'] ?? 0) ?: 1;
+        // The merged Campus/College/Office picker writes its value to college_id.
+        // campus_id no longer exists as a column at all — don't send it.
         $college_id = sanitizeInput($_POST['college_id'] ?? '');
         $password   = $_POST['password'] ?? '';
         $confirm    = $_POST['confirm_password'] ?? '';
@@ -104,7 +105,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'email'      => $email,
                 'phone'      => $phone,
                 'role'       => in_array($role, ['admin', 'user']) ? $role : 'user',
-                'campus_id'  => $campus_id,
                 'college_id' => $college_id ?: null,
             ];
             if ($password !== '') $update['password'] = hashPassword($password);
@@ -145,9 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $all_users = getUsers();
-$campuses    = getAllCampuses();
-$colleges    = getMainCampusColleges();
-$offices     = getMainCampusOffices();
+$all_department_names = getAllDepartmentNames(); // includes campuses, for display lookups
 
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
@@ -328,27 +326,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
             <div class="um-form-section mt-4"><i class="fas fa-building"></i> Campus &amp; Department</div>
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="um-form-label">Campus <span class="um-form-req">*</span></label>
-                    <select class="form-select" name="campus_id" required>
-                        <?php foreach ($campuses as $c): ?>
-                        <option value="<?php echo $c['id']; ?>"
-                            <?php echo ((int)($_SESSION['user_form_data']['campus_id'] ?? 1) === $c['id']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($c['name']); ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
                 <div class="col-md-6" id="collegeFieldWrap">
-                    <label class="um-form-label">Department / Office</label>
+                    <label class="um-form-label">Campus / College / Office</label>
                     <select class="form-select" name="college_id">
                         <option value="">— None —</option>
-                        <?php foreach (array_merge($colleges, $offices) as $code => $name): ?>
-                        <option value="<?php echo htmlspecialchars($code); ?>"
-                            <?php echo (($_SESSION['user_form_data']['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($name); ?>
-                        </option>
-                        <?php endforeach; ?>
+                        <?php renderDepartmentOptionGroups($_SESSION['user_form_data']['college_id'] ?? null); ?>
                     </select>
                 </div>
             </div>
@@ -455,27 +437,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
             <div class="um-form-section mt-4"><i class="fas fa-building"></i> Department</div>
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="um-form-label">Campus <span class="um-form-req">*</span></label>
-                    <select class="form-select" name="campus_id" required>
-                        <?php foreach ($campuses as $c): ?>
-                        <option value="<?php echo $c['id']; ?>"
-                            <?php echo ((int)($fd['campus_id'] ?? 1) === $c['id']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($c['name']); ?>
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
                 <div class="col-md-6" id="collegeFieldWrap">
-                    <label class="um-form-label">Department / Office</label>
+                    <label class="um-form-label">Campus / College / Office</label>
                     <select class="form-select" name="college_id">
                         <option value="">— None —</option>
-                        <?php foreach (array_merge($colleges, $offices) as $code => $name): ?>
-                        <option value="<?php echo htmlspecialchars($code); ?>"
-                            <?php echo (($fd['college_id'] ?? '') === $code) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($name); ?>
-                        </option>
-                        <?php endforeach; ?>
+                        <?php renderDepartmentOptionGroups($fd['college_id'] ?? null); ?>
                     </select>
                 </div>
             </div>
@@ -530,7 +496,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     $count_active = count(array_filter($all_users, fn($u) => $u['is_active']));
     $count_admin  = count(array_filter($all_users, fn($u) => $u['role'] === 'admin'));
     $avatar_colors = ['#8B0000','#1d4ed8','#15803d','#b45309','#7c3aed','#0e7490'];
-    $all_depts = array_merge($colleges, $offices);
 
     // Precompute per-user history counts, so the delete modal can tell the admin up
     // front exactly what else will be deleted along with the account.
@@ -572,7 +537,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     <?php foreach ($all_users as $u):
         $col      = $avatar_colors[($u['id'] - 1) % count($avatar_colors)];
         $initials = strtoupper(substr($u['full_name'], 0, 1));
-        $dept_name = (!empty($u['college_id']) && isset($all_depts[$u['college_id']])) ? $u['college_id'] : '';
+        $dept_name = (!empty($u['college_id']) && isset($all_department_names[$u['college_id']])) ? $all_department_names[$u['college_id']] : '';
         $is_me = ($u['id'] === $current_user['id']);
     ?>
     <div class="um-user-card">

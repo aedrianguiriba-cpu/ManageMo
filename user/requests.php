@@ -6,9 +6,12 @@ requireUser();
 
 $current_user = getCurrentUser();
 
-// Check if item_id is passed from inventory page
+// Check if item_id is passed from inventory page. "type" tells us which catalog
+// (borrow vs item/acquire) to pre-select — the Inventory page links here with the
+// type that actually applies to the item's acquisition_mode (see user/inventory.php).
 $auto_fill_item = null;
 $auto_fill_item_id = null;
+$auto_fill_type = in_array($_GET['type'] ?? '', ['borrow', 'item']) ? $_GET['type'] : 'borrow';
 if (isset($_GET['item_id'])) {
     $item_id = (int)$_GET['item_id'];
     $all_items = getInventory();
@@ -113,9 +116,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } elseif ($safe_type === 'service') {
                 // Pure free-text now — no item dropdown/inventory link, just what the user typed.
+                // No QR code either — it's a ticket, not a physical unit that needs a sticker.
                 $units_to_save[] = [
                     'inventory_id' => null,
-                    'qr_code_id'   => generateQRCodeId(),
+                    'qr_code_id'   => null,
                     'item_name'    => sanitizeInput($entry['name'] ?? 'Service Request'),
                 ];
             }
@@ -141,9 +145,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 continue;
             }
             if (!empty($unit['inventory_id'])) {
-                // Mark the physical unit unavailable immediately so no one else can request it
-                $inv_status = ($safe_type === 'service') ? 'maintenance' : 'requested';
-                dbUpdateInventory((int)$unit['inventory_id'], ['status' => $inv_status]);
+                // Mark the physical unit unavailable immediately so no one else can request it.
+                // (Service requests never reach here with an inventory_id — they're always
+                // submitted as pure free-text tickets with no catalog item attached.)
+                dbUpdateInventory((int)$unit['inventory_id'], ['status' => 'requested']);
             }
         }
 
@@ -933,7 +938,7 @@ if (!empty($submit_error)): ?>
     <!-- Step 1 — Type Selection -->
     <div id="step1_section">
         <div class="rq-type-grid mb-4">
-            <label class="rq-type-card selected" onclick="selectType(this,'borrow')">
+            <label class="rq-type-card selected" id="typeCardBorrow" onclick="selectType(this,'borrow')">
                 <input type="radio" name="_type_vis" value="borrow" checked>
                 <div class="rq-type-check"><i class="fas fa-check"></i></div>
                 <div class="rq-type-icon" style="color:#1d4ed8;">
@@ -942,7 +947,7 @@ if (!empty($submit_error)): ?>
                 <h6>Borrow Item</h6>
                 <p>Temporarily borrow an item from inventory</p>
             </label>
-            <label class="rq-type-card" onclick="selectType(this,'item')">
+            <label class="rq-type-card" id="typeCardItem" onclick="selectType(this,'item')">
                 <input type="radio" name="_type_vis" value="item">
                 <div class="rq-type-check"><i class="fas fa-check"></i></div>
                 <div class="rq-type-icon" style="color:#15803d;">
@@ -1099,6 +1104,11 @@ if (!empty($submit_error)): ?>
                                         <i class="fas <?php echo $meta['icon']; ?>"></i>
                                     </div>
                                     <div class="bshop-name"><?php echo htmlspecialchars($ci['item_name']); ?></div>
+                                    <?php $__borrow_acq = acquisitionModeBadge($firstUnit['acquisition_mode'] ?? 'borrow'); ?>
+                                    <span style="font-size:0.65rem;font-weight:700;padding:1px 7px;border-radius:10px;display:inline-block;margin-bottom:4px;
+                                                 background:<?php echo $__borrow_acq['bg']; ?>;color:<?php echo $__borrow_acq['fg']; ?>;">
+                                        <?php echo htmlspecialchars($__borrow_acq['label']); ?>
+                                    </span>
                                     <div class="bshop-desc"><?php echo htmlspecialchars($ci['description'] ?: ($firstUnit['description'] ?? '')); ?></div>
                                     <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($firstUnit['location'] ?? ''); ?></div>
                                     <div class="bshop-foot">
@@ -1220,11 +1230,10 @@ if (!empty($submit_error)): ?>
                                         <i class="fas <?php echo $meta['icon']; ?>"></i>
                                     </div>
                                     <div class="bshop-name"><?php echo htmlspecialchars($ci['item_name']); ?></div>
-                                    <?php $__acq = $firstUnit['acquisition_mode'] ?? 'borrow'; ?>
+                                    <?php $__acq_badge = acquisitionModeBadge($firstUnit['acquisition_mode'] ?? 'borrow'); ?>
                                     <span style="font-size:0.65rem;font-weight:700;padding:1px 7px;border-radius:10px;display:inline-block;margin-bottom:4px;
-                                                 background:<?php echo $__acq === 'request' ? 'rgba(34,197,94,0.10)' : 'rgba(59,130,246,0.10)'; ?>;
-                                                 color:<?php echo $__acq === 'request' ? '#15803d' : '#1d4ed8'; ?>;">
-                                        <?php echo $__acq === 'request' ? 'Acquire / Keep' : 'Also Borrowable'; ?>
+                                                 background:<?php echo $__acq_badge['bg']; ?>;color:<?php echo $__acq_badge['fg']; ?>;">
+                                        <?php echo htmlspecialchars($__acq_badge['label']); ?>
                                     </span>
                                     <div class="bshop-desc"><?php echo htmlspecialchars($desc); ?></div>
                                     <div class="bshop-loc"><i class="fas fa-location-dot"></i> <?php echo htmlspecialchars($firstUnit['location'] ?? ''); ?></div>
@@ -2020,7 +2029,23 @@ renderCart();
 updateSummary();
 
 // Pre-select item from inventory page
-<?php if ($auto_fill_item): ?>
+<?php if ($auto_fill_item && $auto_fill_type === 'item'): ?>
+    (function() {
+        // Request/acquire-only items were linked here with type=item — switch to the
+        // "Request Item" step and pre-select the matching card in that catalog instead
+        // of the Borrow one (which never lists request-only items).
+        selectType(document.getElementById('typeCardItem'), 'item');
+        var autoVal = '<?php echo htmlspecialchars($auto_fill_item, ENT_QUOTES); ?>';
+        var matchCard = null;
+        document.querySelectorAll('#ishop-grid .bshop-card').forEach(function(c) {
+            if (c.getAttribute('data-value') === autoVal) matchCard = c;
+        });
+        if (matchCard) {
+            selectItemReqCard(matchCard);
+            setTimeout(function() { matchCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
+        }
+    })();
+<?php elseif ($auto_fill_item): ?>
     (function() {
         var autoVal = '<?php echo htmlspecialchars($auto_fill_item, ENT_QUOTES); ?>';
         // Select the matching shop card

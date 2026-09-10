@@ -125,19 +125,20 @@ function groupOwnedItems(array $items): array {
     return array_values($groups);
 }
 
-// Groups inventory items. Uses group_id when present; falls back to item_name+category+campus_id.
+// Groups inventory items. Uses group_id when present; falls back to item_name+category+college_id
+// (campus_id is no longer relied on for inventory — it's kept only to satisfy the NOT NULL column).
 function groupInventoryItems(array $items): array {
     $groups = [];
     foreach ($items as $item) {
         $key = !empty($item['group_id'])
             ? 'gid:' . $item['group_id']
-            : strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? '')) . '||' . (int)$item['campus_id'];
+            : strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? '')) . '||' . ($item['college_id'] ?? '');
         if (!isset($groups[$key])) {
             $groups[$key] = [
                 'group_id'    => $item['group_id'] ?? null,
                 'item_name'   => $item['item_name'],
                 'category'    => $item['category'] ?? '',
-                'campus_id'   => (int)$item['campus_id'],
+                'campus_id'   => (int)($item['campus_id'] ?? 1),
                 'college_id'  => $item['college_id'] ?? null,
                 'location'    => $item['location'] ?? '',
                 'description' => $item['description'] ?? '',
@@ -149,6 +150,17 @@ function groupInventoryItems(array $items): array {
         $groups[$key]['units'][] = $item;
     }
     return array_values($groups);
+}
+
+// Shared label/color for an inventory item's acquisition_mode ('borrow','request','both'),
+// used to render a consistent badge wherever items are listed (admin inventory cards,
+// user request catalogs).
+function acquisitionModeBadge(?string $mode): array {
+    switch ($mode) {
+        case 'request': return ['label' => 'Acquire Only',  'bg' => 'rgba(34,197,94,0.12)',  'fg' => '#15803d'];
+        case 'both':    return ['label' => 'Borrow & Acquire', 'bg' => 'rgba(139,92,246,0.12)', 'fg' => '#6d28d9'];
+        default:        return ['label' => 'Borrowable',    'bg' => 'rgba(59,130,246,0.12)', 'fg' => '#1d4ed8'];
+    }
 }
 
 // Generate random token
@@ -500,6 +512,26 @@ function getInventoryCount($campus_id) {
     $inventory = getInventory();
     $items = filterByColumn($inventory, 'campus_id', $campus_id);
     return count($items);
+}
+
+// Renders the <optgroup> options for a single merged Campus/College/Office
+// picker (used by the inventory Add/Edit forms — the picker writes a plain
+// department abbreviation into inventory.college_id, regardless of type).
+function renderDepartmentOptionGroups(?string $selected = null): void {
+    $groups = [
+        'Campuses'         => array_column(getDepartmentCampuses(), 'name', 'abbreviation'),
+        'Colleges'         => getMainCampusColleges(),
+        'Offices'          => getMainCampusOffices(),
+    ];
+    foreach ($groups as $label => $options) {
+        if (empty($options)) continue;
+        echo '<optgroup label="' . htmlspecialchars($label) . '">';
+        foreach ($options as $abbr => $fullname) {
+            $sel = ($selected !== null && $selected === $abbr) ? ' selected' : '';
+            echo '<option value="' . htmlspecialchars($abbr) . '"' . $sel . '>' . htmlspecialchars($fullname) . '</option>';
+        }
+        echo '</optgroup>';
+    }
 }
 
 // Get pending requests count

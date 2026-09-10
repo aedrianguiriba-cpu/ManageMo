@@ -34,15 +34,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action_type === 'approve') {
         foreach ($group_reqs as $gr) {
-            // Custom item with no catalog match — only counted in inventory once approved
-            if (empty($gr['inventory_id'])) {
+            // Custom item with no catalog match — only counted in inventory once approved.
+            // Service requests are pure maintenance/repair tickets, not catalog items — a
+            // free-text service (no inventory_id) never spawns an inventory row; it's just
+            // a service, never an "item".
+            if (empty($gr['inventory_id']) && $gr['request_type'] !== 'service') {
                 $item_name = $gr['service_description'] ?: 'Custom Item';
                 $requester = findById(getUsers(), (int)$gr['user_id']);
                 $new_inv = dbCreateInventory([
                     'qr_code_id' => $gr['qr_code_id'] ?: generateQRCodeId(),
                     'item_name'  => $item_name,
                     'category'   => 'Other',
-                    'campus_id'  => $requester['campus_id'] ?? 1,
+                    'college_id' => $requester['college_id'] ?? null,
                     'quantity'   => 1,
                     'status'     => 'available',
                     'condition'  => 'good',
@@ -53,6 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             dbUpdateRequest((int)$gr['id'], ['status' => 'approved', 'approved_by' => $current_user['id'], 'approved_at' => date('Y-m-d H:i:s')]);
+            // Only a service request tied to an existing catalog item (inventory_id already
+            // set) actually flips that real item's status to maintenance — a plain-text
+            // service ticket (no inventory_id) has no item to touch.
             if (!empty($gr['inventory_id'])) {
                 if ($gr['request_type'] === 'borrow')  dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'requested']);
                 if ($gr['request_type'] === 'service') dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'maintenance']);
@@ -81,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($gr['inventory_id'])) {
                 $inv = findById(getInventory(), (int)$gr['inventory_id']);
                 if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
-                    dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);
+                    dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available', 'college_id' => null]);
                 }
             }
         }
@@ -154,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'category'   => $inv_item['category']   ?? 'General',
                     'description'=> $inv_item['description'] ?? null,
                     'year_owned' => (int)date('Y'),
-                    'campus_id'  => (int)($req_user['campus_id'] ?? $inv_item['campus_id'] ?? 1),
+                    'college_id' => $req_user['college_id'] ?? $inv_item['college_id'] ?? null,
                     'quantity'   => 1,
                     'condition'  => $inv_item['condition'] ?? null,
                     'notes'      => $gr['reason_for_request'] ?? null,
@@ -179,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     supabase()->updateById('borrow_records', (int)$br['id'], ['status' => 'returned', 'actual_return_date' => date('Y-m-d')]);
                 }
             }
-            if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);
+            if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available', 'college_id' => null]);
             dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
         }
         clearDataCache('borrow_records');
@@ -193,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action_type === 'mark_completed') {
         foreach ($group_reqs as $gr) {
-            if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available']);
+            if (!empty($gr['inventory_id'])) dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available', 'college_id' => null]);
             dbUpdateRequest((int)$gr['id'], ['status' => 'completed']);
         }
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
@@ -775,7 +781,9 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 <span class="ar-badge ar-badge-<?php echo $status_colors[$request['status']] ?? 'secondary'; ?>" style="font-size:0.85rem;padding:6px 16px;"><?php echo ucfirst($request['status']); ?></span>
+                <?php if ($request['request_type'] !== 'service'): ?>
                 <button class="ar-sticker-btn" onclick="openStickerSheet()"><i class="fas fa-qrcode me-1"></i>Print QR Sticker</button>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -991,8 +999,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php endif; ?>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">#</th>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Item</th>
+                        <?php if ($request['request_type'] !== 'service'): ?>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">QR Code</th>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Inventory ID</th>
+                        <?php endif; ?>
                         <?php if (!$__pending): ?>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Status</th>
                         <?php endif; ?>
@@ -1006,6 +1016,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php endif; ?>
                         <td style="padding:8px 10px;color:#999;font-size:.75rem;"><?php echo $di_idx + 1; ?></td>
                         <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?></td>
+                        <?php if ($request['request_type'] !== 'service'): ?>
                         <td style="padding:8px 10px;">
                             <?php if (!empty($di['qr_code_id'])): ?>
                             <span style="font-family:monospace;background:rgba(139,0,0,0.07);color:#8B0000;border-radius:5px;padding:2px 7px;font-size:.77rem;"><?php echo htmlspecialchars($di['qr_code_id']); ?></span>
@@ -1014,6 +1025,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                             <?php endif; ?>
                         </td>
                         <td style="padding:8px 10px;color:#777;font-size:.77rem;"><?php echo $di['inventory_id'] ? '#' . $di['inventory_id'] : '—'; ?></td>
+                        <?php endif; ?>
                         <?php if (!$__pending): ?>
                         <td style="padding:8px 10px;"><span class="ar-badge ar-badge-<?php echo $status_colors[$di['status']] ?? 'secondary'; ?>" style="font-size:.72rem;"><?php echo ucfirst($di['status']); ?></span></td>
                         <?php endif; ?>
@@ -1144,7 +1156,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     <i class="fas fa-check-double me-1"></i> Mark as Completed
                 </button>
             </form>
-            <?php if ($request['request_type'] === 'service'): ?>
+            <?php if ($request['request_type'] === 'service' && !empty($request['inventory_id'])): ?>
             <div style="margin-top:8px;font-size:0.76rem;color:rgba(0,0,0,0.40);">This will restore the item status to available.</div>
             <?php endif; ?>
         </div>

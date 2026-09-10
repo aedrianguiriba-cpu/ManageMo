@@ -96,6 +96,7 @@ displayMessage();
 $all_inventory  = getInventory();
 $all_campuses   = getAllCampuses();
 $all_departments = getMainCampusDepartments();
+$all_department_names = getAllDepartmentNames(); // includes campuses, for display lookups
 $all_users      = getUsers();
 
 // Build tab lists (re-index with array_values for clean iteration)
@@ -123,10 +124,10 @@ $disposed_count   = count($disposed_items);
 $value_at_risk    = array_sum(array_column($evaluate_items, 'cost'));
 
 // Filters — one combined "department" filter covers Campuses, Colleges, and
-// Offices together: value is "c:<campus id>" or "d:<college/office abbr>".
+// Offices together. Inventory no longer relies on campus_id, so both "c:" and
+// "d:" prefixes resolve to the same college_id comparison.
 $filter_dept     = $_GET['dept'] ?? '';
-$filter_campus   = str_starts_with($filter_dept, 'c:') ? substr($filter_dept, 2) : '';
-$filter_college  = str_starts_with($filter_dept, 'd:') ? substr($filter_dept, 2) : '';
+$filter_college  = (str_starts_with($filter_dept, 'c:') || str_starts_with($filter_dept, 'd:')) ? substr($filter_dept, 2) : '';
 $filter_category = $_GET['category'] ?? '';
 $filter_search   = trim($_GET['search'] ?? '');
 
@@ -140,9 +141,8 @@ foreach ($all_inventory as $inv) {
 sort($all_categories);
 
 // Apply filters to the active tab's list
-function cdApplyFilters(array $items, string $campus, string $college, string $category, string $search): array {
-    return array_values(array_filter($items, function($item) use ($campus, $college, $category, $search) {
-        if ($campus   && (string)($item['campus_id'] ?? '') !== $campus)                            return false;
+function cdApplyFilters(array $items, string $college, string $category, string $search): array {
+    return array_values(array_filter($items, function($item) use ($college, $category, $search) {
         if ($college  && (string)($item['college_id'] ?? '') !== $college)                          return false;
         if ($category && ($item['category'] ?? '') !== $category)                                   return false;
         if ($search) {
@@ -154,11 +154,11 @@ function cdApplyFilters(array $items, string $campus, string $college, string $c
 }
 
 if ($active_tab === 'evaluate') {
-    $display_items = cdApplyFilters($evaluate_items, $filter_campus, $filter_college, $filter_category, $filter_search);
+    $display_items = cdApplyFilters($evaluate_items, $filter_college, $filter_category, $filter_search);
 } elseif ($active_tab === 'condemned') {
-    $display_items = cdApplyFilters($condemned_items, $filter_campus, $filter_college, $filter_category, $filter_search);
+    $display_items = cdApplyFilters($condemned_items, $filter_college, $filter_category, $filter_search);
 } else {
-    $display_items = cdApplyFilters($disposed_items, $filter_campus, $filter_college, $filter_category, $filter_search);
+    $display_items = cdApplyFilters($disposed_items, $filter_college, $filter_category, $filter_search);
 }
 ?>
 
@@ -424,7 +424,7 @@ if ($active_tab === 'evaluate') {
                     <option value="">All</option>
                     <optgroup label="Campuses">
                     <?php foreach ($all_campuses as $c): ?>
-                    <option value="c:<?php echo $c['id']; ?>" <?php echo $filter_dept==='c:'.$c['id']?'selected':''; ?>>
+                    <option value="c:<?php echo htmlspecialchars($c['abbreviation']); ?>" <?php echo $filter_dept==='c:'.$c['abbreviation']?'selected':''; ?>>
                         <?php echo htmlspecialchars($c['name']); ?>
                     </option>
                     <?php endforeach; ?>
@@ -461,7 +461,7 @@ if ($active_tab === 'evaluate') {
                            style="border-left:none;">
                 </div>
             </div>
-            <?php if ($filter_campus || $filter_college || $filter_category || $filter_search): ?>
+            <?php if ($filter_college || $filter_category || $filter_search): ?>
             <div style="align-self:flex-end;">
                 <a href="condemnation.php?tab=<?php echo htmlspecialchars($active_tab); ?>"
                    class="btn" style="background:#f7f7f7;border:1px solid #e5e7eb;font-size:0.82rem;font-weight:600;color:#555;">
@@ -549,7 +549,7 @@ if ($active_tab === 'evaluate') {
             </thead>
             <tbody>
             <?php foreach ($display_items as $row):
-                $dept_name = !empty($row['college_id']) ? ($all_departments[$row['college_id']] ?? $row['college_id']) : '—';
+                $dept_name = !empty($row['college_id']) ? ($all_department_names[$row['college_id']] ?? $row['college_id']) : '—';
 
                 $condition_badge = match($row['condition'] ?? '') {
                     'excellent' => 'cd-badge-excellent',

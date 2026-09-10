@@ -54,9 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup_submit'])) {
     $email = sanitizeInput($_POST['email_signup'] ?? '');
     $password = $_POST['password_signup'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
-    $campus_id = sanitizeInput($_POST['campus_id'] ?? '');
-    
-    if (!$full_name || !$email || !$password || !$confirm_password || !$campus_id) {
+    $college_id = sanitizeInput($_POST['college_id'] ?? '');
+
+    if (!$full_name || !$email || !$password || !$confirm_password) {
         $error = 'All fields are required';
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters';
@@ -75,19 +75,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['signup_submit'])) {
         
         if (!$error) {
             $new_user = dbCreateUser([
-                'email'     => $email,
-                'password'  => hashPassword($password),
-                'full_name' => $full_name,
-                'role'      => 'user',
-                'campus_id' => (int)$campus_id,
-                'is_active' => 1,
+                'email'      => $email,
+                'password'   => hashPassword($password),
+                'full_name'  => $full_name,
+                'role'       => 'user',
+                'college_id' => $college_id ?: null,
+                'is_active'  => 1,
             ]);
             $success = $new_user ? 'Account created successfully! Please log in with your credentials.' : 'Registration failed. Please try again.';
         }
     }
 }
 
-$campuses = getAllCampuses();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -571,14 +570,10 @@ $campuses = getAllCampuses();
                             </div>
 
                             <div class="form-group">
-                                <label for="campus_id">Campus</label>
-                                <select class="form-select" id="campus_id" name="campus_id" required>
-                                    <option value="">Select your campus</option>
-                                    <?php foreach ($campuses as $campus): ?>
-                                    <option value="<?php echo $campus['id']; ?>">
-                                        <?php echo htmlspecialchars($campus['name']); ?>
-                                    </option>
-                                    <?php endforeach; ?>
+                                <label for="college_id">Campus / College / Office</label>
+                                <select class="form-select" id="college_id" name="college_id">
+                                    <option value="">— None / Not applicable —</option>
+                                    <?php renderDepartmentOptionGroups(); ?>
                                 </select>
                             </div>
 

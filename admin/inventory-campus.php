@@ -358,7 +358,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     <!-- ── Campuses ── -->
     <div id="ov-panel-campuses" class="ic-grid ic-dept-grid" style="display:none;">
         <?php foreach (getDepartmentCampuses() as $c):
-            $camp_items  = filterByColumn(getInventory(), 'campus_id', $c['id']);
+            // Inventory no longer relies on campus_id — a campus "owns" an item the
+            // same way a college/office does, via its abbreviation in college_id.
+            $camp_items  = array_values(array_filter(getInventory(), fn($i) => ($i['college_id'] ?? '') === $c['abbreviation']));
             $camp_status = countByStatus($camp_items);
         ?>
         <div class="ic-campus-card">
@@ -387,7 +389,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <span class="ic-badge ic-badge-secondary"><?php echo $camp_status['requested'] ?? 0; ?></span>
                 </div>
             </div>
-            <button onclick="openInventoryModal(<?php echo $c['id']; ?>, '', '<?php echo htmlspecialchars($c['name']); ?>')" class="ic-btn-view">
+            <button onclick="openInventoryModal('<?php echo htmlspecialchars($c['abbreviation']); ?>', '', '<?php echo htmlspecialchars($c['name']); ?>')" class="ic-btn-view">
                 <i class="fas fa-eye"></i> View Inventory
             </button>
         </div>
@@ -628,15 +630,16 @@ function openDeptInventoryModal(deptCode, deptName) {
     renderInventoryModal('');
 }
 
-// Campuses tab — filters inventory by the (old, still-live) campus_id column.
-function openInventoryModal(campusId, filterCode, campusName) {
+// Campuses tab — campus_id is no longer relied on; a campus owns an item the
+// same way a college/office does, via its abbreviation in college_id.
+function openInventoryModal(campusAbbr, filterCode, campusName) {
     const modal = document.getElementById('inventoryModal');
     const modalTitle = document.getElementById('modalTitle');
 
     modalTitle.textContent = campusName + ' - Inventory Items';
     modal.classList.add('active');
 
-    icModalItems = icAllInventory.filter(item => item.campus_id == campusId);
+    icModalItems = icAllInventory.filter(item => item.college_id === campusAbbr);
     icModalSortBy = 'name';
     renderInventoryModal('');
 }

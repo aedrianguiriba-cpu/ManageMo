@@ -659,16 +659,25 @@ displayMessage();
                         </span>
                     </div>
                     <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.4);margin-bottom:8px;">
-                        Items in this request (<?php echo $req['unit_count']; ?>)
+                        <?php echo $req['request_type'] === 'service' ? 'Service' : 'Items in this request (' . $req['unit_count'] . ')'; ?>
                     </div>
                     <div style="display:flex;flex-direction:column;gap:6px;">
-                        <?php foreach ($req['group_rows'] as $gr_idx => $gr): ?>
+                        <?php foreach ($req['group_rows'] as $gr_idx => $gr):
+                            // Service tickets have no catalog item — fall back to the
+                            // service description instead of the literal word "Item".
+                            $gr_name = $gr['item_name'] ?? null;
+                            if (!$gr_name) {
+                                $gr_name = $gr['service_description']
+                                    ? mb_strimwidth($gr['service_description'], 0, 60, '…')
+                                    : ($req['request_type'] === 'service' ? 'Service Request' : 'Item');
+                            }
+                        ?>
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#f7f7f7;border-radius:8px;">
                             <div>
                                 <div style="font-weight:700;font-size:0.87rem;color:#1a1d23;">
-                                    <?php echo ($gr_idx + 1) . '. ' . htmlspecialchars($gr['item_name'] ?? 'Item'); ?>
+                                    <?php echo ($gr_idx + 1) . '. ' . htmlspecialchars($gr_name); ?>
                                 </div>
-                                <?php if (!empty($gr['qr_code_id'])): ?>
+                                <?php if (!empty($gr['qr_code_id']) && $req['request_type'] !== 'service'): ?>
                                 <div style="font-family:monospace;font-size:0.70rem;color:rgba(139,0,0,0.65);margin-top:2px;">
                                     <?php echo htmlspecialchars($gr['qr_code_id']); ?>
                                 </div>

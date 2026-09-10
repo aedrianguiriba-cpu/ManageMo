@@ -90,6 +90,18 @@ function getMainCampusDepartments(?int $campus_id = null): array {
     return array_merge(getMainCampusColleges(), getMainCampusOffices());
 }
 
+// Flat abbreviation => full_name map spanning ALL department types (campuses
+// included). Used wherever a single value needs to represent "Campus, College,
+// or Office" — e.g. the merged inventory owner picker, which stores whichever
+// one was picked as a plain abbreviation in inventory.college_id.
+function getAllDepartmentNames(): array {
+    $campusNames = [];
+    foreach (getDepartmentCampuses() as $c) {
+        if ($c['abbreviation'] !== '') $campusNames[$c['abbreviation']] = $c['name'];
+    }
+    return array_merge($campusNames, getMainCampusDepartments());
+}
+
 // ── Campuses (also a departments-table entry, type='campus') ───────────────────
 // Unlike colleges/offices, a campus carries a location/description, so it needs
 // its own richer shape instead of the flat abbreviation => full_name map above.
@@ -113,7 +125,9 @@ function getDepartmentCampuses(): array {
 function getUsers(): array {
     return _dbCache('users', function () {
         $rows = supabase()->select('users', 'order=id.asc');
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)$r['campus_id'], 'is_active' => (int)$r['is_active']]), $rows);
+        // campus_id is no longer relied on (college_id is the source of truth for a
+        // user's department) — coalesce to 1 in case the column is absent/null.
+        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'is_active' => (int)$r['is_active']]), $rows);
     });
 }
 
@@ -131,7 +145,9 @@ function getCampuses(): array {
 function getInventory(): array {
     return _dbCache('inventory', function () {
         $rows = supabase()->select('inventory', 'order=id.asc');
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)$r['campus_id'], 'quantity' => (int)$r['quantity'], 'cost' => $r['cost'] !== null ? (float)$r['cost'] : null]), $rows);
+        // campus_id is no longer relied on for inventory (college_id is the source of
+        // truth for ownership) — coalesce to 1 in case the column is absent/null.
+        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'quantity' => (int)$r['quantity'], 'cost' => $r['cost'] !== null ? (float)$r['cost'] : null]), $rows);
     });
 }
 
@@ -175,7 +191,9 @@ function getBorrowRecords(): array {
 function getUserOwnedItems(): array {
     return _dbCache('user_owned_items', function () {
         $rows = supabase()->select('user_owned_items', 'order=id.asc');
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'campus_id' => (int)$r['campus_id'], 'quantity' => (int)$r['quantity'], 'year_owned' => $r['year_owned'] !== null ? (int)$r['year_owned'] : null]), $rows);
+        // campus_id is no longer relied on here either (college_id is the source of
+        // truth for ownership) — coalesce to 1 in case the column is absent/null.
+        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'quantity' => (int)$r['quantity'], 'year_owned' => $r['year_owned'] !== null ? (int)$r['year_owned'] : null]), $rows);
     });
 }
 

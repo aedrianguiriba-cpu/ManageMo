@@ -4,10 +4,13 @@
 -- NOTE: Campuses, like colleges and offices, are rows in the `departments`
 -- table (type='campus') — there is no separate `campuses` table anymore (it
 -- never actually existed on the live DB, which is why campus dropdowns were
--- empty before this revision). `campus_id` on `inventory`, `users`, and
--- `user_owned_items` now means departments.id, not a foreign key into some
--- other table (same non-enforced convention `college_id` already used,
--- pointing at departments.abbreviation).
+-- empty before this revision).
+--
+-- `campus_id` has been REMOVED from `inventory`, `users`, and
+-- `user_owned_items` — a campus is no longer a distinct concept from a
+-- college/office on these tables. Ownership/affiliation is expressed purely
+-- through `college_id` (TEXT), which holds a `departments.abbreviation` for
+-- ANY department type — college, office, OR campus.
 
 -- ═════════════════════════════════════════════════════════════════════════
 -- ⚠ REQUIRED MIGRATION — run this block now against the LIVE database.
@@ -22,9 +25,10 @@ ALTER TABLE inventory ADD COLUMN IF NOT EXISTS acquisition_mode    TEXT NOT NULL
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS model               TEXT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS serial_number       TEXT;
 DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_acquisition_mode_check') THEN
-        ALTER TABLE inventory ADD CONSTRAINT inventory_acquisition_mode_check CHECK (acquisition_mode IN ('borrow','request'));
+    IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_acquisition_mode_check') THEN
+        ALTER TABLE inventory DROP CONSTRAINT inventory_acquisition_mode_check;
     END IF;
+    ALTER TABLE inventory ADD CONSTRAINT inventory_acquisition_mode_check CHECK (acquisition_mode IN ('borrow','request','both'));
 END $$;
 
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS disapproval_reason      TEXT;
@@ -51,9 +55,7 @@ END $$;
 
 -- The `campuses` table was never actually created on the live DB (dropped/never
 -- run) — every campus dropdown in the app read from it and silently got an
--- empty list. Drop it if it exists anywhere else. (The campus_id remap onto
--- departments.id runs at the very end of this file, after the campus rows
--- are seeded below — it needs them to exist first.)
+-- empty list. Drop it if it exists anywhere else.
 DROP TABLE IF EXISTS campuses;
 
 -- "Date needed" for item/service requests (borrow already has expected_return_date).
@@ -72,6 +74,14 @@ DO $$ BEGIN
     ALTER TABLE requests ADD CONSTRAINT requests_request_type_check
         CHECK (request_type IN ('borrow','item','service','condemnation'));
 END $$;
+
+-- campus_id is no longer a distinct concept from college/office — a campus is
+-- just another department type, and college_id (which already stores a
+-- departments.abbreviation for any type) is the single source of truth for
+-- ownership/affiliation. Drop the now-unused column everywhere it existed.
+ALTER TABLE inventory        DROP COLUMN IF EXISTS campus_id;
+ALTER TABLE users            DROP COLUMN IF EXISTS campus_id;
+ALTER TABLE user_owned_items DROP COLUMN IF EXISTS campus_id;
 
 CREATE TABLE IF NOT EXISTS notifications (
     id         BIGSERIAL PRIMARY KEY,
@@ -96,7 +106,6 @@ CREATE TABLE IF NOT EXISTS users (
     password             TEXT NOT NULL,
     full_name            TEXT NOT NULL,
     role                 TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin','user')),
-    campus_id            INT  NOT NULL DEFAULT 1,
     college_id           TEXT,
     phone                TEXT,
     is_active            INT  NOT NULL DEFAULT 1,
@@ -116,7 +125,6 @@ CREATE TABLE IF NOT EXISTS inventory (
     item_name            TEXT NOT NULL,
     category             TEXT NOT NULL,
     description          TEXT,
-    campus_id            INT  NOT NULL DEFAULT 1,
     college_id           TEXT,
     quantity             INT  NOT NULL DEFAULT 1,
     status               TEXT NOT NULL DEFAULT 'available'
@@ -133,7 +141,7 @@ CREATE TABLE IF NOT EXISTS inventory (
     disposed_at          TIMESTAMPTZ,
     disposed_by          INT,
     group_id             TEXT,
-    acquisition_mode     TEXT NOT NULL DEFAULT 'borrow' CHECK (acquisition_mode IN ('borrow','request')),
+    acquisition_mode     TEXT NOT NULL DEFAULT 'borrow' CHECK (acquisition_mode IN ('borrow','request','both')),
     model                TEXT,
     serial_number        TEXT,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -204,7 +212,6 @@ CREATE TABLE IF NOT EXISTS user_owned_items (
     category      TEXT NOT NULL,
     description   TEXT,
     year_owned    INT,
-    campus_id     INT  NOT NULL DEFAULT 1,
     college_id    TEXT,
     quantity      INT  NOT NULL DEFAULT 1,
     condition     TEXT,
@@ -268,58 +275,58 @@ ALTER TABLE notifications  DISABLE ROW LEVEL SECURITY;
 -- ─────────────────────────────────────────────
 
 -- Users (passwords are BCrypt hashes)
-INSERT INTO users (id, email, password, full_name, role, campus_id, college_id, phone, is_active, created_at, updated_at) VALUES
-(1, 'admin@university.edu',       '$2y$10$nLrah9DuGOziCM/BlWJFheD7ECyeITABU6Lnb5dei5IIrC3nXdPCG', 'John Administrator', 'admin', 1, NULL,  '09171234567', 1, '2026-01-15 08:00:00', '2026-04-11 10:00:00'),
-(2, 'user@university.edu',        '$2y$10$ujcshmXy9T9ncnJxOE7oNueB16kTlTiWH9QY0ggUHrXSZUClfXpVa', 'Maria Garcia',       'user',  1, 'CCS', '09171234568', 1, '2026-01-20 09:00:00', '2026-04-11 10:00:00'),
-(3, 'custodian1@university.edu',  '$2y$10$6aKE8TKp4PxeX/jg3Y5TE.fITuRur4vsK1MSGBaE8pWUhPQFyi8Ea', 'Carlos Santos',      'user',  2, NULL,  '09171234569', 1, '2026-02-01 08:30:00', '2026-04-11 10:00:00'),
-(4, 'custodian2@university.edu',  '$2y$10$6aKE8TKp4PxeX/jg3Y5TE.fITuRur4vsK1MSGBaE8pWUhPQFyi8Ea', 'Anna Rodriguez',     'user',  3, NULL,  '09171234570', 1, '2026-02-05 09:15:00', '2026-04-11 10:00:00')
+INSERT INTO users (id, email, password, full_name, role, college_id, phone, is_active, created_at, updated_at) VALUES
+(1, 'admin@university.edu',       '$2y$10$nLrah9DuGOziCM/BlWJFheD7ECyeITABU6Lnb5dei5IIrC3nXdPCG', 'John Administrator', 'admin', NULL,  '09171234567', 1, '2026-01-15 08:00:00', '2026-04-11 10:00:00'),
+(2, 'user@university.edu',        '$2y$10$ujcshmXy9T9ncnJxOE7oNueB16kTlTiWH9QY0ggUHrXSZUClfXpVa', 'Maria Garcia',       'user',  'CCS', '09171234568', 1, '2026-01-20 09:00:00', '2026-04-11 10:00:00'),
+(3, 'custodian1@university.edu',  '$2y$10$6aKE8TKp4PxeX/jg3Y5TE.fITuRur4vsK1MSGBaE8pWUhPQFyi8Ea', 'Carlos Santos',      'user',  NULL,  '09171234569', 1, '2026-02-01 08:30:00', '2026-04-11 10:00:00'),
+(4, 'custodian2@university.edu',  '$2y$10$6aKE8TKp4PxeX/jg3Y5TE.fITuRur4vsK1MSGBaE8pWUhPQFyi8Ea', 'Anna Rodriguez',     'user',  NULL,  '09171234570', 1, '2026-02-05 09:15:00', '2026-04-11 10:00:00')
 ON CONFLICT DO NOTHING;
 SELECT setval('users_id_seq', (SELECT MAX(id) FROM users));
 
 -- Inventory
-INSERT INTO inventory (id, qr_code_id, item_name, category, description, campus_id, college_id, quantity, status, location, purchase_date, cost, condition, created_at) VALUES
-(1,  'QR-A1B2C3D4E5', 'Wooden Chair',           'Furniture',        'Brown wooden chair with back support',                         1, 'COE',  5,  'borrowed',    'Admin Building - Room 101',  '2024-01-15', 1500.00,  'excellent', '2026-01-20 10:00:00'),
-(2,  'QR-F6G7H8I9J0', 'Office Desk',            'Furniture',        'Large wooden office desk',                                     1, 'CAS',  3,  'borrowed',    'Admin Building - Room 102',  '2024-02-10', 5000.00,  'excellent', '2026-01-25 10:00:00'),
-(3,  'QR-K1L2M3N4O5', 'Laptop Computer',        'Electronics',      'Dell Inspiron 15 Laptop',                                      2, NULL,   1,  'borrowed',    'Computer Lab 201',           '2024-03-05', 35000.00, 'good',      '2026-02-01 10:00:00'),
-(4,  'QR-P6Q7R8S9T0', 'Projector',              'Electronics',      '4K Multimedia Projector',                                      2, NULL,   1,  'available',   'Auditorium',                 '2024-01-20', 25000.00, 'excellent', '2026-02-05 10:00:00'),
-(5,  'QR-U1V2W3X4Y5', 'Whiteboard Marker Set',  'Supplies',         '12-pack assorted whiteboard markers',                          3, NULL,   10, 'available',   'Supply Room',                '2024-04-01', 500.00,   'good',      '2026-02-10 10:00:00'),
-(6,  'QR-Z1A2B3C4D5', 'Scientific Calculator',  'Equipment',        'Casio Scientific Calculator FX-991EX',                         3, NULL,   10, 'available',   'Science Room 305',           '2024-03-15', 2000.00,  'excellent', '2026-02-15 10:00:00'),
-(7,  'QR-E6F7G8H9I0', 'Office Chair',           'Furniture',        'Ergonomic office chair with wheels',                           4, NULL,   4,  'available',   'Faculty Office',             '2024-02-20', 3000.00,  'good',      '2026-02-20 10:00:00'),
-(8,  'QR-J1K2L3M4N5', 'Monitor',                'Electronics',      '27-inch LED Monitor',                                          4, NULL,   2,  'available',   'Computer Lab 202',           '2024-01-30', 8000.00,  'excellent', '2026-02-25 10:00:00'),
-(9,  'QR-O6P7Q8R9S0', 'Bookshelf',              'Furniture',        '5-tier wooden bookshelf',                                      5, NULL,   1,  'damaged',     'Library',                    '2024-02-01', 4000.00,  'fair',      '2026-03-01 10:00:00'),
-(10, 'QR-T1U2V3W4X5', 'Air Conditioning Unit',  'Appliances',       '1.5 HP split-type air conditioner',                            5, NULL,   1,  'maintenance', 'Faculty Room',               '2023-06-10', 28000.00, 'fair',      '2026-03-05 10:00:00'),
-(11, 'QR-Y6Z7A8B9C0', 'Ceiling Fan',            'Appliances',       '60-inch white ceiling fan',                                    6, NULL,   3,  'available',   'Classrooms',                 '2024-03-20', 2500.00,  'good',      '2026-03-10 10:00:00'),
-(12, 'QR-D1E2F3G4H5', 'Printer',                'Electronics',      'Canon Laser Printer LBP6030',                                  6, NULL,   1,  'available',   'Admin Office',               '2024-02-28', 12000.00, 'good',      '2026-03-15 10:00:00'),
-(13, 'QR-I6J7K8L9M0', 'Whiteboard',             'Equipment',        'Magnetic whiteboard 8x4 feet',                                 7, NULL,   2,  'available',   'Classroom 301',              '2024-05-10', 3500.00,  'excellent', '2026-03-20 10:00:00'),
-(14, 'QR-N1O2P3Q4R5', 'Desktop Computer',       'Electronics',      'Intel Core i5 Desktop with 24" monitor',                       7, NULL,   5,  'available',   'Computer Lab',               '2024-04-15', 32000.00, 'excellent', '2026-03-25 10:00:00'),
-(15, 'QR-S6T7U8V9W0', 'Steel Filing Cabinet',   'Furniture',        '4-drawer steel filing cabinet with lock',                      8, NULL,   2,  'available',   'Records Office',             '2024-01-05', 6500.00,  'good',      '2026-03-30 10:00:00'),
-(16, 'QR-X1Y2Z3A4B5', 'CCTV Camera Set',        'Security',         '4-camera CCTV system with DVR',                                8, NULL,   1,  'available',   'Security Office',            '2024-06-01', 15000.00, 'excellent', '2026-04-01 10:00:00'),
-(17, 'QR-C1D2E3F4G5', 'CAD Workstation',        'Electronics',      'High-performance CAD workstation PC',                          1, 'CEA',  2,  'borrowed',    'Engineering Lab',            '2024-07-10', 45000.00, 'excellent', '2026-04-05 10:00:00'),
-(18, 'QR-H6I7J8K9L0', 'Accounting Calculator',  'Equipment',        'Casio HR-200RC Printing Calculator set of 10',                 1, 'CBS',  10, 'borrowed',    'Business Lab',               '2024-06-15', 3500.00,  'excellent', '2026-04-06 10:00:00'),
-(19, 'QR-M1N2O3P4Q5', 'Network Server',         'Electronics',      'Dell PowerEdge T40 Tower Server',                              1, 'CCS',  1,  'borrowed',    'Server Room 101',            '2024-08-01', 85000.00, 'excellent', '2026-04-07 10:00:00'),
-(20, 'QR-R6S7T8U9V0', 'Industrial Drill Press', 'Equipment',        'JET JDP-17MF Floor Drill Press',                               1, 'CIT',  1,  'borrowed',    'Industrial Workshop',        '2024-05-20', 22000.00, 'good',      '2026-04-08 10:00:00'),
-(21, 'QR-W1X2Y3Z4A5', 'Food Service Cart',      'Equipment',        'Stainless steel hotel service trolley',                        1, 'CHTM', 3,  'borrowed',    'Hospitality Training Room',  '2024-04-12', 8500.00,  'good',      '2026-04-09 10:00:00'),
-(22, 'QR-B6C7D8E9F0', 'Reference Book Set',     'Supplies',         'Social Sciences reference library collection',                 1, 'CSSP', 50, 'borrowed',    'CSSP Library',               '2024-03-10', 12000.00, 'good',      '2026-04-10 10:00:00'),
-(23, 'QR-G1H2I3J4K5', 'Smart TV 55 inch',       'Electronics',      '4K Smart Television with stand',                               1, NULL,   1,  'requested',   'Conference Room 103',        '2024-06-10', 25000.00, 'excellent', '2026-04-11 10:00:00'),
-(24, 'QR-L1M2N3O4P5', 'Bookcase Cabinet',       'Furniture',        '5-shelf wooden bookcase',                                      2, NULL,   0,  'requested',   'Library 304',                '2024-04-10', 2800.00,  'good',      '2026-04-11 10:15:00'),
-(25, 'QR-Q1R2S3T4U5', 'Document Scanner',       'Office Equipment', 'High-speed document scanner',                                  3, NULL,   1,  'requested',   'Admin Office 402',           '2024-05-20', 8500.00,  'excellent', '2026-04-11 10:30:00'),
-(26, 'QR-V2W3X4Y5Z6', 'Electric Water Heater',  'Appliances',       '20L storage-type water heater, heating element burnt out',     1, NULL,   1,  'damaged',     'Faculty Lounge 105',         '2022-08-12', 6500.00,  'poor',      '2026-05-10 09:00:00'),
-(27, 'QR-A7B8C9D0E1', 'Portable Generator',     'Equipment',        '3.5 kVA portable gasoline generator, engine seized',           2, NULL,   1,  'damaged',     'Utility Room 001',           '2022-11-05', 18000.00, 'poor',      '2026-05-12 10:30:00'),
-(28, 'QR-F2G3H4I5J6', 'Industrial Floor Buffer','Equipment',        '175 RPM floor polisher/buffer, motor damaged',                 1, NULL,   1,  'maintenance', 'Custodial Office',           '2023-03-18', 12000.00, 'fair',      '2026-05-15 08:00:00'),
-(29, 'QR-K7L8M9N0O1', 'Overhead Projector',     'Electronics',      'Old-model overhead projector, lamp cracked and flickering',    3, NULL,   1,  'damaged',     'Lecture Hall 202',           '2022-06-20', 9500.00,  'poor',      '2026-05-18 11:00:00'),
-(30, 'QR-P2Q3R4S5T6', 'UPS Battery Backup',     'Electronics',      '1200VA UPS unit, battery no longer holds charge',              1, NULL,   2,  'maintenance', 'Server Room 101',            '2023-01-30', 7800.00,  'fair',      '2026-05-20 13:00:00')
+INSERT INTO inventory (id, qr_code_id, item_name, category, description, college_id, quantity, status, location, purchase_date, cost, condition, created_at) VALUES
+(1,  'QR-A1B2C3D4E5', 'Wooden Chair',           'Furniture',        'Brown wooden chair with back support',                          'COE',  5,  'borrowed',    'Admin Building - Room 101',  '2024-01-15', 1500.00,  'excellent', '2026-01-20 10:00:00'),
+(2,  'QR-F6G7H8I9J0', 'Office Desk',            'Furniture',        'Large wooden office desk',                                      'CAS',  3,  'borrowed',    'Admin Building - Room 102',  '2024-02-10', 5000.00,  'excellent', '2026-01-25 10:00:00'),
+(3,  'QR-K1L2M3N4O5', 'Laptop Computer',        'Electronics',      'Dell Inspiron 15 Laptop',                                       NULL,   1,  'borrowed',    'Computer Lab 201',           '2024-03-05', 35000.00, 'good',      '2026-02-01 10:00:00'),
+(4,  'QR-P6Q7R8S9T0', 'Projector',              'Electronics',      '4K Multimedia Projector',                                       NULL,   1,  'available',   'Auditorium',                 '2024-01-20', 25000.00, 'excellent', '2026-02-05 10:00:00'),
+(5,  'QR-U1V2W3X4Y5', 'Whiteboard Marker Set',  'Supplies',         '12-pack assorted whiteboard markers',                           NULL,   10, 'available',   'Supply Room',                '2024-04-01', 500.00,   'good',      '2026-02-10 10:00:00'),
+(6,  'QR-Z1A2B3C4D5', 'Scientific Calculator',  'Equipment',        'Casio Scientific Calculator FX-991EX',                          NULL,   10, 'available',   'Science Room 305',           '2024-03-15', 2000.00,  'excellent', '2026-02-15 10:00:00'),
+(7,  'QR-E6F7G8H9I0', 'Office Chair',           'Furniture',        'Ergonomic office chair with wheels',                            NULL,   4,  'available',   'Faculty Office',             '2024-02-20', 3000.00,  'good',      '2026-02-20 10:00:00'),
+(8,  'QR-J1K2L3M4N5', 'Monitor',                'Electronics',      '27-inch LED Monitor',                                           NULL,   2,  'available',   'Computer Lab 202',           '2024-01-30', 8000.00,  'excellent', '2026-02-25 10:00:00'),
+(9,  'QR-O6P7Q8R9S0', 'Bookshelf',              'Furniture',        '5-tier wooden bookshelf',                                       NULL,   1,  'damaged',     'Library',                    '2024-02-01', 4000.00,  'fair',      '2026-03-01 10:00:00'),
+(10, 'QR-T1U2V3W4X5', 'Air Conditioning Unit',  'Appliances',       '1.5 HP split-type air conditioner',                             NULL,   1,  'maintenance', 'Faculty Room',               '2023-06-10', 28000.00, 'fair',      '2026-03-05 10:00:00'),
+(11, 'QR-Y6Z7A8B9C0', 'Ceiling Fan',            'Appliances',       '60-inch white ceiling fan',                                     NULL,   3,  'available',   'Classrooms',                 '2024-03-20', 2500.00,  'good',      '2026-03-10 10:00:00'),
+(12, 'QR-D1E2F3G4H5', 'Printer',                'Electronics',      'Canon Laser Printer LBP6030',                                   NULL,   1,  'available',   'Admin Office',               '2024-02-28', 12000.00, 'good',      '2026-03-15 10:00:00'),
+(13, 'QR-I6J7K8L9M0', 'Whiteboard',             'Equipment',        'Magnetic whiteboard 8x4 feet',                                  NULL,   2,  'available',   'Classroom 301',              '2024-05-10', 3500.00,  'excellent', '2026-03-20 10:00:00'),
+(14, 'QR-N1O2P3Q4R5', 'Desktop Computer',       'Electronics',      'Intel Core i5 Desktop with 24" monitor',                        NULL,   5,  'available',   'Computer Lab',               '2024-04-15', 32000.00, 'excellent', '2026-03-25 10:00:00'),
+(15, 'QR-S6T7U8V9W0', 'Steel Filing Cabinet',   'Furniture',        '4-drawer steel filing cabinet with lock',                       NULL,   2,  'available',   'Records Office',             '2024-01-05', 6500.00,  'good',      '2026-03-30 10:00:00'),
+(16, 'QR-X1Y2Z3A4B5', 'CCTV Camera Set',        'Security',         '4-camera CCTV system with DVR',                                 NULL,   1,  'available',   'Security Office',            '2024-06-01', 15000.00, 'excellent', '2026-04-01 10:00:00'),
+(17, 'QR-C1D2E3F4G5', 'CAD Workstation',        'Electronics',      'High-performance CAD workstation PC',                           'CEA',  2,  'borrowed',    'Engineering Lab',            '2024-07-10', 45000.00, 'excellent', '2026-04-05 10:00:00'),
+(18, 'QR-H6I7J8K9L0', 'Accounting Calculator',  'Equipment',        'Casio HR-200RC Printing Calculator set of 10',                  'CBS',  10, 'borrowed',    'Business Lab',               '2024-06-15', 3500.00,  'excellent', '2026-04-06 10:00:00'),
+(19, 'QR-M1N2O3P4Q5', 'Network Server',         'Electronics',      'Dell PowerEdge T40 Tower Server',                               'CCS',  1,  'borrowed',    'Server Room 101',            '2024-08-01', 85000.00, 'excellent', '2026-04-07 10:00:00'),
+(20, 'QR-R6S7T8U9V0', 'Industrial Drill Press', 'Equipment',        'JET JDP-17MF Floor Drill Press',                                'CIT',  1,  'borrowed',    'Industrial Workshop',        '2024-05-20', 22000.00, 'good',      '2026-04-08 10:00:00'),
+(21, 'QR-W1X2Y3Z4A5', 'Food Service Cart',      'Equipment',        'Stainless steel hotel service trolley',                         'CHTM', 3,  'borrowed',    'Hospitality Training Room',  '2024-04-12', 8500.00,  'good',      '2026-04-09 10:00:00'),
+(22, 'QR-B6C7D8E9F0', 'Reference Book Set',     'Supplies',         'Social Sciences reference library collection',                  'CSSP', 50, 'borrowed',    'CSSP Library',               '2024-03-10', 12000.00, 'good',      '2026-04-10 10:00:00'),
+(23, 'QR-G1H2I3J4K5', 'Smart TV 55 inch',       'Electronics',      '4K Smart Television with stand',                                NULL,   1,  'requested',   'Conference Room 103',        '2024-06-10', 25000.00, 'excellent', '2026-04-11 10:00:00'),
+(24, 'QR-L1M2N3O4P5', 'Bookcase Cabinet',       'Furniture',        '5-shelf wooden bookcase',                                       NULL,   0,  'requested',   'Library 304',                '2024-04-10', 2800.00,  'good',      '2026-04-11 10:15:00'),
+(25, 'QR-Q1R2S3T4U5', 'Document Scanner',       'Office Equipment', 'High-speed document scanner',                                   NULL,   1,  'requested',   'Admin Office 402',           '2024-05-20', 8500.00,  'excellent', '2026-04-11 10:30:00'),
+(26, 'QR-V2W3X4Y5Z6', 'Electric Water Heater',  'Appliances',       '20L storage-type water heater, heating element burnt out',      NULL,   1,  'damaged',     'Faculty Lounge 105',         '2022-08-12', 6500.00,  'poor',      '2026-05-10 09:00:00'),
+(27, 'QR-A7B8C9D0E1', 'Portable Generator',     'Equipment',        '3.5 kVA portable gasoline generator, engine seized',            NULL,   1,  'damaged',     'Utility Room 001',           '2022-11-05', 18000.00, 'poor',      '2026-05-12 10:30:00'),
+(28, 'QR-F2G3H4I5J6', 'Industrial Floor Buffer','Equipment',        '175 RPM floor polisher/buffer, motor damaged',                  NULL,   1,  'maintenance', 'Custodial Office',           '2023-03-18', 12000.00, 'fair',      '2026-05-15 08:00:00'),
+(29, 'QR-K7L8M9N0O1', 'Overhead Projector',     'Electronics',      'Old-model overhead projector, lamp cracked and flickering',     NULL,   1,  'damaged',     'Lecture Hall 202',           '2022-06-20', 9500.00,  'poor',      '2026-05-18 11:00:00'),
+(30, 'QR-P2Q3R4S5T6', 'UPS Battery Backup',     'Electronics',      '1200VA UPS unit, battery no longer holds charge',               NULL,   2,  'maintenance', 'Server Room 101',            '2023-01-30', 7800.00,  'fair',      '2026-05-20 13:00:00')
 ON CONFLICT DO NOTHING;
 
--- A couple more sample items per campus (1-8), so every campus has some inventory to show.
-INSERT INTO inventory (id, qr_code_id, item_name, category, description, campus_id, college_id, quantity, status, location, purchase_date, cost, condition, created_at) VALUES
-(31, 'QR-CMP1A1B2C3', 'Ergonomic Standing Desk','Furniture',        'Height-adjustable standing desk',                              1, NULL,   4,  'available',   'Admin Building - Room 110',  '2024-09-01', 9500.00,  'excellent', '2026-06-01 09:00:00'),
-(32, 'QR-CMP2D4E5F6', 'Laser Engraving Machine','Equipment',        'CO2 laser engraver for workshop use',                          2, NULL,   1,  'available',   'Workshop Building',          '2024-08-15', 55000.00, 'excellent', '2026-06-02 09:00:00'),
-(33, 'QR-CMP3G7H8I9', 'Solar Panel Kit',        'Equipment',        '5-panel solar training kit',                                   3, NULL,   2,  'available',   'Engineering Annex',          '2024-07-20', 32000.00, 'good',      '2026-06-03 09:00:00'),
-(34, 'QR-CMP4J1K2L3', 'Digital Podium',         'Electronics',      'Touchscreen lecture podium with AV controls',                  4, NULL,   1,  'available',   'Main Auditorium',            '2024-09-10', 48000.00, 'excellent', '2026-06-04 09:00:00'),
-(35, 'QR-CMP5M4N5O6', 'Portable PA System',     'Electronics',      'Battery-powered PA speaker with mic',                          5, NULL,   2,  'available',   'Events Office',              '2024-06-25', 15000.00, 'good',      '2026-06-05 09:00:00'),
-(36, 'QR-CMP6P7Q8R9', 'Agricultural Drone',     'Equipment',        'Crop-monitoring drone for farm science',                       6, NULL,   1,  'available',   'Agri Extension Office',      '2024-08-05', 68000.00, 'excellent', '2026-06-06 09:00:00'),
-(37, 'QR-CMP7S1T2U3', 'Industrial Sewing Machine','Equipment',      'Heavy-duty sewing machine for TVET training',                  7, NULL,   3,  'available',   'Skills Training Center',     '2024-05-30', 21000.00, 'good',      '2026-06-07 09:00:00'),
-(38, 'QR-CMP8V4W5X6', 'Conference Table Set',   'Furniture',        '10-seater conference table with chairs',                       8, NULL,   1,  'available',   'Administration Office',      '2024-09-18', 38000.00, 'excellent', '2026-06-08 09:00:00')
+-- A couple more sample items with no department tag (no owning campus/college/office).
+INSERT INTO inventory (id, qr_code_id, item_name, category, description, college_id, quantity, status, location, purchase_date, cost, condition, created_at) VALUES
+(31, 'QR-CMP1A1B2C3', 'Ergonomic Standing Desk','Furniture',        'Height-adjustable standing desk',                               NULL,   4,  'available',   'Admin Building - Room 110',  '2024-09-01', 9500.00,  'excellent', '2026-06-01 09:00:00'),
+(32, 'QR-CMP2D4E5F6', 'Laser Engraving Machine','Equipment',        'CO2 laser engraver for workshop use',                           NULL,   1,  'available',   'Workshop Building',          '2024-08-15', 55000.00, 'excellent', '2026-06-02 09:00:00'),
+(33, 'QR-CMP3G7H8I9', 'Solar Panel Kit',        'Equipment',        '5-panel solar training kit',                                    NULL,   2,  'available',   'Engineering Annex',          '2024-07-20', 32000.00, 'good',      '2026-06-03 09:00:00'),
+(34, 'QR-CMP4J1K2L3', 'Digital Podium',         'Electronics',      'Touchscreen lecture podium with AV controls',                   NULL,   1,  'available',   'Main Auditorium',            '2024-09-10', 48000.00, 'excellent', '2026-06-04 09:00:00'),
+(35, 'QR-CMP5M4N5O6', 'Portable PA System',     'Electronics',      'Battery-powered PA speaker with mic',                           NULL,   2,  'available',   'Events Office',              '2024-06-25', 15000.00, 'good',      '2026-06-05 09:00:00'),
+(36, 'QR-CMP6P7Q8R9', 'Agricultural Drone',     'Equipment',        'Crop-monitoring drone for farm science',                        NULL,   1,  'available',   'Agri Extension Office',      '2024-08-05', 68000.00, 'excellent', '2026-06-06 09:00:00'),
+(37, 'QR-CMP7S1T2U3', 'Industrial Sewing Machine','Equipment',      'Heavy-duty sewing machine for TVET training',                   NULL,   3,  'available',   'Skills Training Center',     '2024-05-30', 21000.00, 'good',      '2026-06-07 09:00:00'),
+(38, 'QR-CMP8V4W5X6', 'Conference Table Set',   'Furniture',        '10-seater conference table with chairs',                        NULL,   1,  'available',   'Administration Office',      '2024-09-18', 38000.00, 'excellent', '2026-06-08 09:00:00')
 ON CONFLICT DO NOTHING;
 SELECT setval('inventory_id_seq', (SELECT MAX(id) FROM inventory));
 
@@ -364,12 +371,12 @@ ON CONFLICT DO NOTHING;
 SELECT setval('borrow_records_id_seq', (SELECT MAX(id) FROM borrow_records));
 
 -- User owned items
-INSERT INTO user_owned_items (id, user_id, item_name, category, description, year_owned, campus_id, quantity, condition, notes, purchase_date, created_at) VALUES
-(1, 2, 'Desktop Computer', 'Electronics', 'Dell Desktop PC with 24" monitor',    2023, 1, 1, 'excellent', 'Returned in excellent condition', '2023-05-10', '2024-06-15 10:00:00'),
-(2, 2, 'Office Chair',     'Furniture',   'Ergonomic swivel office chair',        2023, 1, 3, 'good',      'Minor wear on armrests',          '2023-03-20', '2024-07-01 14:30:00'),
-(3, 3, 'Projector',        'Electronics', '4K Multimedia Projector',              2024, 2, 1, 'excellent', 'Used for semester presentations', '2024-01-15', '2024-08-10 09:15:00'),
-(4, 4, 'Whiteboard Set',   'Equipment',   'Portable whiteboard with markers',     2022, 3, 2, 'fair',      'Surface has some stains but functional', '2022-09-12', '2024-05-22 11:45:00'),
-(5, 2, 'Printer',          'Electronics', 'Canon Laser Printer',                  2024, 1, 1, 'excellent', 'Department use',                  '2024-02-28', '2024-09-05 16:20:00')
+INSERT INTO user_owned_items (id, user_id, item_name, category, description, year_owned, quantity, condition, notes, purchase_date, created_at) VALUES
+(1, 2, 'Desktop Computer', 'Electronics', 'Dell Desktop PC with 24" monitor',    2023, 1, 'excellent', 'Returned in excellent condition', '2023-05-10', '2024-06-15 10:00:00'),
+(2, 2, 'Office Chair',     'Furniture',   'Ergonomic swivel office chair',        2023, 3, 'good',      'Minor wear on armrests',          '2023-03-20', '2024-07-01 14:30:00'),
+(3, 3, 'Projector',        'Electronics', '4K Multimedia Projector',              2024, 1, 'excellent', 'Used for semester presentations', '2024-01-15', '2024-08-10 09:15:00'),
+(4, 4, 'Whiteboard Set',   'Equipment',   'Portable whiteboard with markers',     2022, 2, 'fair',      'Surface has some stains but functional', '2022-09-12', '2024-05-22 11:45:00'),
+(5, 2, 'Printer',          'Electronics', 'Canon Laser Printer',                  2024, 1, 'excellent', 'Department use',                  '2024-02-28', '2024-09-05 16:20:00')
 ON CONFLICT DO NOTHING;
 SELECT setval('user_owned_items_id_seq', (SELECT MAX(id) FROM user_owned_items));
 
@@ -413,28 +420,6 @@ INSERT INTO departments (type, abbreviation, full_name, location, description, i
 ('campus', 'CITYOFSANFERNANDOCAMPUS', 'City of San Fernando Campus', 'City of San Fernando, Pampanga', 'PSU satellite campus in the provincial capital, City of San Fernando.',                   true)
 ON CONFLICT DO NOTHING;
 
--- Remap existing campus_id values (1-8, the old dropped `campuses` table's
--- row order) onto the departments campus rows just seeded above, matched by
--- name. Must run after the INSERT above. Safe to re-run: once a row's
--- campus_id is remapped it no longer matches the CASE below, so it's skipped.
-DO $$
-DECLARE
-    tbl TEXT;
-BEGIN
-    FOREACH tbl IN ARRAY ARRAY['inventory', 'users', 'user_owned_items'] LOOP
-        EXECUTE format($f$
-            UPDATE %I t SET campus_id = d.id
-            FROM departments d
-            WHERE d.type = 'campus' AND d.full_name = CASE t.campus_id
-                WHEN 1 THEN 'Main Campus'
-                WHEN 2 THEN 'Mexico Campus'
-                WHEN 3 THEN 'Porac Campus'
-                WHEN 4 THEN 'Santo Tomas Campus'
-                WHEN 5 THEN 'Lubao Campus'
-                WHEN 6 THEN 'Candaba Campus'
-                WHEN 7 THEN 'Apalit Campus'
-                WHEN 8 THEN 'City of San Fernando Campus'
-            END
-        $f$, tbl);
-    END LOOP;
-END $$;
+-- (No campus_id remap needed anymore — the column has been dropped from
+-- inventory/users/user_owned_items entirely; college_id is the single
+-- ownership field for colleges, offices, AND campuses alike.)

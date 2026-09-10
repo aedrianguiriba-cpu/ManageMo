@@ -60,7 +60,7 @@ if (!$dry_run && !empty($missing)) {
             'category'    => $inv['category']    ?? 'General',
             'description' => $inv['description'] ?? null,
             'year_owned'  => (int)date('Y', strtotime($req['updated_at'] ?? $req['created_at'])),
-            'campus_id'   => (int)($user['campus_id'] ?? $inv['campus_id'] ?? 1),
+            'college_id'  => $user['college_id'] ?? $inv['college_id'] ?? null,
             'quantity'    => 1,
             'condition'   => $inv['condition'] ?? null,
             'notes'       => $req['reason_for_request'] ?? null,

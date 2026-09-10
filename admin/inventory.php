@@ -19,8 +19,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'item_name'        => $item_name,
             'category'         => sanitizeInput($_POST['category']),
             'description'      => sanitizeInput($_POST['description']),
-            'campus_id'        => (int)($_POST['campus_id'] ?? 0) ?: 1,
-            'college_id'       => sanitizeInput($_POST['college_id'] ?? '') ?: null,
+            // New items always start life as Available, so no department is tagged yet
+            // (see the "Available = no owner" rule). campus_id no longer exists as a
+            // column at all — don't send it.
+            'college_id'       => null,
             'quantity'         => 1,
             'location'         => sanitizeInput($_POST['location']),
             'purchase_date'    => sanitizeInput($_POST['purchase_date']) ?: null,
@@ -28,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'condition'        => sanitizeInput($_POST['condition']),
             'status'           => 'available',
             'group_id'         => generateGroupId(),
-            'acquisition_mode' => in_array($acq_mode, ['borrow', 'request']) ? $acq_mode : 'borrow',
+            'acquisition_mode' => in_array($acq_mode, ['borrow', 'request', 'both']) ? $acq_mode : 'borrow',
             'model'            => sanitizeInput($_POST['model'] ?? '') ?: null,
             'serial_number'    => sanitizeInput($_POST['serial_number'] ?? '') ?: null,
         ];
@@ -69,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'item_name'     => $base_item_name,
             'category'      => $ref_item['category'],
             'description'   => $ref_item['description'],
-            'campus_id'     => $ref_item['campus_id'],
             'college_id'    => $ref_item['college_id'] ?? null,
             'quantity'      => 1,
             'location'      => $ref_item['location'],
@@ -110,7 +111,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'item_name'     => $item_name,
             'category'      => sanitizeInput($_POST['category']),
             'description'   => sanitizeInput($_POST['description']),
-            'campus_id'     => (int)($_POST['campus_id'] ?? 0) ?: 1,
+            // The merged Campus/College/Office picker writes its value to college_id.
+            // campus_id no longer exists as a column at all — don't send it.
             'college_id'    => sanitizeInput($_POST['college_id'] ?? '') ?: null,
             'year_owned'    => (int)$_POST['year_owned'] ?: null,
             'quantity'      => 1,
@@ -136,7 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'item_name'     => $item_name,
             'category'      => sanitizeInput($_POST['category']),
             'description'   => sanitizeInput($_POST['description']),
-            'campus_id'     => (int)($_POST['campus_id'] ?? 0) ?: 1,
+            // The merged Campus/College/Office picker writes its value to college_id.
+            // campus_id no longer exists as a column at all — don't send it.
             'college_id'    => sanitizeInput($_POST['college_id'] ?? '') ?: null,
             'year_owned'    => (int)$_POST['year_owned'] ?: null,
             'quantity'      => 1,
@@ -162,17 +165,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $inventory_id = (int)$_GET['id'];
         $item_name    = sanitizeInput($_POST['item_name']);
         $acq_mode     = sanitizeInput($_POST['acquisition_mode'] ?? 'borrow');
+        $item_status  = sanitizeInput($_POST['status']);
+        // Items still Available haven't been claimed by any department/campus/college yet.
+        $college_id   = $item_status === 'available' ? null : (sanitizeInput($_POST['college_id'] ?? '') ?: null);
         dbUpdateInventory($inventory_id, [
             'item_name'        => $item_name,
             'category'         => sanitizeInput($_POST['category']),
             'description'      => sanitizeInput($_POST['description']),
-            'campus_id'        => (int)($_POST['campus_id'] ?? 0) ?: 1,
-            'college_id'       => sanitizeInput($_POST['college_id'] ?? '') ?: null,
+            // The single merged Campus/College/Office picker writes its value to
+            // college_id, cleared above whenever status is Available. campus_id no
+            // longer exists as a column at all — don't send it.
+            'college_id'       => $college_id,
             'quantity'         => max(0, (int)$_POST['quantity']),
             'location'         => sanitizeInput($_POST['location']),
             'condition'        => sanitizeInput($_POST['condition']),
-            'status'           => sanitizeInput($_POST['status']),
-            'acquisition_mode' => in_array($acq_mode, ['borrow', 'request']) ? $acq_mode : 'borrow',
+            'status'           => $item_status,
+            'acquisition_mode' => in_array($acq_mode, ['borrow', 'request', 'both']) ? $acq_mode : 'borrow',
             'model'            => sanitizeInput($_POST['model'] ?? '') ?: null,
             'serial_number'    => sanitizeInput($_POST['serial_number'] ?? '') ?: null,
         ]);
@@ -322,12 +330,12 @@ displayMessage();
                     <input type="text" class="form-control" name="item_name" required>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">Campus *</label>
-                    <select class="form-select" name="campus_id" required>
-                        <?php foreach ($campuses as $campus): ?>
-                        <option value="<?php echo $campus['id']; ?>"><?php echo htmlspecialchars($campus['name']); ?></option>
-                        <?php endforeach; ?>
+                    <label class="form-label">Campus / College / Office</label>
+                    <select class="form-select" id="addItemCollegeId" disabled>
+                        <option>— None / Not applicable —</option>
+                        <?php renderDepartmentOptionGroups(); ?>
                     </select>
+                    <div class="form-text">New items start as Available, so no department owner is tagged yet — assign one after the item's status changes.</div>
                 </div>
             </div>
             <div class="row g-3 mb-3">
@@ -378,15 +386,6 @@ displayMessage();
                     <label class="form-label">Purchase Date</label>
                     <input type="date" class="form-control" name="purchase_date">
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">College / Office</label>
-                    <select class="form-select" name="college_id" id="addItemCollegeId">
-                        <option value="">— None / Not applicable —</option>
-                        <?php foreach (getMainCampusDepartments() as $abbr => $fullname): ?>
-                        <option value="<?php echo htmlspecialchars($abbr); ?>"><?php echo htmlspecialchars($fullname); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
             </div>
             <div class="row g-3 mb-3">
                 <div class="col-md-4">
@@ -394,8 +393,9 @@ displayMessage();
                     <select class="form-select" name="acquisition_mode" required>
                         <option value="borrow" selected>Borrowable</option>
                         <option value="request">Request / Acquire Only</option>
+                        <option value="both">Both (Borrowable &amp; Acquirable)</option>
                     </select>
-                    <div class="form-text">Borrowable items appear in the Borrow catalog; request-only items are removed from it.</div>
+                    <div class="form-text">Borrowable items appear in the Borrow catalog; request-only items are removed from it; "Both" appears in both catalogs.</div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Model</label>
@@ -441,14 +441,6 @@ displayMessage();
             </div>
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                    <label class="form-label">Campus *</label>
-                    <select class="form-select" name="campus_id" required>
-                        <?php foreach ($campuses as $campus): ?>
-                        <option value="<?php echo $campus['id']; ?>" <?php echo $campus['id'] == $item['campus_id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($campus['name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-6">
                     <label class="form-label">Quantity *</label>
                     <input type="number" class="form-control" name="quantity" value="<?php echo $item['quantity']; ?>" min="1" required>
                 </div>
@@ -464,7 +456,7 @@ displayMessage();
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Status *</label>
-                    <select class="form-select" name="status" required>
+                    <select class="form-select" name="status" id="editItemStatus" required>
                         <?php foreach (['available','requested','borrowed','maintenance'] as $s): ?>
                         <option value="<?php echo $s; ?>" <?php echo $item['status']===$s?'selected':''; ?>><?php echo ucfirst($s); ?></option>
                         <?php endforeach; ?>
@@ -483,12 +475,10 @@ displayMessage();
             </div>
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                    <label class="form-label">College / Office</label>
+                    <label class="form-label">Campus / College / Office</label>
                     <select class="form-select" name="college_id" id="editItemCollegeId">
                         <option value="">— None / Not applicable —</option>
-                        <?php foreach (getMainCampusDepartments() as $abbr => $fullname): ?>
-                        <option value="<?php echo htmlspecialchars($abbr); ?>" <?php echo ($item['college_id'] ?? '') === $abbr ? 'selected' : ''; ?>><?php echo htmlspecialchars($fullname); ?></option>
-                        <?php endforeach; ?>
+                        <?php renderDepartmentOptionGroups($item['college_id'] ?? null); ?>
                     </select>
                 </div>
                 <div class="col-md-6">
@@ -496,6 +486,7 @@ displayMessage();
                     <select class="form-select" name="acquisition_mode" required>
                         <option value="borrow"  <?php echo ($item['acquisition_mode'] ?? 'borrow') === 'borrow'  ? 'selected' : ''; ?>>Borrowable</option>
                         <option value="request" <?php echo ($item['acquisition_mode'] ?? 'borrow') === 'request' ? 'selected' : ''; ?>>Request / Acquire Only</option>
+                        <option value="both"    <?php echo ($item['acquisition_mode'] ?? 'borrow') === 'both'    ? 'selected' : ''; ?>>Both (Borrowable &amp; Acquirable)</option>
                     </select>
                 </div>
             </div>
@@ -528,6 +519,20 @@ displayMessage();
             </div>
         </form>
     </div>
+    <script>
+    (function() {
+        var statusSelect = document.getElementById('editItemStatus');
+        var collegeSelect = document.getElementById('editItemCollegeId');
+        if (!statusSelect || !collegeSelect) return;
+        function syncCollegeField() {
+            var isAvailable = statusSelect.value === 'available';
+            collegeSelect.disabled = isAvailable;
+            if (isAvailable) collegeSelect.value = '';
+        }
+        statusSelect.addEventListener('change', syncCollegeField);
+        syncCollegeField();
+    })();
+    </script>
 
     <?php elseif ($action === 'edit_owned'): ?>
     <!-- Edit User-Owned Item Form -->
@@ -582,27 +587,15 @@ displayMessage();
             </div>
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                    <label class="form-label">Campus *</label>
-                    <select class="form-select" name="campus_id" required>
-                        <?php foreach ($campuses as $campus): ?>
-                        <option value="<?php echo $campus['id']; ?>" <?php echo $campus['id'] == $owned_item['campus_id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($campus['name']); ?></option>
-                        <?php endforeach; ?>
+                    <label class="form-label">Campus / College / Office</label>
+                    <select class="form-select" name="college_id">
+                        <option value="">— None / Not applicable —</option>
+                        <?php renderDepartmentOptionGroups($owned_item['college_id'] ?? null); ?>
                     </select>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Purchase Date</label>
                     <input type="date" class="form-control" name="purchase_date" value="<?php echo htmlspecialchars($owned_item['purchase_date'] ?? ''); ?>">
-                </div>
-            </div>
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label class="form-label">College / Office</label>
-                    <select class="form-select" name="college_id">
-                        <option value="">— None / Not applicable —</option>
-                        <?php foreach (getMainCampusDepartments() as $abbr => $fullname): ?>
-                        <option value="<?php echo htmlspecialchars($abbr); ?>" <?php echo ($owned_item['college_id'] ?? '') === $abbr ? 'selected' : ''; ?>><?php echo htmlspecialchars($fullname); ?></option>
-                        <?php endforeach; ?>
-                    </select>
                 </div>
             </div>
             <div class="mb-3">
@@ -626,17 +619,15 @@ displayMessage();
         <div class="ai-card-title">Add User-Owned Item</div>
         <div class="ai-card-sub">Record items owned by users from past years for tracking purposes</div>
         <hr class="ai-divider mt-0">
-        <!-- User-to-campus/college/office maps for auto-fill -->
+        <!-- User-to-department map for auto-fill, from each user's own college_id -->
+        <!-- (campus_id no longer exists — college_id is the only affiliation field left). -->
         <script>
-        var userCollegeMap = <?php
-            $cmap = [];
-            foreach ($users as $u) $cmap[$u['id']] = $u['college_id'] ?? '';
-            echo json_encode($cmap);
-        ?>;
-        var userCampusMap = <?php
-            $campmap = [];
-            foreach ($users as $u) $campmap[$u['id']] = $u['campus_id'] ?? '';
-            echo json_encode($campmap);
+        var userDeptMap = <?php
+            $dmap = [];
+            foreach ($users as $u) {
+                $dmap[$u['id']] = $u['college_id'] ?? '';
+            }
+            echo json_encode($dmap);
         ?>;
         </script>
         <form method="POST" action="?action=add_owned">
@@ -687,22 +678,10 @@ displayMessage();
             </div>
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                    <label class="form-label">Campus *</label>
-                    <select class="form-select" name="campus_id" id="ownedCampusId" required>
-                        <option value="">Select Campus</option>
-                        <?php foreach ($campuses as $campus): ?>
-                        <option value="<?php echo $campus['id']; ?>"><?php echo htmlspecialchars($campus['name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="form-text">Auto-filled from the selected user's campus — change it if this item is elsewhere.</div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">College / Office</label>
+                    <label class="form-label">Campus / College / Office</label>
                     <select class="form-select" name="college_id" id="ownedCollegeId">
                         <option value="">— None / Not applicable —</option>
-                        <?php foreach (getMainCampusDepartments() as $abbr => $fullname): ?>
-                        <option value="<?php echo htmlspecialchars($abbr); ?>"><?php echo htmlspecialchars($fullname); ?></option>
-                        <?php endforeach; ?>
+                        <?php renderDepartmentOptionGroups(); ?>
                     </select>
                     <div class="form-text">Auto-filled from the selected user's department — change it if this item belongs elsewhere.</div>
                 </div>
@@ -744,8 +723,7 @@ displayMessage();
     </div>
     <script>
     function fillUserFields(userId) {
-        document.getElementById('ownedCollegeId').value = userCollegeMap[userId] || '';
-        document.getElementById('ownedCampusId').value = userCampusMap[userId] || '';
+        document.getElementById('ownedCollegeId').value = userDeptMap[userId] || '';
     }
     </script>
 
@@ -756,18 +734,18 @@ displayMessage();
 
     // Shared filter/search — applies to the All Items and Available tabs.
     // One combined "department" filter (fdept) covers Campuses, Colleges, and
-    // Offices together — value is "c:<campus id>" or "d:<college/office abbr>".
+    // Offices together — inventory items only ever carry a single owner
+    // abbreviation in college_id (campus_id is no longer relied on), so both
+    // "c:" and "d:" prefixes resolve to the same college_id comparison.
     $filter_search   = trim($_GET['search'] ?? '');
     $filter_dept     = $_GET['fdept'] ?? '';
-    $filter_campus_id  = str_starts_with($filter_dept, 'c:') ? substr($filter_dept, 2) : '';
-    $filter_college_id = str_starts_with($filter_dept, 'd:') ? substr($filter_dept, 2) : '';
+    $filter_college_id = (str_starts_with($filter_dept, 'c:') || str_starts_with($filter_dept, 'd:')) ? substr($filter_dept, 2) : '';
     $filter_category   = $_GET['fcategory'] ?? '';
     $all_categories    = array_values(array_unique(array_filter(array_column($all_items, 'category'))));
     sort($all_categories);
 
-    $applyInventoryFilters = function(array $items) use ($filter_search, $filter_campus_id, $filter_college_id, $filter_category): array {
-        return array_values(array_filter($items, function($i) use ($filter_search, $filter_campus_id, $filter_college_id, $filter_category) {
-            if ($filter_campus_id !== '' && (int)($i['campus_id'] ?? 0) !== (int)$filter_campus_id) return false;
+    $applyInventoryFilters = function(array $items) use ($filter_search, $filter_college_id, $filter_category): array {
+        return array_values(array_filter($items, function($i) use ($filter_search, $filter_college_id, $filter_category) {
             if ($filter_college_id !== '' && ($i['college_id'] ?? '') !== $filter_college_id) return false;
             if ($filter_category !== '' && $i['category'] !== $filter_category) return false;
             if ($filter_search !== '') {
@@ -782,7 +760,6 @@ displayMessage();
     $all_active_items  = array_values(array_filter($all_items, fn($i) => !in_array($i['status'], ['condemned','disposed'])));
     $available_items   = filterByColumn($all_items, 'status', 'available');
     $requested_items   = filterByColumn($all_items, 'status', 'requested');
-    $maintenance_items = filterByColumn($all_items, 'status', 'maintenance');
     $borrowed_items     = filterByColumn($all_items, 'status', 'borrowed');
 
     $all_active_items = $applyInventoryFilters($all_active_items);
@@ -791,10 +768,18 @@ displayMessage();
     // Get user owned items
     $owned_items = getUserOwnedItems();
 
+    // Maintenance tab: service requests are pure free-text tickets with no catalog
+    // item attached (see user/requests.php), so there's no inventory row to filter
+    // by status here. Instead, list the open service tickets themselves.
+    $all_users_by_id = array_column(getUsers(), null, 'id');
+    $maintenance_requests = array_values(array_filter(getRequests(), function($r) {
+        return $r['request_type'] === 'service' && in_array($r['status'], ['pending', 'approved']);
+    }));
+    usort($maintenance_requests, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
+
     usort($all_active_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($available_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($requested_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
-    usort($maintenance_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($borrowed_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($owned_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
 
@@ -804,7 +789,6 @@ displayMessage();
     $grouped_all         = groupInventoryItems($all_active_items);
     $grouped_available   = groupInventoryItems($available_items);
     $grouped_requested   = groupInventoryItems($requested_items);
-    $grouped_maintenance = groupInventoryItems($maintenance_items);
     $grouped_borrowed    = groupInventoryItems($borrowed_items);
     $grouped_owned       = groupOwnedItems($owned_items);
 
@@ -822,14 +806,14 @@ displayMessage();
     $total_all = count($all_active_items);
     $total_available = count($available_items);
     $total_requested = count($requested_items);
-    $total_maintenance = count($maintenance_items);
+    $total_maintenance = count($maintenance_requests);
     $total_borrowed = count($borrowed_items);
     $total_owned = count($owned_items);
 
     $pages_all = ceil(count($grouped_all) / $items_per_page);
     $pages_available = ceil(count($grouped_available) / $items_per_page);
     $pages_requested = ceil(count($grouped_requested) / $items_per_page);
-    $pages_maintenance = ceil(count($grouped_maintenance) / $items_per_page);
+    $pages_maintenance = ceil(count($maintenance_requests) / $items_per_page);
     $pages_borrowed = ceil(count($grouped_borrowed) / $items_per_page);
     $pages_owned = ceil(count($grouped_owned) / $items_per_page);
 
@@ -843,7 +827,7 @@ displayMessage();
     $all_items_page          = array_slice($grouped_all, $offset_all, $items_per_page);
     $available_items_page   = array_slice($grouped_available, $offset_available, $items_per_page);
     $requested_items_page   = array_slice($grouped_requested, $offset_requested, $items_per_page);
-    $maintenance_items_page = array_slice($grouped_maintenance, $offset_maintenance, $items_per_page);
+    $maintenance_items_page = array_slice($maintenance_requests, $offset_maintenance, $items_per_page);
     $borrowed_items_page    = array_slice($grouped_borrowed, $offset_borrowed, $items_per_page);
     $owned_items_page       = array_slice($grouped_owned, $offset_owned, $items_per_page);
     ?>
@@ -861,7 +845,7 @@ displayMessage();
                 <option value="">All</option>
                 <optgroup label="Campuses">
                 <?php foreach ($campuses as $campus): ?>
-                <option value="c:<?php echo $campus['id']; ?>" <?php echo $filter_dept === 'c:' . $campus['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($campus['name']); ?></option>
+                <option value="c:<?php echo htmlspecialchars($campus['abbreviation']); ?>" <?php echo $filter_dept === 'c:' . $campus['abbreviation'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($campus['name']); ?></option>
                 <?php endforeach; ?>
                 </optgroup>
                 <optgroup label="Colleges/Offices">
@@ -882,7 +866,7 @@ displayMessage();
         </div>
         <div>
             <button type="submit" class="btn ai-btn-primary btn-sm"><i class="fas fa-filter"></i> Apply</button>
-            <?php if ($filter_search !== '' || $filter_campus_id !== '' || $filter_college_id !== '' || $filter_category !== ''): ?>
+            <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== ''): ?>
             <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?>" class="btn ai-btn-secondary btn-sm">Clear</a>
             <?php endif; ?>
         </div>
@@ -939,7 +923,7 @@ displayMessage();
                     $statuses = array_unique(array_column($group['units'], 'status'));
                     $status_label = count($statuses) === 1 ? ucfirst($statuses[0]) : 'Mixed';
                     $status_color = count($statuses) === 1 ? ($status_colors[$statuses[0]] ?? 'secondary') : 'secondary';
-                    $__all_grp_depts = getMainCampusDepartments();
+                    $__all_grp_depts = getAllDepartmentNames();
                     $__all_grp_dept_name = ($group['college_id'] ?? null) && isset($__all_grp_depts[$group['college_id']])
                         ? $__all_grp_depts[$group['college_id']] : null;
         ?>
@@ -955,6 +939,10 @@ displayMessage();
                 </div>
                 <span class="ai-badge ai-badge-<?php echo $status_color; ?>"><?php echo htmlspecialchars($status_label); ?></span>
             </div>
+            <?php $__all_acq = acquisitionModeBadge($group['units'][0]['acquisition_mode'] ?? 'borrow'); ?>
+            <span style="display:inline-block;background:<?php echo $__all_acq['bg']; ?>;color:<?php echo $__all_acq['fg']; ?>;font-weight:700;font-size:0.72rem;padding:2px 9px;border-radius:8px;margin-bottom:8px;">
+                <?php echo htmlspecialchars($__all_acq['label']); ?>
+            </span>
             <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
@@ -1017,11 +1005,15 @@ displayMessage();
                     <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
                 </span>
             </div>
+            <?php $__avail_acq = acquisitionModeBadge($group['units'][0]['acquisition_mode'] ?? 'borrow'); ?>
+            <span style="display:inline-block;background:<?php echo $__avail_acq['bg']; ?>;color:<?php echo $__avail_acq['fg']; ?>;font-weight:700;font-size:0.72rem;padding:2px 9px;border-radius:8px;margin-bottom:8px;">
+                <?php echo htmlspecialchars($__avail_acq['label']); ?>
+            </span>
             <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
                         <?php
-                            $__grp_depts = getMainCampusDepartments();
+                            $__grp_depts = getAllDepartmentNames();
                             $__grp_dept_name = ($group['college_id'] ?? null) && isset($__grp_depts[$group['college_id']])
                                 ? $__grp_depts[$group['college_id']] : null;
                         ?>
@@ -1095,7 +1087,7 @@ displayMessage();
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
                         <?php
-                            $__grp_depts = getMainCampusDepartments();
+                            $__grp_depts = getAllDepartmentNames();
                             $__grp_dept_name = ($group['college_id'] ?? null) && isset($__grp_depts[$group['college_id']])
                                 ? $__grp_depts[$group['college_id']] : null;
                         ?>
@@ -1156,7 +1148,7 @@ displayMessage();
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
                         <?php
-                            $__grp_depts = getMainCampusDepartments();
+                            $__grp_depts = getAllDepartmentNames();
                             $__grp_dept_name = ($group['college_id'] ?? null) && isset($__grp_depts[$group['college_id']])
                                 ? $__grp_depts[$group['college_id']] : null;
                         ?>
@@ -1196,62 +1188,62 @@ displayMessage();
         <?php endif; ?>
     </div>
 
-    <!-- MAINTENANCE ITEMS TAB -->
+    <!-- MAINTENANCE TICKETS TAB -->
+    <!-- Service requests are free-text maintenance tickets with no catalog item
+         attached (see user/requests.php), so this lists the open tickets
+         themselves rather than filtering inventory by status. -->
     <div id="tab-maintenance" style="display: <?php echo $current_tab === 'maintenance' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($maintenance_items_page) > 0):
-                foreach ($maintenance_items_page as $group):
-                    $unit_count = count($group['units']);
-                    $conditions = array_unique(array_column($group['units'], 'condition'));
-                    $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
+                foreach ($maintenance_items_page as $req):
+                    $__requester = $all_users_by_id[$req['user_id']] ?? null;
+                    $__depts = getAllDepartmentNames();
+                    $__dept_name = ($__requester['college_id'] ?? null) && isset($__depts[$__requester['college_id']])
+                        ? $__depts[$__requester['college_id']] : null;
+                    $__is_approved = $req['status'] === 'approved';
         ?>
         <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
             <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
                 <div>
                     <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:4px;">
-                        <?php echo htmlspecialchars($group['item_name']); ?>
+                        <?php echo htmlspecialchars($req['item_name'] ?? 'Service Request'); ?>
                     </div>
                     <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
-                        <?php echo htmlspecialchars($group['category']); ?>
+                        <?php echo htmlspecialchars($req['request_number'] ?? ''); ?>
                     </div>
                 </div>
-                <span style="background:rgba(245,158,11,0.12);color:#b45309;font-weight:700;font-size:0.76rem;padding:3px 10px;border-radius:10px;">
-                    <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                <span style="background:<?php echo $__is_approved ? 'rgba(37,99,235,0.12)' : 'rgba(245,158,11,0.12)'; ?>;color:<?php echo $__is_approved ? '#1d4ed8' : '#b45309'; ?>;font-weight:700;font-size:0.76rem;padding:3px 10px;border-radius:10px;">
+                    <?php echo ucfirst($req['status']); ?>
                 </span>
             </div>
             <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                     <div>
-                        <?php
-                            $__grp_depts = getMainCampusDepartments();
-                            $__grp_dept_name = ($group['college_id'] ?? null) && isset($__grp_depts[$group['college_id']])
-                                ? $__grp_depts[$group['college_id']] : null;
-                        ?>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">College/Office</div>
-                        <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($__grp_dept_name ?? '—'); ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Requested By</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($__requester['full_name'] ?? '—'); ?></div>
                     </div>
                     <div>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Condition</div>
-                        <div style="font-weight:600;color:#1a1d23;"><?php echo $cond_label; ?></div>
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">College/Office</div>
+                        <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($__dept_name ?? '—'); ?></div>
                     </div>
                 </div>
             </div>
-            <div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px;min-height:22px;">
-                <?php foreach (array_slice($group['units'], 0, 2) as $u): ?>
-                <span class="ai-qr-chip" style="font-size:0.68rem;"><?php echo htmlspecialchars($u['qr_code_id']); ?></span>
-                <?php endforeach; ?>
-                <?php if ($unit_count > 2): ?><span style="font-size:0.7rem;color:rgba(0,0,0,0.40);align-self:center;">+<?php echo $unit_count - 2; ?> more</span><?php endif; ?>
+            <?php if (!empty($req['service_description'])): ?>
+            <div style="font-size:0.8rem;color:rgba(0,0,0,0.65);margin-bottom:10px;line-height:1.4;">
+                <?php echo htmlspecialchars($req['service_description']); ?>
             </div>
+            <?php endif; ?>
             <div style="display:flex;align-items:center;gap:7px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:8px 12px;font-size:0.8rem;color:#b45309;font-weight:600;">
-                <i class="fas fa-tools"></i> Under Maintenance
+                <i class="fas fa-tools"></i>
+                <a href="requests.php?action=view&id=<?php echo (int)$req['id']; ?>" style="color:inherit;text-decoration:underline;">View request</a>
             </div>
         </div>
         <?php endforeach; else: ?>
-        <div class="ai-empty" style="grid-column:1/-1;"><i class="fas fa-tools"></i>No items in maintenance</div>
+        <div class="ai-empty" style="grid-column:1/-1;"><i class="fas fa-tools"></i>No open maintenance tickets</div>
         <?php endif; ?>
         </div>
-        
-        <!-- Pagination for Maintenance Items -->
+
+        <!-- Pagination for Maintenance Tickets -->
         <?php if ($pages_maintenance > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_maintenance; $i++): ?>
@@ -1270,7 +1262,7 @@ displayMessage();
                 foreach ($owned_items_page as $group):
                     $owner_user  = findById($users, $group['user_id']);
                     $owner_name  = $owner_user ? htmlspecialchars($owner_user['full_name']) : 'Unknown User';
-                    $__owned_depts = getMainCampusDepartments();
+                    $__owned_depts = getAllDepartmentNames();
                     $__owned_dept_name = ($group['college_id'] ?? null) && isset($__owned_depts[$group['college_id']])
                         ? $__owned_depts[$group['college_id']] : null;
                     $unit_count  = count($group['units']);
@@ -1477,7 +1469,7 @@ displayMessage();
 </style>
 
 <script>
-var icDeptMap = <?php echo json_encode(getMainCampusDepartments()); ?>;
+var icDeptMap = <?php echo json_encode(getAllDepartmentNames()); ?>;
 function openGroupModal(group) {
     // A group's stored item_name is just whichever unit happened to be created first, which
     // may already carry a " Unit N" suffix — strip it so we always have the clean product name

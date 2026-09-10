@@ -580,10 +580,14 @@ displayMessage();
                         $urgency  = $req['urgency'] ?? 'medium';
                         $svc_type = $req['service_type'] ?? null;
                         $desc     = $req['service_description'] ?? '';
+                        // service_description is stored as "Subject [type] — details" — service
+                        // requests have no catalog item, so the "Item" column shows just the
+                        // subject portion instead of the literal item_name (always null here).
+                        $svc_subject = $desc ? preg_replace('/\s*\[.*$/', '', $desc) : '';
                 ?>
                 <tr>
                     <td><span class="br-qr-chip"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
-                    <td><span class="br-item-name"><?php echo htmlspecialchars($req['item_name'] ?? '—'); ?></span></td>
+                    <td><span class="br-item-name"><?php echo htmlspecialchars(($req['item_name'] ?? $svc_subject) ?: '—'); ?></span></td>
                     <td>
                         <?php if ($svc_type): ?>
                         <span class="br-badge" style="background:rgba(245,158,11,0.10);color:#b45309;border:1px solid rgba(245,158,11,0.25);">

@@ -6,7 +6,7 @@ require_once dirname(__DIR__) . '/lib/qrcode.php';
 requireUser();
 
 $current_user = getCurrentUser();
-$current_tab = $_GET['tab'] ?? 'available';
+$current_tab = $_GET['tab'] ?? 'all';
 $page = $_GET['page'] ?? 1;
 $search = $_GET['search'] ?? '';
 $category_filter = $_GET['category'] ?? '';
@@ -17,8 +17,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
 <div class="main-wrapper">
 <?php
-// Inventory is a single global list — no more campus scoping.
-$all_campus_inventory = getInventory();
+// Inventory is a single global list — no more campus scoping. Condemned/disposed
+// units are retired stock and never shown to users, in any tab.
+$all_campus_inventory = array_values(array_filter(getInventory(), fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
 
 // Stats
 $inv_total     = count($all_campus_inventory);
@@ -51,9 +52,12 @@ if ($status_filter === 'owned') {
     $current_tab = 'owned';
 }
 
-// Auto-filter by tab if not using custom status filter
+// Auto-filter by tab if not using custom status filter. "All Items" intentionally
+// applies no default status filter — that's the point of the tab.
 if (!$status_filter && $current_tab === 'borrowed') {
     $status_filter = 'borrowed';
+} elseif (!$status_filter && $current_tab === 'available') {
+    $status_filter = 'available';
 }
 
 // Apply filters
@@ -461,14 +465,21 @@ foreach ($all_borrows as $br) {
     </div>
 
     <!-- TAB NAVIGATION -->
+    <!-- Plain links (no preventDefault) — each tab needs its own status filter recomputed
+         server-side (see $status_filter logic above). A client-side-only toggle would just
+         show/hide the same already-rendered item set, which is what made non-available
+         items appear to "leak" into the Available tab. -->
     <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; border-bottom: 2px solid rgba(0,0,0,0.08); padding-bottom: 0;">
-        <a href="inventory.php?tab=available" class="inv-tab-link <?php echo $current_tab === 'available' ? 'inv-tab-active' : ''; ?>" onclick="setInvTab('available'); return false;" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
+        <a href="inventory.php?tab=all" class="inv-tab-link <?php echo $current_tab === 'all' ? 'inv-tab-active' : ''; ?>" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
+            <i class="fas fa-layer-group"></i> All Items
+        </a>
+        <a href="inventory.php?tab=available" class="inv-tab-link <?php echo $current_tab === 'available' ? 'inv-tab-active' : ''; ?>" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
             <i class="fas fa-boxes-stacked"></i> Available
         </a>
-        <a href="inventory.php?tab=borrowed" class="inv-tab-link <?php echo $current_tab === 'borrowed' ? 'inv-tab-active' : ''; ?>" onclick="setInvTab('borrowed'); return false;" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
+        <a href="inventory.php?tab=borrowed" class="inv-tab-link <?php echo $current_tab === 'borrowed' ? 'inv-tab-active' : ''; ?>" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
             <i class="fas fa-hand-holding"></i> Borrowed
         </a>
-        <a href="inventory.php?tab=owned" class="inv-tab-link <?php echo $current_tab === 'owned' ? 'inv-tab-active' : ''; ?>" onclick="setInvTab('owned'); return false;" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
+        <a href="inventory.php?tab=owned" class="inv-tab-link <?php echo $current_tab === 'owned' ? 'inv-tab-active' : ''; ?>" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
             <i class="fas fa-user-check"></i> My Owned Items
         </a>
     </div>
@@ -488,7 +499,7 @@ foreach ($all_borrows as $br) {
     </style>
 
     <!-- Filter Card (Available & Borrowed Tabs Only) -->
-    <div class="inv-filter-card" id="inv-filter-section" style="display: <?php echo in_array($current_tab, ['available', 'borrowed']) ? 'block' : 'none'; ?>;">
+    <div class="inv-filter-card" id="inv-filter-section" style="display: <?php echo in_array($current_tab, ['all', 'available', 'borrowed']) ? 'block' : 'none'; ?>;">
         <form method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
             <div class="col-md-4">
@@ -539,7 +550,7 @@ foreach ($all_borrows as $br) {
     </div>
 
     <!-- AVAILABLE/BORROWED ITEMS TAB -->
-    <div id="tab-campus-inventory" style="display: <?php echo in_array($current_tab, ['available', 'borrowed']) ? 'block' : 'none'; ?>;">
+    <div id="tab-campus-inventory" style="display: <?php echo in_array($current_tab, ['all', 'available', 'borrowed']) ? 'block' : 'none'; ?>;">
     <!-- Inventory Grid (grouped) -->
     <?php if (count($items) > 0): ?>
     <div class="row g-3">
@@ -571,6 +582,8 @@ foreach ($all_borrows as $br) {
             $cond_color       = count($conditions) === 1 ? ($cond_color_map[strtolower(reset($conditions))] ?? '#6b7280') : '#6b7280';
             $location         = $group['units'][0]['location'] ?? 'N/A';
             $cicon            = $cat_icon_map[$group['category']] ?? 'fa-box';
+            $acq_mode         = $group['units'][0]['acquisition_mode'] ?? 'borrow';
+            $acq_badge        = acquisitionModeBadge($acq_mode);
         ?>
         <div class="col-md-6 col-lg-4">
             <div class="inv-card">
@@ -582,6 +595,9 @@ foreach ($all_borrows as $br) {
                     <div style="flex:1; min-width:0;">
                         <div class="inv-card-name"><?php echo htmlspecialchars($group['item_name']); ?></div>
                         <span class="inv-card-category"><?php echo htmlspecialchars($group['category']); ?></span>
+                        <span style="background:<?php echo $acq_badge['bg']; ?>;color:<?php echo $acq_badge['fg']; ?>;font-weight:700;font-size:0.68rem;padding:2px 8px;border-radius:8px;margin-left:4px;display:inline-block;">
+                            <?php echo htmlspecialchars($acq_badge['label']); ?>
+                        </span>
                     </div>
                     <span style="background:rgba(59,130,246,0.12);color:#1d4ed8;font-weight:700;font-size:0.74rem;padding:3px 10px;border-radius:10px;white-space:nowrap;flex-shrink:0;">
                         <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
@@ -623,6 +639,12 @@ foreach ($all_borrows as $br) {
                         <div class="inv-disabled-btn">
                             <i class="fas fa-check"></i> Already Borrowed
                         </div>
+                    <?php elseif ($acq_mode === 'request' && $first_available): ?>
+                        <!-- Request/Acquire-only items aren't lent out — send the user to the
+                             Request Item flow instead of a Borrow link that would 404 the catalog. -->
+                        <a href="requests.php?item_id=<?php echo $first_available['id']; ?>&type=item" class="inv-borrow-btn" style="background:#15803d !important;">
+                            <i class="fas fa-hand-holding"></i> Request to Acquire
+                        </a>
                     <?php elseif ($first_available): ?>
                         <a href="requests.php?item_id=<?php echo $first_available['id']; ?>&type=borrow" class="inv-borrow-btn">
                             <i class="fas fa-hand-paper"></i> Borrow Item
@@ -779,15 +801,8 @@ foreach ($all_borrows as $br) {
 </div>
 
 <script>
-function setInvTab(tabName) {
-    document.getElementById('tab-campus-inventory').style.display = tabName !== 'owned' ? 'block' : 'none';
-    document.getElementById('tab-owned-items').style.display = tabName === 'owned' ? 'block' : 'none';
-    document.getElementById('inv-filter-section').style.display = tabName !== 'owned' ? 'block' : 'none';
-    document.querySelectorAll('.inv-tab-link').forEach(function(tab) {
-        tab.classList.remove('inv-tab-active');
-    });
-    event.target.closest('a').classList.add('inv-tab-active');
-}
+// Tab links are plain navigations now (see TAB NAVIGATION above) — each tab's status
+// filter is recomputed server-side per request, so no client-side toggle is needed here.
 
 function showOwnedGroup(group) {
     document.getElementById('ownedModalTitle').textContent = group.item_name;
