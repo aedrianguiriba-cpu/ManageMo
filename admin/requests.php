@@ -10,6 +10,63 @@ $page = $_GET['page'] ?? 1;
 $status_filter = $_GET['status'] ?? '';
 $type_filter = $_GET['type'] ?? '';
 
+// Shared step computation for the progress tracker — used for both the
+// request-level stepper and each unit's own mini tracker.
+function arComputeTrackerSteps(bool $isService, ?string $status, ?string $deliveryStatus): array {
+    $sd = [1=>'s-done',2=>'',3=>'',4=>'',5=>''];
+    $ld = [1=>'l-done',2=>'',3=>'',4=>'',5=>''];
+    $ln = [1=>'',2=>'',3=>'',4=>''];
+
+    if ($isService) {
+        $si = [1=>'fas fa-check',2=>'fas fa-search',3=>'fas fa-check',4=>'fas fa-wrench',5=>'fas fa-flag-checkered'];
+        $sl = [1=>'Submitted',2=>'Under Review',3=>'Approved',4=>'In Progress',5=>'Completed'];
+        if ($status === 'pending') {
+            $sd[2]='s-pending'; $ld[2]='l-pending';
+            $ln[1]='l-done';
+        } elseif ($status === 'disapproved') {
+            $sd[2]='s-done'; $ld[2]='l-done';
+            $sd[3]='s-rejected'; $ld[3]='l-rejected'; $sl[3]='Disapproved';
+            $si[3]='fas fa-times';
+            $ln[1]='l-done';
+        } elseif ($status === 'completed') {
+            foreach([2,3,4,5] as $x){$sd[$x]='s-done';$ld[$x]='l-done';}
+            foreach([1,2,3,4] as $x){$ln[$x]='l-done';}
+        } elseif ($status === 'approved') {
+            $sd[2]='s-done'; $ld[2]='l-done';
+            $sd[3]='s-done'; $ld[3]='l-done';
+            $sd[4]='s-active'; $ld[4]='l-active';
+            $ln[1]='l-done'; $ln[2]='l-done'; $ln[3]='l-done';
+        }
+    } else {
+        $si = [1=>'fas fa-check',2=>'fas fa-search',3=>'fas fa-check',4=>'fas fa-truck',5=>'fas fa-flag-checkered'];
+        $sl = [1=>'Submitted',2=>'Under Review',3=>'Approved',4=>'Out for Delivery',5=>'Delivered'];
+        if ($status === 'pending') {
+            $sd[2]='s-pending'; $ld[2]='l-pending';
+            $ln[1]='l-done';
+        } elseif ($status === 'disapproved') {
+            $sd[2]='s-done'; $ld[2]='l-done';
+            $sd[3]='s-rejected'; $ld[3]='l-rejected'; $sl[3]='Disapproved';
+            $si[3]='fas fa-times';
+            $ln[1]='l-done';
+        } elseif ($deliveryStatus === 'delivered') {
+            foreach([2,3,4,5] as $x){$sd[$x]='s-done';$ld[$x]='l-done';}
+            foreach([1,2,3,4] as $x){$ln[$x]='l-done';}
+        } elseif ($deliveryStatus === 'out_for_delivery') {
+            $sd[2]='s-done'; $ld[2]='l-done';
+            $sd[3]='s-done'; $ld[3]='l-done';
+            $sd[4]='s-active'; $ld[4]='l-active';
+            $ln[1]='l-done'; $ln[2]='l-done'; $ln[3]='l-done';
+        } else {
+            $sd[2]='s-done'; $ld[2]='l-done';
+            $sd[3]='s-done'; $ld[3]='l-done';
+            $sd[4]='s-pending'; $ld[4]='l-pending';
+            $ln[1]='l-done'; $ln[2]='l-done';
+        }
+    }
+
+    return [$si, $sl, $sd, $ld, $ln];
+}
+
 // Handle request actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $request_id  = (int)sanitizeInput($_POST['request_id']);
@@ -477,31 +534,20 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 }
 .ar-step-line.l-done { background: #22c55e; }
 
-/* Tracker card view */
-.ar-tracker-card {
-    background: #fff;
-    border: 1px solid #e5e7eb; border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    margin-bottom: 14px; overflow: hidden;
-    transition: border-color .18s;
+/* Per-unit tracker dropdown (Units table) */
+.ar-unit-tracker-toggle {
+    border: 1px solid #e5e7eb; background: #fff; color: #999;
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
 }
-.ar-tracker-card:hover { border-color: rgba(139,0,0,.20); }
-.ar-tracker-head {
-    padding: 14px 20px;
-    display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 1px solid #e5e7eb; gap: 12px; flex-wrap: wrap;
-}
-.ar-tracker-body { padding: 16px 20px; }
-.ar-view-toggle {
-    display: inline-flex; background: #f7f7f7; border-radius: 6px; padding: 3px;
-    gap: 2px; margin-bottom: 16px;
-}
-.ar-vt-btn {
-    padding: 6px 14px; border-radius: 4px; border: none; background: transparent;
-    font-size: .8rem; font-weight: 700; color: #555;
-    cursor: pointer; transition: all .2s;
-}
-.ar-vt-btn.active { background: #fff; color: #8B0000; border: 1px solid #e5e7eb; }
+.ar-unit-tracker-toggle:hover { border-color: rgba(139,0,0,.25); color: #8B0000; }
+.ar-unit-tracker-toggle i { transition: transform 0.15s; }
+.ar-unit-tracker-toggle.open { border-color: #8B0000; color: #8B0000; background: rgba(139,0,0,.06); }
+.ar-unit-tracker-toggle.open i { transform: rotate(180deg); }
+.ar-mini-steps .ar-step-dot { width: 26px; height: 26px; font-size: 0.62rem; }
+.ar-mini-steps .ar-step-lbl { font-size: 0.58rem; max-width: 56px; margin-top: 5px; }
+.ar-mini-steps .ar-step-line { margin-top: -14px; }
 
 /* Request type tabs */
 .ar-type-tabs {
@@ -598,10 +644,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     .ar-filter-card { padding: 12px 14px; gap: 8px; }
     .ar-filter-card .form-select { min-width: 0 !important; width: 100%; }
 
-    /* View toggle */
-    .ar-view-toggle { width: 100%; }
-    .ar-vt-btn { flex: 1; display: inline-flex; justify-content: center; align-items: center; }
-
     /* Table → stacked card list on mobile */
     .ar-table-card {
         overflow: visible; background: transparent;
@@ -650,10 +692,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     .ar-step-dot { width: 26px; height: 26px; font-size: 0.58rem; }
     .ar-step-lbl { font-size: 0.54rem; max-width: 44px; margin-top: 5px; }
     .ar-step-line { margin-top: -14px; }
-
-    /* Tracker card stacks on mobile */
-    .ar-tracker-head { flex-direction: column; align-items: flex-start; gap: 8px; }
-    .ar-tracker-head > div:last-child { width: 100%; display: flex; justify-content: space-between; align-items: center; }
 
     /* Detail view header */
     .ar-mob-header { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
@@ -789,63 +827,8 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 
         <!-- Tracker Stepper -->
         <?php
-        $rstatus   = $request['status'];
         $is_service = ($request['request_type'] === 'service');
-        $rdel      = $request['delivery_status'] ?? null;
-
-        // Compute per-step state
-        $sd = [1=>'s-done',2=>'',3=>'',4=>'',5=>''];
-        $ld = [1=>'l-done',2=>'',3=>'',4=>'',5=>''];
-        $ln = [1=>'',2=>'',3=>'',4=>''];
-
-        if ($is_service) {
-            // Service request steps: Submitted → Under Review → Approved → In Progress → Completed
-            $si = [1=>'fas fa-check',2=>'fas fa-search',3=>'fas fa-check',4=>'fas fa-wrench',5=>'fas fa-flag-checkered'];
-            $sl = [1=>'Submitted',2=>'Under Review',3=>'Approved',4=>'In Progress',5=>'Completed'];
-            if ($rstatus === 'pending') {
-                $sd[2]='s-pending'; $ld[2]='l-pending';
-                $ln[1]='l-done';
-            } elseif ($rstatus === 'disapproved') {
-                $sd[2]='s-done'; $ld[2]='l-done';
-                $sd[3]='s-rejected'; $ld[3]='l-rejected'; $sl[3]='Disapproved';
-                $si[3]='fas fa-times';
-                $ln[1]='l-done';
-            } elseif ($rstatus === 'completed') {
-                foreach([2,3,4,5] as $x){$sd[$x]='s-done';$ld[$x]='l-done';}
-                foreach([1,2,3,4] as $x){$ln[$x]='l-done';}
-            } elseif ($rstatus === 'approved') {
-                $sd[2]='s-done'; $ld[2]='l-done';
-                $sd[3]='s-done'; $ld[3]='l-done';
-                $sd[4]='s-active'; $ld[4]='l-active';
-                $ln[1]='l-done'; $ln[2]='l-done'; $ln[3]='l-done';
-            }
-        } else {
-            // Borrow/Item steps: Submitted → Under Review → Approved → Out for Delivery → Delivered
-            $si = [1=>'fas fa-check',2=>'fas fa-search',3=>'fas fa-check',4=>'fas fa-truck',5=>'fas fa-flag-checkered'];
-            $sl = [1=>'Submitted',2=>'Under Review',3=>'Approved',4=>'Out for Delivery',5=>'Delivered'];
-            if ($rstatus === 'pending') {
-                $sd[2]='s-pending'; $ld[2]='l-pending';
-                $ln[1]='l-done';
-            } elseif ($rstatus === 'disapproved') {
-                $sd[2]='s-done'; $ld[2]='l-done';
-                $sd[3]='s-rejected'; $ld[3]='l-rejected'; $sl[3]='Disapproved';
-                $si[3]='fas fa-times';
-                $ln[1]='l-done';
-            } elseif ($rdel === 'delivered') {
-                foreach([2,3,4,5] as $x){$sd[$x]='s-done';$ld[$x]='l-done';}
-                foreach([1,2,3,4] as $x){$ln[$x]='l-done';}
-            } elseif ($rdel === 'out_for_delivery') {
-                $sd[2]='s-done'; $ld[2]='l-done';
-                $sd[3]='s-done'; $ld[3]='l-done';
-                $sd[4]='s-active'; $ld[4]='l-active';
-                $ln[1]='l-done'; $ln[2]='l-done'; $ln[3]='l-done';
-            } else {
-                $sd[2]='s-done'; $ld[2]='l-done';
-                $sd[3]='s-done'; $ld[3]='l-done';
-                $sd[4]='s-pending'; $ld[4]='l-pending';
-                $ln[1]='l-done'; $ln[2]='l-done';
-            }
-        }
+        [$si, $sl, $sd, $ld, $ln] = arComputeTrackerSteps($is_service, $request['status'], $request['delivery_status'] ?? null);
         ?>
         <div class="ar-stepper-wrap">
             <div class="ar-stepper-title"><i class="fas fa-map-signs me-2" style="color:#8B0000;"></i>Request Progress Tracker</div>
@@ -949,12 +932,13 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             foreach ($group_view_reqs as $_du) {
                 $_du_inv = !empty($_du['inventory_id']) ? findById(getInventory(), (int)$_du['inventory_id']) : null;
                 $detail_units[] = [
-                    'id'           => $_du['id'],
-                    'item_name'    => $_du_inv['item_name'] ?? ($_du['service_description'] ?? 'N/A'),
-                    'qr_code_id'   => $_du['qr_code_id'] ?? ($_du_inv['qr_code_id'] ?? null),
-                    'inventory_id' => $_du['inventory_id'] ?? null,
-                    'req_num'      => $_du['request_number'] ?? '',
-                    'status'       => $_du['status'] ?? 'pending',
+                    'id'              => $_du['id'],
+                    'item_name'       => $_du_inv['item_name'] ?? ($_du['service_description'] ?? 'N/A'),
+                    'qr_code_id'      => $_du['qr_code_id'] ?? ($_du_inv['qr_code_id'] ?? null),
+                    'inventory_id'    => $_du['inventory_id'] ?? null,
+                    'req_num'         => $_du['request_number'] ?? '',
+                    'status'          => $_du['status'] ?? 'pending',
+                    'delivery_status' => $_du['delivery_status'] ?? null,
                 ];
             }
         }
@@ -963,10 +947,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             $leg_items = getRequestItems($request['id']);
             if (!empty($leg_items)) {
                 $detail_units = array_map(fn($ri) => [
-                    'item_name'    => $ri['item_name'],
-                    'qr_code_id'   => $ri['qr_code_id'] ?? null,
-                    'inventory_id' => $ri['inventory_id'] ?? null,
-                    'req_num'      => '',
+                    'item_name'       => $ri['item_name'],
+                    'qr_code_id'      => $ri['qr_code_id'] ?? null,
+                    'inventory_id'    => $ri['inventory_id'] ?? null,
+                    'req_num'         => '',
+                    'status'          => $request['status'],
+                    'delivery_status' => $request['delivery_status'] ?? null,
                 ], $leg_items);
             }
         }
@@ -1006,10 +992,16 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php if (!$__pending): ?>
                         <th style="padding:7px 10px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Status</th>
                         <?php endif; ?>
+                        <th style="padding:7px 10px;text-align:center;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#999;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Tracker</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($detail_units as $di_idx => $di): ?>
+                <?php
+                $__unit_cols = ($__pending ? 1 : 0) + 2 + ($request['request_type'] !== 'service' ? 2 : 0) + (!$__pending ? 1 : 0) + 1;
+                foreach ($detail_units as $di_idx => $di):
+                    $__uid = 'unit-' . $di_idx;
+                    [$u_si, $u_sl, $u_sd, $u_ld, $u_ln] = arComputeTrackerSteps($is_service, $di['status'] ?? 'pending', $di['delivery_status'] ?? null);
+                ?>
                     <tr style="border-bottom:1px solid #f0f0f0;">
                         <?php if ($__pending): ?>
                         <td style="padding:8px 10px;"><input type="checkbox" class="unit-check" name="unit_ids[]" value="<?php echo (int)$di['id']; ?>" checked></td>
@@ -1029,6 +1021,26 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php if (!$__pending): ?>
                         <td style="padding:8px 10px;"><span class="ar-badge ar-badge-<?php echo $status_colors[$di['status']] ?? 'secondary'; ?>" style="font-size:.72rem;"><?php echo ucfirst($di['status']); ?></span></td>
                         <?php endif; ?>
+                        <td style="padding:8px 10px;text-align:center;">
+                            <button type="button" class="ar-unit-tracker-toggle" onclick="toggleUnitTracker('<?php echo $__uid; ?>', this)" aria-expanded="false">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <tr id="row-<?php echo $__uid; ?>" class="ar-unit-tracker-row" style="display:none;">
+                        <td colspan="<?php echo $__unit_cols; ?>" style="padding:14px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0;">
+                            <div class="ar-steps ar-mini-steps">
+                                <?php for($i=1;$i<=5;$i++): ?>
+                                <div class="ar-step">
+                                    <div class="ar-step-dot <?php echo $u_sd[$i]; ?>">
+                                        <i class="<?php echo $u_si[$i]; ?>"></i>
+                                    </div>
+                                    <div class="ar-step-lbl <?php echo $u_ld[$i]; ?>"><?php echo $u_sl[$i]; ?></div>
+                                </div>
+                                <?php if($i<5): ?><div class="ar-step-line <?php echo $u_ln[$i]; ?>"></div><?php endif; ?>
+                                <?php endfor; ?>
+                            </div>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -1254,6 +1266,14 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             _renderStickers();
             document.getElementById('arStickerPrint').classList.add('open');
         }
+        function toggleUnitTracker(uid, btn) {
+            var row = document.getElementById('row-' + uid);
+            if (!row) return;
+            var open = row.style.display !== 'none';
+            row.style.display = open ? 'none' : 'table-row';
+            btn.setAttribute('aria-expanded', String(!open));
+            btn.classList.toggle('open', !open);
+        }
         function printStickerWindow() {
             var grid = document.getElementById('stickerGrid').innerHTML;
             var win = window.open('', '_blank', 'width=850,height=700,scrollbars=yes');
@@ -1287,7 +1307,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     <?php else: ?>
         <!-- List Requests -->
         <?php
-        $view_mode   = $_GET['view'] ?? 'table';
         $active_tab  = $_GET['tab']  ?? 'all';
         // Count per tab (using all requests, not paginated)
         $all_reqs_raw  = getRequests();
@@ -1359,16 +1378,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             ]);
         }
         ?>
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
-            <?php if ($active_tab !== 'service' && $active_tab !== 'item'): ?>
-            <div class="ar-view-toggle">
-                <button class="ar-vt-btn <?php echo $view_mode==='table'?'active':''; ?>" onclick="setView('table')"><i class="fas fa-table me-1"></i>Table</button>
-                <button class="ar-vt-btn <?php echo $view_mode==='tracker'?'active':''; ?>" onclick="setView('tracker')"><i class="fas fa-route me-1"></i>Tracker</button>
-            </div>
-            <?php else: ?>
-            <div></div>
-            <?php endif; ?>
-        </div>
         <div class="ar-filter-card">
             <form method="GET" action="" class="d-flex align-items-end flex-wrap gap-3 w-100">
                 <input type="hidden" name="tab" value="<?php echo htmlspecialchars($active_tab); ?>">
@@ -1482,7 +1491,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             </table>
         </div></div>
         <?php else: ?>
-        <div id="tableView"><div class="ar-table-card"><div class="ar-table-scroll">
+        <div class="ar-table-card"><div class="ar-table-scroll">
             <table class="ar-table ar-table-all">
                 <thead><tr>
                     <th>Request ID</th><th>Requester</th><th>Department</th><th>Item</th><th>Type</th><th>Urgency</th><th>Status</th><th>Date</th><th>Actions</th>
@@ -1524,79 +1533,8 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-        <!-- hidden by default if tracker mode -->
-        </div>
+        </div></div>
         <?php endif; ?>
-
-        <!-- Tracker card view -->
-        <?php if ($active_tab !== 'service' && $active_tab !== 'item'): ?>
-        <div id="trackerView" style="display:none;">
-        <?php
-        $type_labels_t = ['item'=>'Item Request','borrow'=>'Borrow','service'=>'Service'];
-        $status_colors_t = ['pending'=>'ar-badge-warning','approved'=>'ar-badge-success','disapproved'=>'ar-badge-danger'];
-        if(count($requests)>0): foreach($requests as $req):
-            $rs = $req['status'];
-            $rd = $req['delivery_status'] ?? null;
-            $is_svc = ($req['request_type'] === 'service');
-            // Steps
-            $tsd=[1=>'s-done',2=>'',3=>'',4=>'',5=>'']; $tld=[1=>'l-done',2=>'',3=>'',4=>'',5=>'']; $tln=[1=>'',2=>'',3=>'',4=>''];
-            if ($is_svc) {
-                $tsi=[1=>'fa-check',2=>'fa-search',3=>'fa-check',4=>'fa-wrench',5=>'fa-flag-checkered'];
-                $tsl=[1=>'Submitted',2=>'Under Review',3=>'Approved',4=>'In Progress',5=>'Completed'];
-                if($rs==='pending'){$tsd[2]='s-pending';$tld[2]='l-pending';$tln[1]='l-done';}
-                elseif($rs==='disapproved'){$tsd[2]='s-done';$tld[2]='l-done';$tsd[3]='s-rejected';$tld[3]='l-rejected';$tsl[3]='Disapproved';$tsi[3]='fa-times';$tln[1]='l-done';}
-                elseif($rs==='completed'){foreach([2,3,4,5] as $x){$tsd[$x]='s-done';$tld[$x]='l-done';}foreach([1,2,3,4] as $x){$tln[$x]='l-done';}}
-                elseif($rs==='approved'){$tsd[2]='s-done';$tld[2]='l-done';$tsd[3]='s-done';$tld[3]='l-done';$tsd[4]='s-active';$tld[4]='l-active';$tln[1]='l-done';$tln[2]='l-done';$tln[3]='l-done';}
-            } else {
-                $tsi=[1=>'fa-check',2=>'fa-search',3=>'fa-check',4=>'fa-truck',5=>'fa-flag-checkered'];
-                $tsl=[1=>'Submitted',2=>'Under Review',3=>'Approved',4=>'Out for Delivery',5=>'Delivered'];
-                if($rs==='pending'){$tsd[2]='s-pending';$tld[2]='l-pending';$tln[1]='l-done';}
-                elseif($rs==='disapproved'){$tsd[2]='s-done';$tld[2]='l-done';$tsd[3]='s-rejected';$tld[3]='l-rejected';$tsl[3]='Disapproved';$tsi[3]='fa-times';$tln[1]='l-done';}
-                elseif($rd==='delivered'){foreach([2,3,4,5] as $x){$tsd[$x]='s-done';$tld[$x]='l-done';}foreach([1,2,3,4] as $x){$tln[$x]='l-done';}}
-                elseif($rd==='out_for_delivery'){$tsd[2]='s-done';$tld[2]='l-done';$tsd[3]='s-done';$tld[3]='l-done';$tsd[4]='s-active';$tld[4]='l-active';$tln[1]='l-done';$tln[2]='l-done';$tln[3]='l-done';}
-                else{$tsd[2]='s-done';$tld[2]='l-done';$tsd[3]='s-done';$tld[3]='l-done';$tsd[4]='s-pending';$tld[4]='l-pending';$tln[1]='l-done';$tln[2]='l-done';}
-            }
-            $initials = strtoupper(substr($req['full_name'],0,1));
-            $cols=['#8B0000','#1d4ed8','#15803d','#b45309','#7c3aed'];
-            $col=$cols[crc32((string)($req['user_id'] ?? ''))%count($cols)];
-        ?>
-        <div class="ar-tracker-card">
-            <div class="ar-tracker-head">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:36px;height:36px;border-radius:6px;background:<?php echo $col;?>;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.85rem;flex-shrink:0;"><?php echo $initials;?></div>
-                    <div>
-                        <div style="font-weight:700;font-size:.88rem;color:#0f172a;"><?php echo htmlspecialchars($req['full_name']);?></div>
-                        <div style="font-size:.78rem;color:#374151;font-weight:600;margin-top:2px;"><?php echo htmlspecialchars($req['item_name']);?></div>
-                        <div style="font-size:.74rem;color:#94a3b8;margin-top:1px;">
-                            <code style="background:rgba(139,0,0,.07);color:#8B0000;border-radius:4px;padding:1px 6px;font-size:.71rem;"><?php echo $req['request_number'];?></code>
-                            &nbsp;<?php echo $type_labels_t[$req['request_type']]??ucfirst($req['request_type']);?>
-                        </div>
-                    </div>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span class="ar-badge <?php echo $status_colors_t[$rs]??'ar-badge-secondary';?>"><?php echo ucfirst($rs);?></span>
-                    <?php $trk_href = !empty($req['group_id']) ? 'requests.php?action=view&group_id='.urlencode($req['group_id']) : 'requests.php?action=view&id='.$req['id']; ?>
-                    <a href="<?php echo $trk_href;?>" class="ar-btn-view" style="font-size:.77rem;"><i class="fas fa-eye"></i> View<?php if ($req['unit_count'] > 1): ?> <span style="font-size:.70rem;background:rgba(139,0,0,.13);color:#8B0000;border-radius:3px;padding:0 5px;"><?php echo $req['unit_count'];?></span><?php endif; ?></a>
-                </div>
-            </div>
-            <div class="ar-tracker-body">
-                <div class="ar-steps">
-                    <?php for($i=1;$i<=5;$i++): ?>
-                    <div class="ar-step">
-                        <div class="ar-step-dot <?php echo $tsd[$i];?>"><i class="fas <?php echo $tsi[$i];?>"></i></div>
-                        <div class="ar-step-lbl <?php echo $tld[$i];?>"><?php echo $tsl[$i];?></div>
-                    </div>
-                    <?php if($i<5): ?><div class="ar-step-line <?php echo $tln[$i];?>"></div><?php endif; ?>
-                    <?php endfor; ?>
-                </div>
-            </div>
-        </div>
-        <?php endforeach; else: ?>
-        <div class="ar-empty"><i class="fas fa-inbox"></i>No requests found</div>
-        <?php endif; ?>
-        </div>
-        <?php endif; // end tracker tab guard ?>
 
         <?php if ($total_pages > 1): ?>
         <nav class="mt-4">
@@ -1612,21 +1550,5 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     <?php endif; ?>
 </div>
 </div>
-
-<script>
-function setView(mode) {
-    document.getElementById('tableView').style.display  = mode==='table'   ? 'block' : 'none';
-    document.getElementById('trackerView').style.display = mode==='tracker' ? 'block' : 'none';
-    document.querySelectorAll('.ar-vt-btn').forEach(b => b.classList.remove('active'));
-    event.currentTarget.classList.add('active');
-}
-(function(){
-    var mode = '<?php echo $view_mode ?? 'table'; ?>';
-    if(mode==='tracker'){
-        document.getElementById('tableView').style.display='none';
-        document.getElementById('trackerView').style.display='block';
-    }
-})();
-</script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
