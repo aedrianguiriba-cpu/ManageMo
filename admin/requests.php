@@ -1026,18 +1026,13 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     </tr>
                 </thead>
                 <tbody>
-                <?php
-                $__unit_cols = ($__pending ? 1 : 0) + 2 + ($request['request_type'] !== 'service' ? 2 : 0) + (!$__pending ? 1 : 0);
-                foreach ($detail_units as $di_idx => $di):
-                    $__uid = 'unit-' . $di_idx;
-                    [$u_si, $u_sl, $u_sd, $u_ld, $u_ln] = arComputeTrackerSteps($is_service, $di['status'] ?? 'pending', $di['delivery_status'] ?? null);
-                ?>
-                    <tr style="border-bottom:1px solid #f0f0f0;" <?php echo arRowToggleAttrs($__uid); ?>>
+                <?php foreach ($detail_units as $di_idx => $di): ?>
+                    <tr style="border-bottom:1px solid #f0f0f0;">
                         <?php if ($__pending): ?>
                         <td style="padding:8px 10px;"><input type="checkbox" class="unit-check" name="unit_ids[]" value="<?php echo (int)$di['id']; ?>" checked></td>
                         <?php endif; ?>
                         <td style="padding:8px 10px;color:#999;font-size:.75rem;"><?php echo $di_idx + 1; ?></td>
-                        <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?> <i class="fas fa-chevron-down ar-row-chevron"></i></td>
+                        <td style="padding:8px 10px;font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($di['item_name']); ?></td>
                         <?php if ($request['request_type'] !== 'service'): ?>
                         <td style="padding:8px 10px;">
                             <?php if (!empty($di['qr_code_id'])): ?>
@@ -1051,21 +1046,6 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php if (!$__pending): ?>
                         <td style="padding:8px 10px;"><span class="ar-badge ar-badge-<?php echo $status_colors[$di['status']] ?? 'secondary'; ?>" style="font-size:.72rem;"><?php echo ucfirst($di['status']); ?></span></td>
                         <?php endif; ?>
-                    </tr>
-                    <tr id="row-<?php echo $__uid; ?>" class="ar-unit-tracker-row" style="display:none;">
-                        <td colspan="<?php echo $__unit_cols; ?>" style="padding:14px 16px;background:#fafafa;border-bottom:1px solid #f0f0f0;">
-                            <div class="ar-steps ar-mini-steps">
-                                <?php for($i=1;$i<=5;$i++): ?>
-                                <div class="ar-step">
-                                    <div class="ar-step-dot <?php echo $u_sd[$i]; ?>">
-                                        <i class="<?php echo $u_si[$i]; ?>"></i>
-                                    </div>
-                                    <div class="ar-step-lbl <?php echo $u_ld[$i]; ?>"><?php echo $u_sl[$i]; ?></div>
-                                </div>
-                                <?php if($i<5): ?><div class="ar-step-line <?php echo $u_ln[$i]; ?>"></div><?php endif; ?>
-                                <?php endfor; ?>
-                            </div>
-                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
