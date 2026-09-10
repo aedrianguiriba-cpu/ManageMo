@@ -65,6 +65,26 @@ function reqUserName($all_users, $uid) {
     foreach ($all_users as $u) { if ($u['id'] == $uid) return $u['full_name']; }
     return 'Unknown';
 }
+// Shared row markup for the Inventory Report table — used once for the
+// on-screen paginated view and once (unpaginated, full dataset) for print,
+// so "Print Report" doesn't just print whichever page happens to be on screen.
+function rpInventoryRow($item, $rownum, $all_depts) {
+    ?>
+    <tr>
+        <td style="color:rgba(0,0,0,0.35);font-size:0.75rem;"><?php echo $rownum; ?></td>
+        <td><span style="font-family:monospace;font-size:0.76rem;color:#8B0000;background:rgba(139,0,0,0.06);border-radius:4px;padding:1px 5px;"><?php echo htmlspecialchars($item['qr_code_id']); ?></span></td>
+        <td style="font-weight:700;"><?php echo htmlspecialchars($item['item_name']); ?></td>
+        <td><?php echo htmlspecialchars($item['category']); ?></td>
+        <td><?php echo htmlspecialchars(deptName($all_depts, $item['college_id'] ?? '')); ?></td>
+        <td style="font-size:0.80rem;color:rgba(0,0,0,0.55);"><?php echo htmlspecialchars($item['location']); ?></td>
+        <td style="text-align:center;font-weight:700;"><?php echo (int)$item['quantity']; ?></td>
+        <td><?php echo ucfirst(htmlspecialchars($item['condition'])); ?></td>
+        <td><span class="rp-badge rp-badge-<?php echo $item['status']; ?>"><?php echo ucfirst($item['status']); ?></span></td>
+        <td style="text-align:right;"><?php echo number_format($item['cost'], 2); ?></td>
+        <td style="font-size:0.79rem;color:rgba(0,0,0,0.50);"><?php echo $item['purchase_date'] ? date('M d, Y', strtotime($item['purchase_date'])) : '—'; ?></td>
+    </tr>
+    <?php
+}
 
 // --- CSV export (uses the same filtered dataset the on-screen report shows) ---
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
@@ -251,12 +271,19 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         font-size:7.5pt; color:#888; text-align:center;
     }
 
+    /* The on-screen table only shows the current pagination page — printing
+       it as-is would silently cut the report down to whatever page happened
+       to be open. Swap in the print-only table, which always holds the full
+       filtered dataset, and hide the pagination controls entirely. */
+    .rp-screen-only { display:none !important; }
+    .rp-print-only  { display:block !important; }
+
     body { font-family: Arial, sans-serif !important; }
     @page { margin: 18mm 15mm; }
 }
 
 /* Hide print-only elements on screen */
-.rp-print-header, .rp-print-meta, .rp-print-footer { display:none; }
+.rp-print-header, .rp-print-meta, .rp-print-footer, .rp-print-only { display:none; }
 </style>
 
 <div class="container-fluid mt-4 pb-5">
@@ -439,8 +466,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <div class="rp-summary-lbl">Total Value</div>
                 </div>
             </div>
-            <!-- Table -->
-            <div style="overflow-x:auto;">
+            <!-- Table (on-screen: current page only) -->
+            <div style="overflow-x:auto;" class="rp-screen-only">
             <table class="rp-table">
                 <thead>
                     <tr>
@@ -459,19 +486,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </thead>
                 <tbody>
                 <?php foreach ($paginated_inv as $i => $item): ?>
-                <tr>
-                    <td style="color:rgba(0,0,0,0.35);font-size:0.75rem;"><?php echo $offset + $i + 1; ?></td>
-                    <td><span style="font-family:monospace;font-size:0.76rem;color:#8B0000;background:rgba(139,0,0,0.06);border-radius:4px;padding:1px 5px;"><?php echo htmlspecialchars($item['qr_code_id']); ?></span></td>
-                    <td style="font-weight:700;"><?php echo htmlspecialchars($item['item_name']); ?></td>
-                    <td><?php echo htmlspecialchars($item['category']); ?></td>
-                    <td><?php echo htmlspecialchars(deptName($all_depts, $item['college_id'] ?? '')); ?></td>
-                    <td style="font-size:0.80rem;color:rgba(0,0,0,0.55);"><?php echo htmlspecialchars($item['location']); ?></td>
-                    <td style="text-align:center;font-weight:700;"><?php echo (int)$item['quantity']; ?></td>
-                    <td><?php echo ucfirst(htmlspecialchars($item['condition'])); ?></td>
-                    <td><span class="rp-badge rp-badge-<?php echo $item['status']; ?>"><?php echo ucfirst($item['status']); ?></span></td>
-                    <td style="text-align:right;"><?php echo number_format($item['cost'], 2); ?></td>
-                    <td style="font-size:0.79rem;color:rgba(0,0,0,0.50);"><?php echo $item['purchase_date'] ? date('M d, Y', strtotime($item['purchase_date'])) : '—'; ?></td>
-                </tr>
+                    <?php rpInventoryRow($item, $offset + $i + 1, $all_depts); ?>
                 <?php endforeach; ?>
                 <?php if (empty($paginated_inv)): ?>
                 <tr><td colspan="11" style="text-align:center;padding:28px;color:rgba(0,0,0,0.35);">No inventory items match the selected filters.</td></tr>
@@ -479,9 +494,37 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </tbody>
             </table>
             </div>
+            <!-- Table (print: full filtered dataset, not just the on-screen page) -->
+            <div class="rp-print-only" style="overflow-x:auto;">
+            <table class="rp-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>QR Code</th>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>College/Office</th>
+                        <th>Location</th>
+                        <th>Qty</th>
+                        <th>Condition</th>
+                        <th>Status</th>
+                        <th>Value (₱)</th>
+                        <th>Purchase Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($display_inv as $i => $item): ?>
+                    <?php rpInventoryRow($item, $i + 1, $all_depts); ?>
+                <?php endforeach; ?>
+                <?php if (empty($display_inv)): ?>
+                <tr><td colspan="11" style="text-align:center;padding:28px;color:rgba(0,0,0,0.35);">No inventory items match the selected filters.</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+            </div>
             <!-- Pagination -->
             <?php if ($total_pages > 1): ?>
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:24px; padding-top:16px; border-top:1px solid rgba(0,0,0,0.08);">
+            <div class="rp-no-print" style="display:flex; align-items:center; justify-content:space-between; margin-top:24px; padding-top:16px; border-top:1px solid rgba(0,0,0,0.08);">
                 <div style="font-size:0.85rem; color:rgba(0,0,0,0.55);">
                     Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $per_page, $total_inv); ?> of <?php echo $total_inv; ?> items
                 </div>
