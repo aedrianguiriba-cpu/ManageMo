@@ -311,10 +311,17 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     .rp-screen-only { display:none !important; }
     .rp-print-only  { display:block !important; }
 
+    /* These wrappers give the table a horizontal scrollbar on screen when it's
+       wider than its container — but a scrollbar means nothing on paper, so
+       "overflow-x:auto" just silently clips (crops) every column past the
+       fold instead. Let the table spill onto the page in full during print. */
+    .rp-table-scroll { overflow-x:visible !important; overflow:visible !important; }
+    .rp-table { table-layout:auto !important; width:100% !important; }
+
     body, .rp-table, .rp-print-header, .rp-print-meta, .rp-print-title, .rp-print-signatures {
         font-family: "Times New Roman", Times, serif !important;
     }
-    @page { margin: 20mm 18mm; }
+    @page { size: landscape; margin: 15mm; }
 }
 
 /* Hide print-only elements on screen */
@@ -507,7 +514,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
             </div>
             <!-- Table (on-screen: current page only) -->
-            <div style="overflow-x:auto;" class="rp-screen-only">
+            <div style="overflow-x:auto;" class="rp-screen-only rp-table-scroll">
             <table class="rp-table">
                 <thead>
                     <tr>
@@ -535,7 +542,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </table>
             </div>
             <!-- Table (print: full filtered dataset, not just the on-screen page) -->
-            <div class="rp-print-only" style="overflow-x:auto;">
+            <div class="rp-print-only rp-table-scroll" style="overflow-x:auto;">
             <table class="rp-table">
                 <thead>
                     <tr>
@@ -623,7 +630,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <div class="rp-summary-lbl">Disapproved</div>
                 </div>
             </div>
-            <div style="overflow-x:auto;">
+            <div style="overflow-x:auto;" class="rp-table-scroll">
             <table class="rp-table">
                 <thead>
                     <tr>
@@ -703,7 +710,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <div class="rp-summary-lbl">Faculty / Staff</div>
                 </div>
             </div>
-            <div style="overflow-x:auto;">
+            <div style="overflow-x:auto;" class="rp-table-scroll">
             <table class="rp-table">
                 <thead>
                     <tr>
