@@ -11,6 +11,9 @@ $page = $_GET['page'] ?? 1;
 $search = $_GET['search'] ?? '';
 $category_filter = $_GET['category'] ?? '';
 $status_filter = $_GET['status'] ?? '';
+// Acquisition-mode sub-tabs (All Items tab): '', 'borrow', or 'request'.
+$acq_filter = $_GET['facq'] ?? '';
+if (!in_array($acq_filter, ['', 'borrow', 'request'])) $acq_filter = '';
 
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
@@ -74,6 +77,9 @@ if (!empty($status_filter) && $status_filter !== 'owned') {
 
 if (!empty($category_filter)) {
     $filtered_items = filterByColumn($filtered_items, 'category', $category_filter);
+}
+if ($acq_filter !== '') {
+    $filtered_items = array_values(array_filter($filtered_items, fn($item) => ($item['acquisition_mode'] ?? 'borrow') === $acq_filter));
 }
 if (!empty($search)) {
     $s = strtolower($search);
@@ -502,6 +508,7 @@ foreach ($all_borrows as $br) {
     <div class="inv-filter-card" id="inv-filter-section" style="display: <?php echo in_array($current_tab, ['all', 'available', 'borrowed']) ? 'block' : 'none'; ?>;">
         <form method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
+            <input type="hidden" name="facq" value="<?php echo htmlspecialchars($acq_filter); ?>">
             <div class="col-md-4">
                 <label class="inv-filter-label"><i class="fas fa-search me-1"></i>Search</label>
                 <input type="text" class="form-control" name="search"
@@ -539,10 +546,26 @@ foreach ($all_borrows as $br) {
                 </a>
             </div>
         </form>
+        <?php if ($current_tab === 'available'):
+            $__acq_base_qs = 'tab=available&search=' . urlencode($search) . '&category=' . urlencode($category_filter);
+            $__acq_tabs = ['' => 'All', 'borrow' => 'Borrowable', 'request' => 'Acquire Only'];
+        ?>
+        <div style="display:flex;gap:6px;margin:14px 0;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:360px;">
+            <?php foreach ($__acq_tabs as $__acq_val => $__acq_label): ?>
+            <a href="inventory.php?<?php echo $__acq_base_qs; ?>&facq=<?php echo $__acq_val; ?>"
+               style="flex:1;text-align:center;padding:7px 0;border-radius:6px;font-size:.82rem;font-weight:700;text-decoration:none;
+                      background:<?php echo $acq_filter === $__acq_val ? '#fff' : 'transparent'; ?>;
+                      color:<?php echo $acq_filter === $__acq_val ? '#8B0000' : '#555'; ?>;
+                      box-shadow:<?php echo $acq_filter === $__acq_val ? '0 1px 4px rgba(0,0,0,.10)' : 'none'; ?>;">
+                <?php echo $__acq_label; ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <?php if ($total > 0): ?>
         <div class="inv-results-count">
             Showing <?php echo count($items); ?> of <?php echo $total; ?> group<?php echo $total !== 1 ? 's' : ''; ?>
-            <?php if ($search || $category_filter || $status_filter): ?>
+            <?php if ($search || $category_filter || $status_filter || $acq_filter): ?>
                 — filtered results
             <?php endif; ?>
         </div>
@@ -683,6 +706,7 @@ foreach ($all_borrows as $br) {
                         echo $search          ? '&search='   . urlencode($search)          : '';
                         echo $category_filter ? '&category=' . urlencode($category_filter) : '';
                         echo $status_filter   ? '&status='   . urlencode($status_filter)   : '';
+                        echo $acq_filter      ? '&facq='     . urlencode($acq_filter)      : '';
                     ?>"><?php echo $i; ?></a>
                 </li>
             <?php endfor; ?>

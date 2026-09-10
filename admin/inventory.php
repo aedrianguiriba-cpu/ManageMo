@@ -741,13 +741,17 @@ displayMessage();
     $filter_dept     = $_GET['fdept'] ?? '';
     $filter_college_id = (str_starts_with($filter_dept, 'c:') || str_starts_with($filter_dept, 'd:')) ? substr($filter_dept, 2) : '';
     $filter_category   = $_GET['fcategory'] ?? '';
+    // Acquisition-mode sub-tabs (All Items only): '', 'borrow', or 'request'.
+    $filter_acq = $_GET['facq'] ?? '';
+    if (!in_array($filter_acq, ['', 'borrow', 'request'])) $filter_acq = '';
     $all_categories    = array_values(array_unique(array_filter(array_column($all_items, 'category'))));
     sort($all_categories);
 
-    $applyInventoryFilters = function(array $items) use ($filter_search, $filter_college_id, $filter_category): array {
-        return array_values(array_filter($items, function($i) use ($filter_search, $filter_college_id, $filter_category) {
+    $applyInventoryFilters = function(array $items) use ($filter_search, $filter_college_id, $filter_category, $filter_acq): array {
+        return array_values(array_filter($items, function($i) use ($filter_search, $filter_college_id, $filter_category, $filter_acq) {
             if ($filter_college_id !== '' && ($i['college_id'] ?? '') !== $filter_college_id) return false;
             if ($filter_category !== '' && $i['category'] !== $filter_category) return false;
+            if ($filter_acq !== '' && ($i['acquisition_mode'] ?? 'borrow') !== $filter_acq) return false;
             if ($filter_search !== '') {
                 $hay = strtolower($i['item_name'] . ' ' . ($i['qr_code_id'] ?? '') . ' ' . ($i['category'] ?? ''));
                 if (strpos($hay, strtolower($filter_search)) === false) return false;
@@ -835,6 +839,7 @@ displayMessage();
     <!-- FILTER / SEARCH BAR (applies to All Items and Available tabs) -->
     <form method="GET" action="inventory.php" class="ai-filter-card">
         <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
+        <input type="hidden" name="facq" value="<?php echo htmlspecialchars($filter_acq); ?>">
         <div style="flex:1;min-width:180px;">
             <div class="ai-filter-label">Search</div>
             <input type="text" name="search" class="form-control form-control-sm" placeholder="Item name, QR code, category…" value="<?php echo htmlspecialchars($filter_search); ?>">
@@ -866,7 +871,7 @@ displayMessage();
         </div>
         <div>
             <button type="submit" class="btn ai-btn-primary btn-sm"><i class="fas fa-filter"></i> Apply</button>
-            <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== ''): ?>
+            <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== '' || $filter_acq !== ''): ?>
             <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?>" class="btn ai-btn-secondary btn-sm">Clear</a>
             <?php endif; ?>
         </div>
@@ -994,6 +999,22 @@ displayMessage();
 
     <!-- AVAILABLE ITEMS TAB -->
     <div id="tab-available" style="display: <?php echo $current_tab === 'available' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
+        <?php
+        // Acquisition-mode sub-tabs: keep every other active filter, just swap facq.
+        $__acq_base_qs = 'tab=available&search=' . urlencode($filter_search) . '&fdept=' . urlencode($filter_dept) . '&fcategory=' . urlencode($filter_category);
+        $__acq_tabs = ['' => 'All', 'borrow' => 'Borrowable', 'request' => 'Acquire Only'];
+        ?>
+        <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:360px;">
+            <?php foreach ($__acq_tabs as $__acq_val => $__acq_label): ?>
+            <a href="inventory.php?<?php echo $__acq_base_qs; ?>&facq=<?php echo $__acq_val; ?>"
+               style="flex:1;text-align:center;padding:7px 0;border-radius:6px;font-size:.82rem;font-weight:700;text-decoration:none;
+                      background:<?php echo $filter_acq === $__acq_val ? '#fff' : 'transparent'; ?>;
+                      color:<?php echo $filter_acq === $__acq_val ? '#8B0000' : '#555'; ?>;
+                      box-shadow:<?php echo $filter_acq === $__acq_val ? '0 1px 4px rgba(0,0,0,.10)' : 'none'; ?>;">
+                <?php echo $__acq_label; ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($available_items_page) > 0):
                 foreach ($available_items_page as $group):
@@ -1062,7 +1083,7 @@ displayMessage();
         <?php if ($pages_available > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_available; $i++): ?>
-                <a href="inventory.php?tab=available&page_available=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_available ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=available&page_available=<?php echo $i; ?>&search=<?php echo urlencode($filter_search); ?>&fdept=<?php echo urlencode($filter_dept); ?>&fcategory=<?php echo urlencode($filter_category); ?>&facq=<?php echo urlencode($filter_acq); ?>" class="btn btn-sm <?php echo $i === $current_page_available ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
