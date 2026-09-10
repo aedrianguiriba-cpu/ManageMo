@@ -14,73 +14,47 @@ $available_items = 0;
 $borrowed_items = 0;
 $pending_requests = 0;
 
-// Get all colleges/offices AND campuses with stats
-$all_departments = getMainCampusDepartments();
-$all_campuses = getDepartmentCampuses();
+// Join colleges, offices, and campuses into one flat "owner" list — each owns
+// inventory the same way, via its abbreviation stored in inventory.college_id.
 $all_inventory = getInventory();
 $all_requests = getRequests();
 
+$owners = [];
+foreach (getMainCampusColleges() as $code => $name) { $owners[] = ['code' => $code, 'name' => $name, 'type' => 'college']; }
+foreach (getMainCampusOffices()  as $code => $name) { $owners[] = ['code' => $code, 'name' => $name, 'type' => 'office']; }
+foreach (getDepartmentCampuses() as $campus) {
+    if ($campus['abbreviation'] === '') continue;
+    $owners[] = ['code' => $campus['abbreviation'], 'name' => $campus['name'], 'type' => 'campus'];
+}
 $dept_stats = [];
 $total_items = 0;
 $available_items = 0;
 $borrowed_items = 0;
 
-foreach ($all_departments as $dept_code => $dept_name) {
-    // Get inventory for this college/office
-    $dept_inventory = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $dept_code));
-    $status_counts = countByStatus($dept_inventory);
-    if (empty($dept_inventory)) continue;
+foreach ($owners as $owner) {
+    $owner_inventory = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $owner['code']));
+    if (empty($owner_inventory)) continue;
+    $status_counts = countByStatus($owner_inventory);
 
-    // Count requested items for this college/office
-    $dept_inventory_ids = array_column($dept_inventory, 'id');
+    // Count requested items for this college/office/campus
+    $owner_inventory_ids = array_column($owner_inventory, 'id');
     $requested_count = 0;
-    foreach ($dept_inventory_ids as $inv_id) {
+    foreach ($owner_inventory_ids as $inv_id) {
         $requested_count += count(filterByColumn($all_requests, 'inventory_id', $inv_id));
     }
 
     $dept_stats[] = [
-        'code' => $dept_code,
-        'name' => $dept_name,
-        'type' => 'dept',
+        'code' => $owner['code'],
+        'name' => $owner['name'],
+        'type' => $owner['type'],
         'stats' => [
-            'total' => count($dept_inventory),
+            'total' => count($owner_inventory),
             'borrowed' => $status_counts['borrowed'] ?? 0,
             'requested' => $requested_count,
             'maintenance' => $status_counts['maintenance'] ?? 0,
         ],
     ];
-    $total_items += count($dept_inventory);
-    $borrowed_items += $status_counts['borrowed'] ?? 0;
-}
-
-// Campuses "own" inventory the same way a college/office does, via their
-// abbreviation stored in inventory.college_id — fold them into the same
-// summary/totals so campus-tagged items aren't silently dropped.
-foreach ($all_campuses as $campus) {
-    $campus_code = $campus['abbreviation'];
-    if ($campus_code === '') continue;
-    $campus_inventory = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $campus_code));
-    $status_counts = countByStatus($campus_inventory);
-    if (empty($campus_inventory)) continue;
-
-    $campus_inventory_ids = array_column($campus_inventory, 'id');
-    $requested_count = 0;
-    foreach ($campus_inventory_ids as $inv_id) {
-        $requested_count += count(filterByColumn($all_requests, 'inventory_id', $inv_id));
-    }
-
-    $dept_stats[] = [
-        'code' => $campus_code,
-        'name' => $campus['name'],
-        'type' => 'campus',
-        'stats' => [
-            'total' => count($campus_inventory),
-            'borrowed' => $status_counts['borrowed'] ?? 0,
-            'requested' => $requested_count,
-            'maintenance' => $status_counts['maintenance'] ?? 0,
-        ],
-    ];
-    $total_items += count($campus_inventory);
+    $total_items += count($owner_inventory);
     $borrowed_items += $status_counts['borrowed'] ?? 0;
 }
 
@@ -384,10 +358,12 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                     <tr>
                         <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($dept['name']); ?></div></td>
                         <td>
-                            <?php if (($dept['type'] ?? 'dept') === 'campus'): ?>
+                            <?php if ($dept['type'] === 'campus'): ?>
                             <span class="adash-badge" style="background:rgba(124,58,237,.10);color:#7c3aed;"><i class="fas fa-map-marker-alt"></i>Campus</span>
+                            <?php elseif ($dept['type'] === 'office'): ?>
+                            <span class="adash-badge b-gray"><i class="fas fa-briefcase"></i>Office</span>
                             <?php else: ?>
-                            <span class="adash-badge b-gray"><i class="fas fa-building"></i>Dept</span>
+                            <span class="adash-badge" style="background:rgba(29,78,216,.10);color:#1d4ed8;"><i class="fas fa-graduation-cap"></i>College</span>
                             <?php endif; ?>
                         </td>
                         <td><span style="font-weight:800;color:#0f172a;font-size:.95rem;"><?php echo $dept['stats']['total']; ?></span></td>
@@ -555,8 +531,10 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                     </div>
                     <a href="inventory.php" class="adash-viewall"><i class="fas fa-arrow-right"></i> All</a>
                 </div>
-                <?php foreach ($recent_inventory as $item):
-                    $item_dept_name = !empty($item['college_id']) ? ($all_departments[$item['college_id']] ?? $item['college_id']) : null;
+                <?php
+                $all_owner_names = getAllDepartmentNames(); // colleges + offices + campuses, so this label resolves regardless of owner type
+                foreach ($recent_inventory as $item):
+                    $item_dept_name = !empty($item['college_id']) ? ($all_owner_names[$item['college_id']] ?? $item['college_id']) : null;
                     $cat_icons = ['Electronics'=>'fa-laptop','Furniture'=>'fa-chair','Equipment'=>'fa-tools','Office'=>'fa-briefcase'];
                     $iconf = $cat_icons[$item['category']] ?? 'fa-box';
                     $status_class = $item['status'] === 'available' ? 'b-green' : ($item['status'] === 'borrowed' ? 'b-amber' : 'b-blue');
