@@ -219,7 +219,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .rp-summary-val { font-size:1.4rem; font-weight:900; color:#1a1d23; }
 .rp-summary-lbl { font-size:0.70rem; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; color:rgba(0,0,0,0.38); margin-top:2px; }
 
-/* --- Print styles --- */
+/* --- Print styles: formal document layout (Republic-letterhead / grid table / signatories) --- */
 @media print {
     /* Hide everything but the report */
     .sidebar, .sidebar-toggle-btn, .rp-filter-card, .rp-type-tabs,
@@ -234,41 +234,74 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     /* Letterhead */
     .rp-print-header {
         display:flex !important;
-        align-items:center; gap:18px;
-        padding-bottom:14px; margin-bottom:18px;
-        border-bottom:3px solid #8B0000;
+        flex-direction:column; align-items:center; text-align:center;
+        gap:2px;
+        padding-bottom:8px; margin-bottom:4px;
     }
-    .rp-print-header-logo {
-        width:54px; height:54px;
-    }
+    .rp-print-header-logo { width:60px; height:60px; margin-bottom:4px; }
+    .rp-print-header-republic { font-size:10pt; font-style:italic; margin:0; }
     .rp-print-header-text h2 {
-        font-size:14pt; font-weight:900; color:#8B0000; margin:0 0 2px;
+        font-size:14pt; font-weight:700; letter-spacing:0.5px;
+        text-transform:uppercase; margin:0; color:#000;
     }
-    .rp-print-header-text p {
-        font-size:8pt; color:#555; margin:0;
+    .rp-print-header-text p { font-size:8.5pt; color:#000; margin:1px 0 0; }
+    .rp-print-header-rule {
+        display:block !important;
+        border:none; border-top:2.5pt solid #000; border-bottom:0.75pt solid #000;
+        height:4pt; margin:6px 0 14px;
+    }
+    .rp-print-title {
+        display:block !important;
+        text-align:center; font-size:12pt; font-weight:700;
+        text-decoration:underline; text-underline-offset:3px;
+        text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;
     }
     .rp-print-meta {
-        display:flex !important;
-        font-size:8pt; color:#666; gap:24px; margin-bottom:14px;
+        display:block !important;
+        font-size:9pt; color:#000; margin-bottom:16px;
     }
-    .rp-print-meta span strong { color:#111; }
+    .rp-print-meta div { margin-bottom:2px; }
+    .rp-print-meta strong { display:inline-block; min-width:150px; }
 
-    .rp-card { box-shadow:none !important; border:1px solid #ddd !important; border-radius:0 !important; }
-    .rp-card-head { border-bottom:1px solid #ddd !important; background:#f9f9f9 !important; }
-    .rp-card-title { font-size:10pt !important; }
-    .rp-card-icon { display:none !important; }
+    .rp-card { box-shadow:none !important; border:none !important; border-radius:0 !important; }
+    .rp-card-head { display:none !important; }
 
-    .rp-table th { background:#f3f3f3 !important; color:#555 !important; font-size:7.5pt !important; padding:6px 10px !important; }
-    .rp-table td { font-size:8pt !important; color:#222 !important; padding:6px 10px !important; }
-    .rp-badge { font-size:7pt !important; padding:1px 6px !important; border:1px solid currentColor !important; background:transparent !important; }
+    /* Grid-ruled table, like an official tabulated report */
+    .rp-table { border-collapse:collapse !important; width:100% !important; }
+    .rp-table th, .rp-table td { border:0.75pt solid #000 !important; }
+    .rp-table th {
+        background:#e5e5e5 !important; color:#000 !important;
+        font-size:7.5pt !important; padding:5px 8px !important;
+        text-transform:uppercase; text-align:center !important;
+    }
+    .rp-table td { font-size:8pt !important; color:#000 !important; padding:5px 8px !important; }
+    .rp-badge {
+        font-size:7pt !important; padding:1px 6px !important;
+        border:0.75pt solid #000 !important; border-radius:0 !important;
+        background:transparent !important; color:#000 !important; font-weight:600 !important;
+    }
 
-    .rp-summary-val { font-size:16pt !important; }
-    .rp-summary-lbl { font-size:7pt !important; }
+    .rp-summary-grid { border:0.75pt solid #000 !important; }
+    .rp-summary-val { font-size:14pt !important; color:#000 !important; }
+    .rp-summary-lbl { font-size:7pt !important; color:#000 !important; }
+
+    /* Signature block — Prepared by / Certified correct / Noted by */
+    .rp-print-signatures {
+        display:flex !important;
+        justify-content:space-between; gap:20px;
+        margin-top:56px; page-break-inside:avoid;
+    }
+    .rp-print-sig { flex:1; text-align:center; font-size:8.5pt; }
+    .rp-print-sig-line {
+        border-top:0.75pt solid #000; margin-bottom:4px; padding-top:4px;
+        font-weight:700; text-transform:uppercase;
+    }
+    .rp-print-sig-role { color:#333; }
 
     .rp-print-footer {
         display:block !important;
-        margin-top:24px; padding-top:10px; border-top:1px solid #ddd;
-        font-size:7.5pt; color:#888; text-align:center;
+        margin-top:20px; padding-top:8px; border-top:0.5pt solid #999;
+        font-size:7pt; color:#555; text-align:center;
     }
 
     /* The on-screen table only shows the current pagination page — printing
@@ -278,12 +311,15 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     .rp-screen-only { display:none !important; }
     .rp-print-only  { display:block !important; }
 
-    body { font-family: Arial, sans-serif !important; }
-    @page { margin: 18mm 15mm; }
+    body, .rp-table, .rp-print-header, .rp-print-meta, .rp-print-title, .rp-print-signatures {
+        font-family: "Times New Roman", Times, serif !important;
+    }
+    @page { margin: 20mm 18mm; }
 }
 
 /* Hide print-only elements on screen */
-.rp-print-header, .rp-print-meta, .rp-print-footer, .rp-print-only { display:none; }
+.rp-print-header, .rp-print-header-rule, .rp-print-title, .rp-print-meta,
+.rp-print-footer, .rp-print-only, .rp-print-signatures { display:none; }
 </style>
 
 <div class="container-fluid mt-4 pb-5">
@@ -294,25 +330,29 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         <!-- Letterhead (print only) -->
         <div class="rp-print-header">
             <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" class="rp-print-header-logo" alt="PSU Logo">
+            <p class="rp-print-header-republic">Republic of the Philippines</p>
             <div class="rp-print-header-text">
                 <h2>Pampanga State University</h2>
-                <p>ManageMo — Inventory & Asset Management System</p>
-                <p>Report generated by: <?php echo htmlspecialchars($current_user['full_name']); ?></p>
+                <p>ManageMo — Inventory &amp; Asset Management System</p>
             </div>
         </div>
+        <hr class="rp-print-header-rule">
+
+        <div class="rp-print-title">
+            <?php echo ['inventory'=>'Inventory Report','requests'=>'Requests Report','users'=>'User Accounts Report'][$report_type] ?? 'Report'; ?>
+        </div>
+
         <div class="rp-print-meta">
-            <span><strong>Report Type:</strong>
-                <?php echo ['inventory'=>'Inventory Report','requests'=>'Requests Report','users'=>'User Accounts Report'][$report_type] ?? 'Report'; ?>
-            </span>
-            <span><strong>Campus/College/Office:</strong> <?php
+            <div><strong>Campus / College / Office:</strong> <?php
                 if ($campus_id) echo htmlspecialchars(deptName(array_column($all_campuses, 'name', 'id'), (int)$campus_id));
                 elseif ($college_id) echo htmlspecialchars(deptName($all_depts, $college_id));
                 else echo 'All';
-            ?></span>
+            ?></div>
             <?php if ($report_type !== 'inventory'): ?>
-            <span><strong>Period:</strong> <?php echo $date_from; ?> to <?php echo $date_to; ?></span>
+            <div><strong>Period Covered:</strong> <?php echo date('F d, Y', strtotime($date_from)); ?> to <?php echo date('F d, Y', strtotime($date_to)); ?></div>
             <?php endif; ?>
-            <span><strong>Generated:</strong> <?php echo date('F d, Y h:i A'); ?></span>
+            <div><strong>Date Generated:</strong> <?php echo date('F d, Y h:i A'); ?></div>
+            <div><strong>Prepared by:</strong> <?php echo htmlspecialchars($current_user['full_name']); ?></div>
         </div>
 
         <!-- === SCREEN: type tabs + filters === -->
@@ -700,6 +740,22 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </div>
         </div>
         <?php endif; ?>
+
+        <!-- Signature block (print only) -->
+        <div class="rp-print-signatures">
+            <div class="rp-print-sig">
+                <div class="rp-print-sig-line"><?php echo htmlspecialchars($current_user['full_name']); ?></div>
+                <div class="rp-print-sig-role">Prepared by</div>
+            </div>
+            <div class="rp-print-sig">
+                <div class="rp-print-sig-line">&nbsp;</div>
+                <div class="rp-print-sig-role">Certified Correct</div>
+            </div>
+            <div class="rp-print-sig">
+                <div class="rp-print-sig-line">&nbsp;</div>
+                <div class="rp-print-sig-role">Noted by</div>
+            </div>
+        </div>
 
         <!-- Print footer -->
         <div class="rp-print-footer">
