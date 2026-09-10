@@ -20,14 +20,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($item_at_condemn && in_array($item_at_condemn['status'], ['requested', 'borrowed'])) {
             redirectWithMessage('condemnation.php?tab=evaluate', 'This item is currently requested or borrowed and cannot be condemned.', 'danger');
         }
-        dbUpdateInventory($item_id, [
+
+        $batch_qty   = (int)($item_at_condemn['quantity'] ?? 1);
+        $condemn_qty = max(1, min($batch_qty, (int)($_POST['condemn_qty'] ?? $batch_qty)));
+
+        $condemn_fields = [
             'status'                => 'condemned',
             'condemnation_reason'   => $condemn_reason,
             'condemned_at'          => date('Y-m-d H:i:s'),
             'condemned_by'          => $current_user['id'],
             'condemned_condition'   => $item_at_condemn['condition'] ?? null,
-        ]);
-        logActivity($current_user['id'], 'CONDEMN', "Condemned inventory item #$item_id", 'inventory', $item_id);
+        ];
+
+        if ($item_at_condemn && $condemn_qty < $batch_qty) {
+            // This inventory row represents a batch of $batch_qty identical units (one
+            // record, quantity > 1) — condemning it outright would take the WHOLE batch
+            // out of service. Split off just the condemned quantity into its own new
+            // record (its own QR code) and leave the remaining units on the original
+            // row untouched.
+            dbUpdateInventory($item_id, ['quantity' => $batch_qty - $condemn_qty]);
+            dbCreateInventory(array_merge($condemn_fields, [
+                'qr_code_id'       => generateQRCodeId(),
+                'item_name'        => $item_at_condemn['item_name'],
+                'category'         => $item_at_condemn['category'],
+                'description'      => $item_at_condemn['description'] ?? null,
+                'college_id'       => $item_at_condemn['college_id'] ?? null,
+                'quantity'         => $condemn_qty,
+                'location'         => $item_at_condemn['location'] ?? null,
+                'purchase_date'    => $item_at_condemn['purchase_date'] ?? null,
+                'cost'             => $item_at_condemn['cost'] ?? null,
+                'condition'        => $item_at_condemn['condition'] ?? null,
+                'group_id'         => $item_at_condemn['group_id'] ?? null,
+                'acquisition_mode' => $item_at_condemn['acquisition_mode'] ?? 'borrow',
+                'model'            => $item_at_condemn['model'] ?? null,
+                'serial_number'    => $item_at_condemn['serial_number'] ?? null,
+            ]));
+            logActivity($current_user['id'], 'CONDEMN', "Condemned $condemn_qty of $batch_qty unit(s) of inventory item #$item_id (split from batch)", 'inventory', $item_id);
+        } else {
+            dbUpdateInventory($item_id, $condemn_fields);
+            logActivity($current_user['id'], 'CONDEMN', "Condemned inventory item #$item_id", 'inventory', $item_id);
+        }
         redirectWithMessage('condemnation.php?tab=condemned', 'Item condemned successfully.', 'success');
 
     } elseif ($action_type === 'dispose' && $item_id > 0) {
@@ -638,7 +670,7 @@ if ($active_tab === 'evaluate') {
                     <?php if ($active_tab === 'evaluate'): ?>
                     <td>
                         <button type="button" class="cd-btn-condemn"
-                            onclick="openCondemnModal(<?php echo $row['id']; ?>, <?php echo htmlspecialchars(json_encode($row['item_name'])); ?>)">
+                            onclick="openCondemnModal(<?php echo $row['id']; ?>, <?php echo htmlspecialchars(json_encode($row['item_name'])); ?>, <?php echo (int)($row['quantity'] ?? 1); ?>)">
                             <i class="fas fa-ban"></i> Condemn
                         </button>
                     </td>
@@ -695,6 +727,16 @@ if ($active_tab === 'evaluate') {
         <form method="POST" action="condemnation.php" id="condemnForm">
             <input type="hidden" name="action" value="condemn">
             <input type="hidden" name="item_id" id="condemnItemId" value="">
+            <div class="mb-3" id="condemnQtyWrap" style="display:none;">
+                <label class="form-label" style="font-size:0.85rem;font-weight:700;">
+                    Quantity to Condemn
+                    <span style="font-weight:400;color:#999;">(<span id="condemnQtyAvail">1</span> available in this record)</span>
+                </label>
+                <input type="number" class="form-control" name="condemn_qty" id="condemnQty" min="1" value="1" style="font-size:0.87rem;">
+                <div style="font-size:0.75rem;color:#999;margin-top:4px;">
+                    <i class="fas fa-info-circle me-1"></i>Condemning fewer than the full quantity splits that amount into its own condemned record — the rest stays available.
+                </div>
+            </div>
             <div class="mb-3">
                 <label class="form-label" style="font-size:0.85rem;font-weight:700;">
                     Reason for Condemnation <span style="color:#dc2626;">*</span>
@@ -749,10 +791,22 @@ if ($active_tab === 'evaluate') {
 </div>
 
 <script>
-function openCondemnModal(itemId, itemName) {
+function openCondemnModal(itemId, itemName, qty) {
+    qty = qty || 1;
     document.getElementById('condemnItemId').value = itemId;
     document.getElementById('condemnItemName').textContent = itemName;
     document.getElementById('condemnReason').value = '';
+    var qtyWrap = document.getElementById('condemnQtyWrap');
+    var qtyInput = document.getElementById('condemnQty');
+    if (qty > 1) {
+        qtyWrap.style.display = 'block';
+        qtyInput.max = qty;
+        qtyInput.value = qty;
+        document.getElementById('condemnQtyAvail').textContent = qty;
+    } else {
+        qtyWrap.style.display = 'none';
+        qtyInput.value = 1;
+    }
     document.getElementById('condemnModal').classList.add('open');
 }
 function openDisposeModal(itemId, itemName) {
@@ -783,7 +837,7 @@ document.addEventListener('keydown', function(e) {
     if ($__condemn_item):
 ?>
 // Deep-linked from Inventory's "Condemn" quick action
-openCondemnModal(<?php echo (int)$__condemn_item['id']; ?>, <?php echo json_encode($__condemn_item['item_name']); ?>);
+openCondemnModal(<?php echo (int)$__condemn_item['id']; ?>, <?php echo json_encode($__condemn_item['item_name']); ?>, <?php echo (int)($__condemn_item['quantity'] ?? 1); ?>);
 <?php endif; endif; ?>
 </script>
 
