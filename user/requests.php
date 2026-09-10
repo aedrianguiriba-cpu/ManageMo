@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($safe_type === 'borrow') {
             $shared['reason_for_request']   = sanitizeInput($first['reason'] ?? '');
             $shared['expected_return_date'] = !empty($first['return_date']) ? $first['return_date'] : null;
+            $shared['date_needed']          = !empty($first['date_needed']) ? $first['date_needed'] : null;
         } elseif ($safe_type === 'item') {
             $shared['reason_for_request'] = sanitizeInput($first['reason'] ?? '');
             $shared['date_needed']        = !empty($first['date_needed']) ? $first['date_needed'] : null;
@@ -1133,7 +1134,17 @@ if (!empty($submit_error)): ?>
                     </div>
 
                     <div class="row g-3 mb-2">
-                        <div class="col-sm-6">
+                        <div class="col-sm-4">
+                            <div class="rq-field mb-0">
+                                <label>Date Needed</label>
+                                <div class="rq-input-wrap">
+                                    <i class="fas fa-calendar rq-input-icon"></i>
+                                    <input type="date" class="form-control" id="borrow_date_needed"
+                                           name="borrow_date_needed" onchange="updateSummary()">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
                             <div class="rq-field mb-0">
                                 <label>Expected Return Date <span class="rq-req">*</span></label>
                                 <div class="rq-input-wrap">
@@ -1143,7 +1154,7 @@ if (!empty($submit_error)): ?>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-sm-6">
+                        <div class="col-sm-4">
                             <div class="rq-field mb-0">
                                 <label>Quantity <span class="rq-req">*</span></label>
                                 <div class="rq-input-wrap">
@@ -1869,7 +1880,8 @@ function addToCart() {
         try { unitIds = JSON.parse(unitIdsRaw); } catch(e) { unitIds = []; }
         var inventoryId = unitIds.length > 0 ? unitIds[0] : (borrowCard ? (borrowCard.getAttribute('data-item-id') || '') : '');
         var selectedUnitIds = unitIds.slice(0, qty);
-        entry = { type:'borrow', name:name, inventory_id:inventoryId, unit_ids:selectedUnitIds, qty:qty, return_date:rd, reason:reason };
+        var dateNeeded1 = document.getElementById('borrow_date_needed').value;
+        entry = { type:'borrow', name:name, inventory_id:inventoryId, unit_ids:selectedUnitIds, qty:qty, return_date:rd, reason:reason, date_needed:dateNeeded1 };
     } else if (type === 'item') {
         var sel2 = document.getElementById('item_description');
         var name2 = (sel2.value && sel2.value !== '__custom__') ? sel2.value : document.getElementById('custom_item_req_name').value.trim();
@@ -1919,8 +1931,8 @@ function renderCart() {
     cart.forEach(function(e, i) {
         var meta = [];
         if (e.qty && e.qty > 1) meta.push('Qty: ' + e.qty);
-        if (e.return_date) meta.push('Return: ' + new Date(e.return_date + 'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}));
         if (e.date_needed) meta.push('Needed: ' + new Date(e.date_needed + 'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}));
+        if (e.return_date) meta.push('Return: ' + new Date(e.return_date + 'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}));
         if (e.service_type) meta.push(svcLabels[e.service_type] || e.service_type);
         if (e.description)  meta.push(e.description.substring(0,40) + (e.description.length > 40 ? '…' : ''));
         if (e.reason)       meta.push(e.reason.substring(0,40) + (e.reason.length > 40 ? '…' : ''));
@@ -1940,6 +1952,7 @@ function resetStaging(type) {
     if (type === 'borrow') {
         document.getElementById('borrow_catalog_select').value = '';
         document.querySelectorAll('.bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
+        document.getElementById('borrow_date_needed').value = '';
         document.getElementById('expected_return_date').value = '';
         document.getElementById('borrow_quantity').value = 1;
         document.getElementById('reason').value = '';

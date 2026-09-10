@@ -104,14 +104,21 @@ foreach (getRequests() as $req) {
     }
 }
 
-// Calendar events: date => [item names returning that day]
+// Calendar events: date => [item names returning that day]. "Overdue" = expected
+// return date already passed and the unit still hasn't been returned (the same
+// not-yet-returned condition already used to build $item_return_map above).
+$today_str = date('Y-m-d');
 $cal_events = [];
 foreach ($campus_inventory as $item) {
     if (isset($item_return_map[$item['id']])) {
         $d = $item_return_map[$item['id']];
         if ($d) {
             if (!isset($cal_events[$d])) $cal_events[$d] = [];
-            $cal_events[$d][] = ['name' => $item['item_name'], 'category' => $item['category'] ?? 'Other'];
+            $cal_events[$d][] = [
+                'name'     => $item['item_name'],
+                'category' => $item['category'] ?? 'Other',
+                'overdue'  => $d < $today_str,
+            ];
         }
     }
 }
@@ -190,10 +197,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     </div>
 
     <!-- ===== RETURN SCHEDULE CALENDAR (main focus) ===== -->
+    <!-- Both cards share a fixed height (see .fc-fixed-card) instead of stretching
+         to fit content, so the row never grows taller than the calendar itself —
+         each side scrolls internally if its content doesn't fit. -->
     <div class="row g-3 mb-4">
         <!-- Full Calendar -->
         <div class="col-lg-8">
-            <div class="ud-card">
+            <div class="ud-card fc-fixed-card d-flex flex-column">
                 <div class="fc-card-header">
                     <div class="fc-header-left">
                         <i class="fas fa-calendar-alt" style="color:#8B0000;font-size:1rem;"></i>
@@ -202,17 +212,17 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     </div>
                     <div id="fcNavWrap" class="fc-header-nav"></div>
                 </div>
-                <div id="fullCal"></div>
+                <div id="fullCal" style="overflow-y:auto;"></div>
             </div>
         </div>
         <!-- Schedule Sidebar -->
         <div class="col-lg-4">
-            <div class="ud-card h-100 d-flex flex-column">
+            <div class="ud-card fc-fixed-card d-flex flex-column">
                 <div class="ud-card-header">
                     <i class="fas fa-list-ul ud-card-icon" style="color:#8B0000;"></i>
                     <span id="fcSidebarTitle">Upcoming Returns</span>
                 </div>
-                <div class="ud-card-body p-0 flex-grow-1 overflow-auto" id="fcSidebar"></div>
+                <div class="ud-card-body p-0 flex-grow-1" id="fcSidebar" style="overflow-y:auto;"></div>
                 <div id="fcLegend" class="fc-legend-wrap"></div>
             </div>
         </div>
@@ -453,7 +463,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
                 <div class="ud-card-body p-0">
                     <?php if (count($recent_requests) > 0): ?>
-                    <div class="table-responsive">
+                    <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
                         <table class="table table-sm ud-table mb-0">
                             <thead>
                                 <tr>
@@ -908,7 +918,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 }
 
 /* ---- Item list ---- */
-.ud-item-list { list-style: none; margin: 0; padding: 0; }
+.ud-item-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
 .ud-item-row {
     display: flex;
     align-items: center;
@@ -1005,7 +1015,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     border-color: #8B0000;
 }
 .ib-list {
-    max-height: 390px;
+    max-height: 320px;
     overflow-y: auto;
     margin: 0 -18px;
 }
@@ -1104,11 +1114,15 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .ib-reserve-btn:hover { background: #6b0000; }
 
 /* ---- Full Calendar ---- */
+/* Both the calendar and its sidebar are pinned to this same height so the row
+   never grows past it — #fullCal and #fcSidebar scroll internally instead. */
+.fc-fixed-card { height: 420px; overflow: hidden; }
+.fc-fixed-card #fullCal { flex: 1 1 auto; min-height: 0; }
 .fc-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 14px;
+    padding: 12px 18px 10px;
     border-bottom: 1px solid #e5e7eb;
     gap: 12px;
     flex-wrap: wrap;
@@ -1156,10 +1170,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 }
 .fc-col-hdr {
     text-align: center;
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     font-weight: 700;
     color: #aaa;
-    padding: 8px 0;
+    padding: 5px 0;
     background: #fafafa;
     border-right: 1px solid #e5e7eb;
     border-bottom: 1px solid #e5e7eb;
@@ -1167,13 +1181,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     letter-spacing: 0.6px;
 }
 .fc-cell {
-    min-height: 80px;
-    padding: 5px 5px 4px;
+    min-height: 56px;
+    padding: 3px 4px 3px;
     border-right: 1px solid #e5e7eb;
     border-bottom: 1px solid #e5e7eb;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
     position: relative;
     transition: background 0.1s;
 }
@@ -1185,11 +1199,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .fc-cell.fc-today  { background: #fff6f6; }
 .fc-cell.fc-selected { background: #fef2f2 !important; outline: 2px solid #8B0000; outline-offset: -2px; }
 .fc-day-num {
-    font-size: 0.76rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: #555;
     display: inline-flex;
-    width: 22px; height: 22px;
+    width: 19px; height: 19px;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
@@ -1198,10 +1212,15 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 }
 .fc-cell.fc-past .fc-day-num { color: #ccc; }
 .fc-today-num { background: #8B0000 !important; color: #fff !important; font-weight: 800; }
+/* Overdue = expected return date passed and the unit still isn't returned */
+.fc-cell.fc-overdue { background: #fef2f2; }
+.fc-cell.fc-overdue .fc-day-num { color: #dc2626; }
+.fc-ev-chip-overdue { background: #fee2e2 !important; color: #b91c1c !important; font-weight: 700; }
+.fc-ev-chip-overdue .fc-ev-dot { background: #dc2626 !important; opacity: 1; }
 .fc-ev-chip {
-    font-size: 0.67rem;
+    font-size: 0.62rem;
     font-weight: 500;
-    padding: 2px 5px;
+    padding: 1px 4px;
     border-radius: 3px;
     white-space: nowrap;
     overflow: hidden;
@@ -1209,7 +1228,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     display: flex;
     align-items: center;
     gap: 3px;
-    line-height: 1.4;
+    line-height: 1.3;
 }
 .fc-ev-dot {
     width: 5px; height: 5px;
@@ -1250,6 +1269,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 }
 .fc-side-today { background: #fef2f2; color: #8B0000; }
 .fc-side-soon  { background: #fefce8; color: #713f12; }
+.fc-side-overdue { background: #fee2e2; color: #b91c1c; }
 .fc-side-items { flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .fc-side-item {
     font-size: 0.77rem;
@@ -1258,7 +1278,19 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     align-items: center;
     gap: 5px;
 }
+.fc-side-item-overdue { color: #b91c1c; font-weight: 600; }
 .fc-side-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.fc-side-row-overdue { background: #fffafa; }
+.fc-side-row-overdue:hover { background: #fef2f2; }
+.fc-side-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #999;
+    padding: 10px 16px 4px;
+}
+.fc-side-section-overdue { color: #b91c1c; display: flex; align-items: center; gap: 6px; }
 .fc-side-daydetail { padding: 16px 16px 8px; }
 .fc-side-daylabel {
     font-size: 0.84rem;
@@ -1368,21 +1400,29 @@ function filterIbItems(cat, btn) {
             var dow     = (firstDay + d - 1) % 7;
             var isWknd  = dow === 0 || dow === 6;
 
+            var hasOverdue = dayEvs.some(function(ev) { return ev.overdue; });
+
             var cls = 'fc-cell';
             if (isToday)           cls += ' fc-today';
             if (isPast && !isToday) cls += ' fc-past';
             if (isSel)             cls += ' fc-selected';
             if (isWknd)            cls += ' fc-weekend';
             if (dayEvs.length)     cls += ' fc-has-events';
+            if (hasOverdue)        cls += ' fc-overdue';
 
             var click = dayEvs.length ? ' onclick="fcSelectDay(\''+ds+'\')"' : '';
             h += '<div class="'+cls+'"'+click+'>';
             h += '<span class="fc-day-num'+(isToday?' fc-today-num':'')+'">'+d+'</span>';
 
             dayEvs.slice(0,2).forEach(function(ev) {
-                var c = catColor(ev.category);
-                h += '<div class="fc-ev-chip" style="background:'+c.bg+';color:'+c.color+';">'
-                   + '<span class="fc-ev-dot" style="background:'+c.color+';"></span>'+ev.name+'</div>';
+                if (ev.overdue) {
+                    h += '<div class="fc-ev-chip fc-ev-chip-overdue">'
+                       + '<span class="fc-ev-dot"></span>'+ev.name+'</div>';
+                } else {
+                    var c = catColor(ev.category);
+                    h += '<div class="fc-ev-chip" style="background:'+c.bg+';color:'+c.color+';">'
+                       + '<span class="fc-ev-dot" style="background:'+c.color+';"></span>'+ev.name+'</div>';
+                }
             });
             if (dayEvs.length > 2) h += '<div class="fc-ev-more">+' + (dayEvs.length-2) + ' more</div>';
             h += '</div>';
@@ -1411,37 +1451,57 @@ function filterIbItems(cat, btn) {
     }
 
     function renderUpcoming() {
-        document.getElementById('fcSidebarTitle').textContent = 'Upcoming Returns';
+        document.getElementById('fcSidebarTitle').textContent = 'Return Schedule';
         var now2 = new Date(); now2.setHours(0,0,0,0);
-        var upcoming = Object.keys(events)
-            .filter(function(d){ return new Date(d+'T00:00:00') >= now2; })
-            .sort().slice(0, 8);
+        var allDates = Object.keys(events).sort();
+        // Overdue = date already passed and still not returned — shown pinned at
+        // the top instead of silently dropping out of the list.
+        var overdueDates = allDates.filter(function(d){ return new Date(d+'T00:00:00') < now2; });
+        var upcoming     = allDates.filter(function(d){ return new Date(d+'T00:00:00') >= now2; }).slice(0, 8);
 
-        if (!upcoming.length) {
+        if (!overdueDates.length && !upcoming.length) {
             document.getElementById('fcSidebar').innerHTML =
                 '<div class="fc-side-empty"><i class="fas fa-calendar-check"></i><p>No upcoming returns.</p></div>';
             return;
         }
         var h = '';
-        upcoming.forEach(function(ds) {
-            var dt   = new Date(ds+'T00:00:00');
-            var lbl  = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-            var now3 = new Date(); now3.setHours(0,0,0,0);
-            var diff = Math.round((dt - now3)/(864e5));
-            var badge = '';
-            if (diff === 0)      badge = '<span class="fc-side-badge fc-side-today">Today</span>';
-            else if (diff === 1) badge = '<span class="fc-side-badge fc-side-soon">Tomorrow</span>';
-            else if (diff <= 3)  badge = '<span class="fc-side-badge fc-side-soon">In '+diff+' days</span>';
-
-            h += '<div class="fc-side-row" onclick="fcSelectDay(\''+ds+'\')">'
-               + '<div class="fc-side-date-col"><div class="fc-side-date">'+lbl+'</div>'+badge+'</div>'
-               + '<div class="fc-side-items">';
-            events[ds].forEach(function(ev) {
-                var c = catColor(ev.category);
-                h += '<div class="fc-side-item"><span class="fc-side-dot" style="background:'+c.color+';"></span>'+ev.name+'</div>';
+        if (overdueDates.length) {
+            h += '<div class="fc-side-section-label fc-side-section-overdue"><i class="fas fa-triangle-exclamation"></i> Overdue — Not Returned</div>';
+            overdueDates.forEach(function(ds) {
+                var dt = new Date(ds+'T00:00:00');
+                var lbl = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+                var daysLate = Math.round((now2 - dt)/(864e5));
+                h += '<div class="fc-side-row fc-side-row-overdue" onclick="fcSelectDay(\''+ds+'\')">'
+                   + '<div class="fc-side-date-col"><div class="fc-side-date">'+lbl+'</div>'
+                   + '<span class="fc-side-badge fc-side-overdue">'+daysLate+'d late</span></div>'
+                   + '<div class="fc-side-items">';
+                events[ds].forEach(function(ev) {
+                    h += '<div class="fc-side-item fc-side-item-overdue"><span class="fc-side-dot" style="background:#dc2626;"></span>'+ev.name+'</div>';
+                });
+                h += '</div></div>';
             });
-            h += '</div></div>';
-        });
+        }
+        if (upcoming.length) {
+            if (overdueDates.length) h += '<div class="fc-side-section-label">Upcoming Returns</div>';
+            upcoming.forEach(function(ds) {
+                var dt   = new Date(ds+'T00:00:00');
+                var lbl  = dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+                var diff = Math.round((dt - now2)/(864e5));
+                var badge = '';
+                if (diff === 0)      badge = '<span class="fc-side-badge fc-side-today">Today</span>';
+                else if (diff === 1) badge = '<span class="fc-side-badge fc-side-soon">Tomorrow</span>';
+                else if (diff <= 3)  badge = '<span class="fc-side-badge fc-side-soon">In '+diff+' days</span>';
+
+                h += '<div class="fc-side-row" onclick="fcSelectDay(\''+ds+'\')">'
+                   + '<div class="fc-side-date-col"><div class="fc-side-date">'+lbl+'</div>'+badge+'</div>'
+                   + '<div class="fc-side-items">';
+                events[ds].forEach(function(ev) {
+                    var c = catColor(ev.category);
+                    h += '<div class="fc-side-item"><span class="fc-side-dot" style="background:'+c.color+';"></span>'+ev.name+'</div>';
+                });
+                h += '</div></div>';
+            });
+        }
         document.getElementById('fcSidebar').innerHTML = h;
     }
 
@@ -1453,11 +1513,18 @@ function filterIbItems(cat, btn) {
         var evs = events[ds] || [];
         var h = '<div class="fc-side-daydetail"><div class="fc-side-daylabel">'+lbl+'</div>';
         evs.forEach(function(ev) {
-            var c = catColor(ev.category);
-            h += '<div class="fc-side-detail-item" style="border-left-color:'+c.color+';">'
-               + '<div class="fc-side-detail-name">'+ev.name+'</div>'
-               + '<div class="fc-side-detail-cat" style="color:'+c.color+';">'+ev.category+'</div>'
-               + '</div>';
+            if (ev.overdue) {
+                h += '<div class="fc-side-detail-item" style="border-left-color:#dc2626;background:#fef2f2;">'
+                   + '<div class="fc-side-detail-name">'+ev.name+'</div>'
+                   + '<div class="fc-side-detail-cat" style="color:#b91c1c;font-weight:700;"><i class="fas fa-triangle-exclamation"></i> Overdue — Not Returned</div>'
+                   + '</div>';
+            } else {
+                var c = catColor(ev.category);
+                h += '<div class="fc-side-detail-item" style="border-left-color:'+c.color+';">'
+                   + '<div class="fc-side-detail-name">'+ev.name+'</div>'
+                   + '<div class="fc-side-detail-cat" style="color:'+c.color+';">'+ev.category+'</div>'
+                   + '</div>';
+            }
         });
         h += '</div><button class="fc-back-btn" onclick="fcClearDay()">'
            + '<i class="fas fa-arrow-left"></i>All upcoming</button>';

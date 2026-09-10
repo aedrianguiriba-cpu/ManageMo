@@ -1559,7 +1559,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             }
             $initials = strtoupper(substr($req['full_name'],0,1));
             $cols=['#8B0000','#1d4ed8','#15803d','#b45309','#7c3aed'];
-            $col=$cols[crc32($req['user_id'])%count($cols)];
+            $col=$cols[crc32((string)($req['user_id'] ?? ''))%count($cols)];
         ?>
         <div class="ar-tracker-card">
             <div class="ar-tracker-head">

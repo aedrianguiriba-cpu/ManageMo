@@ -123,6 +123,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     padding:10px 18px !important; font-size:0.87rem !important;
     text-decoration:none; display:flex; align-items:center; justify-content:center; gap:7px;
     transition:opacity 0.15s !important;
+    margin-top:auto;
 }
 .ic-btn-view:hover { color:#fff !important; opacity:0.88 !important; }
 
