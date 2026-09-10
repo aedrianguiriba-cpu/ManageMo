@@ -14,8 +14,9 @@ $available_items = 0;
 $borrowed_items = 0;
 $pending_requests = 0;
 
-// Get all colleges/offices with stats
+// Get all colleges/offices AND campuses with stats
 $all_departments = getMainCampusDepartments();
+$all_campuses = getDepartmentCampuses();
 $all_inventory = getInventory();
 $all_requests = getRequests();
 
@@ -40,6 +41,7 @@ foreach ($all_departments as $dept_code => $dept_name) {
     $dept_stats[] = [
         'code' => $dept_code,
         'name' => $dept_name,
+        'type' => 'dept',
         'stats' => [
             'total' => count($dept_inventory),
             'borrowed' => $status_counts['borrowed'] ?? 0,
@@ -50,7 +52,39 @@ foreach ($all_departments as $dept_code => $dept_name) {
     $total_items += count($dept_inventory);
     $borrowed_items += $status_counts['borrowed'] ?? 0;
 }
-// Items with no college/office assigned still count toward totals.
+
+// Campuses "own" inventory the same way a college/office does, via their
+// abbreviation stored in inventory.college_id — fold them into the same
+// summary/totals so campus-tagged items aren't silently dropped.
+foreach ($all_campuses as $campus) {
+    $campus_code = $campus['abbreviation'];
+    if ($campus_code === '') continue;
+    $campus_inventory = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $campus_code));
+    $status_counts = countByStatus($campus_inventory);
+    if (empty($campus_inventory)) continue;
+
+    $campus_inventory_ids = array_column($campus_inventory, 'id');
+    $requested_count = 0;
+    foreach ($campus_inventory_ids as $inv_id) {
+        $requested_count += count(filterByColumn($all_requests, 'inventory_id', $inv_id));
+    }
+
+    $dept_stats[] = [
+        'code' => $campus_code,
+        'name' => $campus['name'],
+        'type' => 'campus',
+        'stats' => [
+            'total' => count($campus_inventory),
+            'borrowed' => $status_counts['borrowed'] ?? 0,
+            'requested' => $requested_count,
+            'maintenance' => $status_counts['maintenance'] ?? 0,
+        ],
+    ];
+    $total_items += count($campus_inventory);
+    $borrowed_items += $status_counts['borrowed'] ?? 0;
+}
+
+// Items with no college/office/campus assigned still count toward totals.
 $unassigned_inventory = array_values(array_filter($all_inventory, fn($i) => empty($i['college_id'])));
 if (!empty($unassigned_inventory)) {
     $unassigned_status = countByStatus($unassigned_inventory);
@@ -334,7 +368,8 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
         <div class="table-responsive">
             <table class="adash-table">
                 <thead><tr>
-                    <th>College / Office</th>
+                    <th>Department / Campus</th>
+                    <th>Type</th>
                     <th>Total</th>
                     <th>Borrowed</th>
                     <th>Requested</th>
@@ -343,11 +378,18 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                 </tr></thead>
                 <tbody>
                     <?php if (empty($dept_stats)): ?>
-                    <tr><td colspan="6" style="text-align:center;padding:24px;color:#999;">No items tagged with a college/office yet.</td></tr>
+                    <tr><td colspan="7" style="text-align:center;padding:24px;color:#999;">No items tagged with a college/office/campus yet.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($dept_stats as $dept): ?>
                     <tr>
                         <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($dept['name']); ?></div></td>
+                        <td>
+                            <?php if (($dept['type'] ?? 'dept') === 'campus'): ?>
+                            <span class="adash-badge" style="background:rgba(124,58,237,.10);color:#7c3aed;"><i class="fas fa-map-marker-alt"></i>Campus</span>
+                            <?php else: ?>
+                            <span class="adash-badge b-gray"><i class="fas fa-building"></i>Dept</span>
+                            <?php endif; ?>
+                        </td>
                         <td><span style="font-weight:800;color:#0f172a;font-size:.95rem;"><?php echo $dept['stats']['total']; ?></span></td>
                         <td><span class="adash-badge b-amber"><i class="fas fa-circle"></i><?php echo $dept['stats']['borrowed']; ?></span></td>
                         <td><span class="adash-badge b-green"><i class="fas fa-circle"></i><?php echo $dept['stats']['requested']; ?></span></td>
