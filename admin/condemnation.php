@@ -599,7 +599,6 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
                                 "item_name" => $row["item_name"],
                                 "qr_code_id" => $row["qr_code_id"] ?? "",
                                 "category" => $row["category"] ?? "",
-                                "condition" => $row["condition"] ?? "",
                                 "cost" => (float)($row["cost"] ?? 0),
                                 "location" => $row["location"] ?? "",
                             ]); ?>)'>
@@ -685,7 +684,6 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
                                 <th style="padding:6px 8px;text-align:left;">Unit</th>
                                 <th style="padding:6px 8px;text-align:left;">QR Code</th>
                                 <th style="padding:6px 8px;text-align:left;">Category</th>
-                                <th style="padding:6px 8px;text-align:left;">Condition</th>
                                 <th style="padding:6px 8px;text-align:left;">Location</th>
                                 <th style="padding:6px 8px;text-align:right;">Cost</th>
                             </tr>
@@ -788,7 +786,6 @@ function openCondemnModal(itemId, qty, details) {
                 '<td style="padding:5px 8px;font-weight:700;">Unit ' + i + '</td>' +
                 '<td style="padding:5px 8px;font-family:monospace;color:#8B0000;">' + _cdEsc(details.qr_code_id || '—') + '</td>' +
                 '<td style="padding:5px 8px;">' + _cdEsc(details.category || '—') + '</td>' +
-                '<td style="padding:5px 8px;">' + _cdEsc(details.condition ? details.condition.charAt(0).toUpperCase() + details.condition.slice(1) : '—') + '</td>' +
                 '<td style="padding:5px 8px;">' + _cdEsc(details.location || '—') + '</td>' +
                 '<td style="padding:5px 8px;text-align:right;">₱' + costFmt + '</td>';
             unitList.appendChild(tr);
@@ -831,7 +828,6 @@ openCondemnModal(<?php echo (int)$__condemn_item['id']; ?>, <?php echo (int)($__
     'item_name'  => $__condemn_item['item_name'],
     'qr_code_id' => $__condemn_item['qr_code_id'] ?? '',
     'category'   => $__condemn_item['category'] ?? '',
-    'condition'  => $__condemn_item['condition'] ?? '',
     'cost'       => (float)($__condemn_item['cost'] ?? 0),
     'location'   => $__condemn_item['location'] ?? '',
 ]); ?>);
