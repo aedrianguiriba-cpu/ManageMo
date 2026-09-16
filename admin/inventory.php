@@ -815,6 +815,10 @@ displayMessage();
     // Acquisition-mode sub-tabs (All Items only): '', 'borrow', or 'request'.
     $filter_acq = $_GET['facq'] ?? '';
     if (!in_array($filter_acq, ['', 'borrow', 'request'])) $filter_acq = '';
+    // Sort order applied across every tab: 'newest' (default) or 'oldest' first.
+    $filter_sort = $_GET['sort'] ?? 'newest';
+    if (!in_array($filter_sort, ['newest', 'oldest'])) $filter_sort = 'newest';
+    $__sortDir = $filter_sort === 'oldest' ? 1 : -1;
     $all_categories    = array_values(array_unique(array_filter(array_column($all_items, 'category'))));
     sort($all_categories);
 
@@ -885,7 +889,7 @@ displayMessage();
             $returned_borrows[] = $__br;
         }
     }
-    usort($returned_borrows, fn($a, $b) => strcmp($b['actual_return_date'] ?? $b['created_at'], $a['actual_return_date'] ?? $a['created_at']));
+    usort($returned_borrows, fn($a, $b) => $__sortDir * strcmp($a['actual_return_date'] ?? $a['created_at'], $b['actual_return_date'] ?? $b['created_at']));
 
     // Maintenance tab: service requests are pure free-text tickets with no catalog
     // item attached (see user/requests.php), so there's no inventory row to filter
@@ -906,7 +910,7 @@ displayMessage();
         }
         return true;
     }));
-    usort($maintenance_requests, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
+    usort($maintenance_requests, function($a, $b) use ($__sortDir) { return $__sortDir * strcmp($a['created_at'], $b['created_at']); });
 
     // "Requested"/"Borrowed" should sort by when that actually happened (request
     // submitted / item borrowed), not by the inventory row's original creation
@@ -930,15 +934,15 @@ displayMessage();
         return $rec['created_at'] ?? $item['created_at'];
     };
 
-    usort($all_active_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
-    usort($available_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
-    usort($requested_items, function($a, $b) use ($__pending_request_by_unit, $__latestActivity) {
-        return strcmp($__latestActivity($b, $__pending_request_by_unit), $__latestActivity($a, $__pending_request_by_unit));
+    usort($all_active_items, function($a, $b) use ($__sortDir) { return $__sortDir * strcmp($a['created_at'], $b['created_at']); });
+    usort($available_items, function($a, $b) use ($__sortDir) { return $__sortDir * strcmp($a['created_at'], $b['created_at']); });
+    usort($requested_items, function($a, $b) use ($__pending_request_by_unit, $__latestActivity, $__sortDir) {
+        return $__sortDir * strcmp($__latestActivity($a, $__pending_request_by_unit), $__latestActivity($b, $__pending_request_by_unit));
     });
-    usort($borrowed_items, function($a, $b) use ($__active_borrows_by_unit, $__latestActivity) {
-        return strcmp($__latestActivity($b, $__active_borrows_by_unit), $__latestActivity($a, $__active_borrows_by_unit));
+    usort($borrowed_items, function($a, $b) use ($__active_borrows_by_unit, $__latestActivity, $__sortDir) {
+        return $__sortDir * strcmp($__latestActivity($a, $__active_borrows_by_unit), $__latestActivity($b, $__active_borrows_by_unit));
     });
-    usort($owned_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
+    usort($owned_items, function($a, $b) use ($__sortDir) { return $__sortDir * strcmp($a['created_at'], $b['created_at']); });
 
     $status_colors = ['available'=>'success','requested'=>'info','borrowed'=>'warning','maintenance'=>'info'];
 
@@ -1030,9 +1034,16 @@ displayMessage();
                 <?php endforeach; ?>
             </select>
         </div>
+        <div style="min-width:150px;">
+            <div class="ai-filter-label">Sort</div>
+            <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="newest" <?php echo $filter_sort === 'newest' ? 'selected' : ''; ?>>Newest first</option>
+                <option value="oldest" <?php echo $filter_sort === 'oldest' ? 'selected' : ''; ?>>Oldest first</option>
+            </select>
+        </div>
         <div>
             <button type="submit" class="btn ai-btn-primary btn-sm"><i class="fas fa-filter"></i> Apply</button>
-            <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== '' || $filter_acq !== ''): ?>
+            <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== '' || $filter_acq !== '' || $filter_sort !== 'newest'): ?>
             <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?>" class="btn ai-btn-secondary btn-sm">Clear</a>
             <?php endif; ?>
         </div>
@@ -1150,7 +1161,7 @@ displayMessage();
         <?php if ($pages_all > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_all; $i++): ?>
-                <a href="inventory.php?tab=all&page_all=<?php echo $i; ?>&search=<?php echo urlencode($filter_search); ?>&fdept=<?php echo urlencode($filter_dept); ?>&fcategory=<?php echo urlencode($filter_category); ?>" class="btn btn-sm <?php echo $i === $current_page_all ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=all&page_all=<?php echo $i; ?>&search=<?php echo urlencode($filter_search); ?>&fdept=<?php echo urlencode($filter_dept); ?>&fcategory=<?php echo urlencode($filter_category); ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_all ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
@@ -1244,7 +1255,7 @@ displayMessage();
         <?php if ($pages_available > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_available; $i++): ?>
-                <a href="inventory.php?tab=available&page_available=<?php echo $i; ?>&search=<?php echo urlencode($filter_search); ?>&fdept=<?php echo urlencode($filter_dept); ?>&fcategory=<?php echo urlencode($filter_category); ?>&facq=<?php echo urlencode($filter_acq); ?>" class="btn btn-sm <?php echo $i === $current_page_available ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=available&page_available=<?php echo $i; ?>&search=<?php echo urlencode($filter_search); ?>&fdept=<?php echo urlencode($filter_dept); ?>&fcategory=<?php echo urlencode($filter_category); ?>&facq=<?php echo urlencode($filter_acq); ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_available ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
@@ -1305,7 +1316,7 @@ displayMessage();
         <?php if ($pages_requested > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_requested; $i++): ?>
-                <a href="inventory.php?tab=requested&page_requested=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_requested ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=requested&page_requested=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_requested ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
@@ -1420,7 +1431,7 @@ displayMessage();
         <?php if ($pages_borrowed > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_borrowed; $i++): ?>
-                <a href="inventory.php?tab=borrowed&fborrow=not_returned&page_borrowed=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_borrowed ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=borrowed&fborrow=not_returned&page_borrowed=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_borrowed ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
@@ -1479,7 +1490,7 @@ displayMessage();
         <?php if ($pages_returned > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_returned; $i++): ?>
-                <a href="inventory.php?tab=borrowed&fborrow=returned&page_returned=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_returned ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=borrowed&fborrow=returned&page_returned=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_returned ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
@@ -1547,7 +1558,7 @@ displayMessage();
         <?php if ($pages_maintenance > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_maintenance; $i++): ?>
-                <a href="inventory.php?tab=maintenance&page_maintenance=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_maintenance ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=maintenance&page_maintenance=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_maintenance ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>
@@ -1625,7 +1636,7 @@ displayMessage();
         <?php if ($pages_owned > 1): ?>
         <nav style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_owned; $i++): ?>
-                <a href="inventory.php?tab=owned&page_owned=<?php echo $i; ?>" class="btn btn-sm <?php echo $i === $current_page_owned ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
+                <a href="inventory.php?tab=owned&page_owned=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_owned ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
                 </a>
             <?php endfor; ?>

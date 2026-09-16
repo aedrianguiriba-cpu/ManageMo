@@ -9,6 +9,10 @@ $action = $_GET['action'] ?? 'list';
 $page = $_GET['page'] ?? 1;
 $status_filter = $_GET['status'] ?? '';
 $type_filter = $_GET['type'] ?? '';
+// Sort order for the request list: 'newest' (default) or 'oldest' first.
+$request_sort = $_GET['sort'] ?? 'newest';
+if (!in_array($request_sort, ['newest', 'oldest'])) $request_sort = 'newest';
+$request_sort_dir = $request_sort === 'oldest' ? 1 : -1;
 
 // Shared step computation for the progress tracker — used for both the
 // request-level stepper and each unit's own mini tracker.
@@ -1346,16 +1350,16 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         ?>
         <!-- Type tabs -->
         <div class="ar-type-tabs">
-            <a class="ar-type-tab <?php echo $active_tab==='all'?'active':''; ?>" href="requests.php?tab=all<?php echo $status_filter?'&status='.$status_filter:''; ?>">
+            <a class="ar-type-tab <?php echo $active_tab==='all'?'active':''; ?>" href="requests.php?tab=all<?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>">
                 <i class="fas fa-list"></i> All Requests <span class="ar-tab-count"><?php echo $count_all; ?></span>
             </a>
-            <a class="ar-type-tab <?php echo $active_tab==='item'?'active':''; ?>" href="requests.php?tab=item<?php echo $status_filter?'&status='.$status_filter:''; ?>">
+            <a class="ar-type-tab <?php echo $active_tab==='item'?'active':''; ?>" href="requests.php?tab=item<?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>">
                 <i class="fas fa-box"></i> Item Requests <span class="ar-tab-count"><?php echo $count_item; ?></span>
             </a>
-            <a class="ar-type-tab <?php echo $active_tab==='borrow'?'active':''; ?>" href="requests.php?tab=borrow<?php echo $status_filter?'&status='.$status_filter:''; ?>">
+            <a class="ar-type-tab <?php echo $active_tab==='borrow'?'active':''; ?>" href="requests.php?tab=borrow<?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>">
                 <i class="fas fa-hand-holding"></i> Borrow Requests <span class="ar-tab-count"><?php echo $count_borrow; ?></span>
             </a>
-            <a class="ar-type-tab <?php echo $active_tab==='service'?'active':''; ?>" href="requests.php?tab=service<?php echo $status_filter?'&status='.$status_filter:''; ?>">
+            <a class="ar-type-tab <?php echo $active_tab==='service'?'active':''; ?>" href="requests.php?tab=service<?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>">
                 <i class="fas fa-tools"></i> Service Requests <span class="ar-tab-count"><?php echo $count_service; ?></span>
             </a>
             <a class="ar-type-tab <?php echo $active_tab==='archived'?'active':''; ?>" href="requests.php?tab=archived">
@@ -1375,6 +1379,12 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         } elseif ($active_tab === 'service') {
             $filtered_requests = array_values(array_filter($filtered_requests, fn($r) => $r['request_type'] === 'service'));
         }
+        // Sort before grouping so each group lands in its "first" row's position —
+        // getRequests() itself comes back oldest-first (id ascending), which would
+        // otherwise bury today's requests on the last page.
+        usort($filtered_requests, function($a, $b) use ($request_sort_dir) {
+            return $request_sort_dir * strcmp($a['created_at'], $b['created_at']);
+        });
         // Group then paginate
         $tab_grouped = [];
         foreach ($filtered_requests as $rr) {
@@ -1439,6 +1449,13 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                     </select>
                 </div>
                 <?php endif; ?>
+                <div>
+                    <div class="ar-filter-label">Sort</div>
+                    <select class="form-select" name="sort" onchange="this.form.submit()" style="min-width:150px;">
+                        <option value="newest" <?php echo $request_sort==='newest'?'selected':''; ?>>Newest first</option>
+                        <option value="oldest" <?php echo $request_sort==='oldest'?'selected':''; ?>>Oldest first</option>
+                    </select>
+                </div>
             </form>
         </div>
         <?php endif; ?>
@@ -1583,7 +1600,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             <ul class="pagination justify-content-center">
                 <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                 <li class="page-item <?php echo $i===(int)$page?'active':''; ?>">
-                    <a class="page-link" href="requests.php?page=<?php echo $i; ?>&tab=<?php echo htmlspecialchars($active_tab); ?><?php echo $status_filter?'&status='.$status_filter:''; ?>"><?php echo $i; ?></a>
+                    <a class="page-link" href="requests.php?page=<?php echo $i; ?>&tab=<?php echo htmlspecialchars($active_tab); ?><?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>"><?php echo $i; ?></a>
                 </li>
                 <?php endfor; ?>
             </ul>
