@@ -1316,7 +1316,7 @@ displayMessage();
                     <form method="POST" action="?action=mark_returned" onsubmit="return confirm('Mark this unit as returned?')" style="margin:0;flex-shrink:0;">
                         <input type="hidden" name="unit_id" value="<?php echo (int)$u['id']; ?>">
                         <button type="submit" class="ai-btn-sm" style="background:rgba(239,68,68,0.12);color:#dc2626;border:none;border-radius:6px;white-space:nowrap;" title="Click to mark as returned">
-                            <i class="fas fa-times"></i> Not Returned
+                            <i class="fas fa-undo"></i> Mark as Returned
                         </button>
                     </form>
                     <?php else: ?>
