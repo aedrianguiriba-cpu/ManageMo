@@ -1004,7 +1004,7 @@ displayMessage();
 
     <!-- FILTER / SEARCH BAR (applies to every tab — search/department/category
          each apply their own filter pass per tab's data shape; see PHP above) -->
-    <form method="GET" action="inventory.php" class="ai-filter-card">
+    <form method="GET" action="inventory.php" class="ai-filter-card ai-no-print">
         <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
         <input type="hidden" name="facq" value="<?php echo htmlspecialchars($filter_acq); ?>">
         <div style="flex:1;min-width:180px;">
@@ -1048,11 +1048,64 @@ displayMessage();
             <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== '' || $filter_acq !== '' || $filter_sort !== 'newest'): ?>
             <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?>" class="btn ai-btn-secondary btn-sm">Clear</a>
             <?php endif; ?>
+            <button type="button" class="btn ai-print-btn btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print Report</button>
         </div>
     </form>
 
+    <!-- Letterhead (print only) -->
+    <?php
+    // Renders a print-only ruled table. $rows is an array of arrays of already
+    // htmlspecialchars()-escaped cell strings — kept simple since every caller
+    // below builds its own rows right before printing them.
+    function aiPrintTable(array $headers, array $rows): void {
+        ?>
+        <table class="ai-print-table">
+            <thead><tr><?php foreach ($headers as $h): ?><th><?php echo htmlspecialchars($h); ?></th><?php endforeach; ?></tr></thead>
+            <tbody>
+            <?php if (empty($rows)): ?>
+                <tr><td colspan="<?php echo count($headers); ?>" style="text-align:center;">No records found.</td></tr>
+            <?php else: foreach ($rows as $row): ?>
+                <tr><?php foreach ($row as $cell): ?><td><?php echo $cell; ?></td><?php endforeach; ?></tr>
+            <?php endforeach; endif; ?>
+            </tbody>
+        </table>
+        <?php
+    }
+    $__tab_titles = [
+        'all' => 'All Items Report', 'available' => 'Available Items Report',
+        'requested' => 'Requested Items Report', 'borrowed' => 'Borrowed Items Report',
+        'maintenance' => 'Maintenance Tickets Report', 'owned' => 'User-Owned Items Report',
+    ];
+    ?>
+    <div class="ai-print-only">
+        <div class="ai-print-header">
+            <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" style="width:60px;height:60px;" alt="PSU Logo">
+            <p class="republic">Republic of the Philippines</p>
+            <h2>Pampanga State University</h2>
+            <p>ManageMo &mdash; Inventory &amp; Asset Management System</p>
+        </div>
+        <div class="ai-print-rule"></div>
+        <div class="ai-print-title"><?php echo $__tab_titles[$current_tab] ?? 'Inventory Report'; ?></div>
+        <div class="ai-print-meta">
+            <div><strong>Campus / College / Office:</strong> <?php
+                if ($filter_dept !== '') {
+                    $__pd = getAllDepartmentNames();
+                    echo htmlspecialchars($__pd[$filter_college_id] ?? $filter_college_id);
+                } else { echo 'All'; }
+            ?></div>
+            <?php if ($filter_category !== ''): ?>
+            <div><strong>Category:</strong> <?php echo htmlspecialchars($filter_category); ?></div>
+            <?php endif; ?>
+            <?php if ($filter_search !== ''): ?>
+            <div><strong>Search:</strong> <?php echo htmlspecialchars($filter_search); ?></div>
+            <?php endif; ?>
+            <div><strong>Date Generated:</strong> <?php echo date('F d, Y h:i A'); ?></div>
+            <div><strong>Prepared by:</strong> <?php echo htmlspecialchars($current_user['full_name']); ?></div>
+        </div>
+    </div>
+
     <!-- TAB NAVIGATION -->
-    <div class="ai-tabs-container">
+    <div class="ai-tabs-container ai-no-print">
         <div style="display: flex; gap: 8px; flex: 1; flex-wrap: wrap;">
             <a href="inventory.php?tab=all" class="ai-tab <?php echo $current_tab === 'all' ? 'ai-tab-active' : ''; ?>" onclick="setTab('all'); return false;">
                 <span class="ai-tab-icon"><i class="fas fa-layer-group"></i></span>
@@ -1093,7 +1146,7 @@ displayMessage();
 
     <!-- ALL ITEMS TAB — every non-condemned/disposed item, any status; where items get edited or sent to condemn -->
     <div id="tab-all" style="display: <?php echo $current_tab === 'all' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($all_items_page) > 0):
                 foreach ($all_items_page as $group):
                     $unit_count = count($group['units']);
@@ -1161,7 +1214,7 @@ displayMessage();
 
         <!-- Pagination for All Items -->
         <?php if ($pages_all > 1): ?>
-        <nav style="display: flex; justify-content: center; gap: 8px;">
+        <nav class="ai-no-print" style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_all; $i++): ?>
                 <a href="inventory.php?tab=all&page_all=<?php echo $i; ?>&search=<?php echo urlencode($filter_search); ?>&fdept=<?php echo urlencode($filter_dept); ?>&fcategory=<?php echo urlencode($filter_category); ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_all ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
@@ -1169,6 +1222,29 @@ displayMessage();
             <?php endfor; ?>
         </nav>
         <?php endif; ?>
+
+        <div class="ai-print-only">
+            <?php
+            $__pd = getAllDepartmentNames();
+            $__rows = [];
+            foreach ($grouped_all as $group) {
+                $conditions = array_unique(array_column($group['units'], 'condition'));
+                $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
+                $statuses = array_unique(array_column($group['units'], 'status'));
+                $status_label = count($statuses) === 1 ? ucfirst($statuses[0]) : 'Mixed';
+                $dept_name = ($group['college_id'] ?? null) && isset($__pd[$group['college_id']]) ? $__pd[$group['college_id']] : '—';
+                $__rows[] = [
+                    htmlspecialchars($group['item_name']),
+                    htmlspecialchars($group['category']),
+                    htmlspecialchars($dept_name),
+                    (string)count($group['units']),
+                    htmlspecialchars($cond_label),
+                    htmlspecialchars($status_label),
+                ];
+            }
+            aiPrintTable(['Item Name', 'Category', 'College/Office', 'Units', 'Condition', 'Status'], $__rows);
+            ?>
+        </div>
     </div>
 
     <!-- AVAILABLE ITEMS TAB -->
@@ -1189,7 +1265,7 @@ displayMessage();
             </a>
             <?php endforeach; ?>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($available_items_page) > 0):
                 foreach ($available_items_page as $group):
                     $unit_count = count($group['units']);
@@ -1255,7 +1331,7 @@ displayMessage();
         
         <!-- Pagination for Available Items -->
         <?php if ($pages_available > 1): ?>
-        <nav style="display: flex; justify-content: center; gap: 8px;">
+        <nav class="ai-no-print" style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_available; $i++): ?>
                 <a href="inventory.php?tab=available&page_available=<?php echo $i; ?>&search=<?php echo urlencode($filter_search); ?>&fdept=<?php echo urlencode($filter_dept); ?>&fcategory=<?php echo urlencode($filter_category); ?>&facq=<?php echo urlencode($filter_acq); ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_available ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
@@ -1263,11 +1339,31 @@ displayMessage();
             <?php endfor; ?>
         </nav>
         <?php endif; ?>
+
+        <div class="ai-print-only">
+            <?php
+            $__pd = getAllDepartmentNames();
+            $__rows = [];
+            foreach ($grouped_available as $group) {
+                $conditions = array_unique(array_column($group['units'], 'condition'));
+                $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
+                $dept_name = ($group['college_id'] ?? null) && isset($__pd[$group['college_id']]) ? $__pd[$group['college_id']] : '—';
+                $__rows[] = [
+                    htmlspecialchars($group['item_name']),
+                    htmlspecialchars($group['category']),
+                    htmlspecialchars($dept_name),
+                    (string)count($group['units']),
+                    htmlspecialchars($cond_label),
+                ];
+            }
+            aiPrintTable(['Item Name', 'Category', 'College/Office', 'Units Available', 'Condition'], $__rows);
+            ?>
+        </div>
     </div>
 
     <!-- REQUESTED ITEMS TAB -->
     <div id="tab-requested" style="display: <?php echo $current_tab === 'requested' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($requested_items_page) > 0):
                 foreach ($requested_items_page as $group):
                     $unit_count = count($group['units']);
@@ -1316,7 +1412,7 @@ displayMessage();
         
         <!-- Pagination for Requested Items -->
         <?php if ($pages_requested > 1): ?>
-        <nav style="display: flex; justify-content: center; gap: 8px;">
+        <nav class="ai-no-print" style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_requested; $i++): ?>
                 <a href="inventory.php?tab=requested&page_requested=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_requested ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
@@ -1324,12 +1420,32 @@ displayMessage();
             <?php endfor; ?>
         </nav>
         <?php endif; ?>
+
+        <div class="ai-print-only">
+            <?php
+            $__pd = getAllDepartmentNames();
+            $__rows = [];
+            foreach ($grouped_requested as $group) {
+                $conditions = array_unique(array_column($group['units'], 'condition'));
+                $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
+                $dept_name = ($group['college_id'] ?? null) && isset($__pd[$group['college_id']]) ? $__pd[$group['college_id']] : '—';
+                $__rows[] = [
+                    htmlspecialchars($group['item_name']),
+                    htmlspecialchars($group['category']),
+                    htmlspecialchars($dept_name),
+                    (string)count($group['units']),
+                    htmlspecialchars($cond_label),
+                ];
+            }
+            aiPrintTable(['Item Name', 'Category', 'College/Office', 'Units', 'Condition'], $__rows);
+            ?>
+        </div>
     </div>
 
     <!-- BORROWED ITEMS TAB -->
     <div id="tab-borrowed" style="display: <?php echo $current_tab === 'borrowed' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
         <?php $__borrow_tabs = ['not_returned' => 'Not Returned', 'returned' => 'Returned']; ?>
-        <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:280px;">
+        <div class="ai-no-print" style="display:flex;gap:6px;margin-bottom:16px;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:280px;">
             <?php foreach ($__borrow_tabs as $__bval => $__blabel): ?>
             <a href="inventory.php?tab=borrowed&fborrow=<?php echo $__bval; ?>"
                style="flex:1;text-align:center;padding:7px 0;border-radius:6px;font-size:.82rem;font-weight:700;text-decoration:none;
@@ -1342,7 +1458,7 @@ displayMessage();
         </div>
 
         <?php if ($filter_borrow === 'not_returned'): ?>
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($borrowed_items_page) > 0):
                 foreach ($borrowed_items_page as $group):
                     $unit_count = count($group['units']);
@@ -1435,7 +1551,7 @@ displayMessage();
         
         <!-- Pagination for Borrowed Items -->
         <?php if ($pages_borrowed > 1): ?>
-        <nav style="display: flex; justify-content: center; gap: 8px;">
+        <nav class="ai-no-print" style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_borrowed; $i++): ?>
                 <a href="inventory.php?tab=borrowed&fborrow=not_returned&page_borrowed=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_borrowed ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
@@ -1444,11 +1560,35 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
+        <div class="ai-print-only">
+            <?php
+            $__pd = getAllDepartmentNames();
+            $__rows = [];
+            foreach ($grouped_borrowed as $group) {
+                $dept_name = ($group['college_id'] ?? null) && isset($__pd[$group['college_id']]) ? $__pd[$group['college_id']] : '—';
+                foreach ($group['units'] as $u) {
+                    $__br = $__active_borrows_by_unit[(int)$u['id']] ?? null;
+                    $__borrower = $__br ? ($all_users_by_id[$__br['user_id']]['full_name'] ?? 'Unknown user') : '—';
+                    $__due = $__br['expected_return_date'] ?? null;
+                    $__rows[] = [
+                        htmlspecialchars($group['item_name']),
+                        htmlspecialchars($u['qr_code_id'] ?? ''),
+                        htmlspecialchars($dept_name),
+                        htmlspecialchars($__borrower),
+                        $__due ? htmlspecialchars(formatDate($__due, 'M d, Y')) : '—',
+                        ($__due && $__due < date('Y-m-d')) ? 'Overdue' : 'On Time',
+                    ];
+                }
+            }
+            aiPrintTable(['Item Name', 'QR Code', 'College/Office', 'Borrower', 'Due Date', 'Status'], $__rows);
+            ?>
+        </div>
+
         <?php else: ?>
         <!-- Returned sub-tab: history from borrow_records (status='returned') — the
              unit itself is back in 'available' status by now, so it can't be found
              by filtering live inventory the way the Not Returned list is. -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($returned_borrows_page) > 0): foreach ($returned_borrows_page as $__rb):
                 $__rb_inv = findById($all_items, (int)$__rb['inventory_id']);
                 $__rb_user = $all_users_by_id[$__rb['user_id']] ?? null;
@@ -1494,7 +1634,7 @@ displayMessage();
 
         <!-- Pagination for Returned Items -->
         <?php if ($pages_returned > 1): ?>
-        <nav style="display: flex; justify-content: center; gap: 8px;">
+        <nav class="ai-no-print" style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_returned; $i++): ?>
                 <a href="inventory.php?tab=borrowed&fborrow=returned&page_returned=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_returned ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
@@ -1502,6 +1642,26 @@ displayMessage();
             <?php endfor; ?>
         </nav>
         <?php endif; ?>
+
+        <div class="ai-print-only">
+            <?php
+            $__pd = getAllDepartmentNames();
+            $__rows = [];
+            foreach ($returned_borrows as $__rb) {
+                $__rb_inv = findById($all_items, (int)$__rb['inventory_id']);
+                $__rb_user = $all_users_by_id[$__rb['user_id']] ?? null;
+                $__rb_dept_name = ($__rb_inv['college_id'] ?? null) && isset($__pd[$__rb_inv['college_id']]) ? $__pd[$__rb_inv['college_id']] : '—';
+                $__rows[] = [
+                    htmlspecialchars($__rb_inv['item_name'] ?? 'Unknown item'),
+                    htmlspecialchars($__rb_inv['qr_code_id'] ?? ''),
+                    htmlspecialchars($__rb_dept_name),
+                    htmlspecialchars($__rb_user['full_name'] ?? 'Unknown user'),
+                    !empty($__rb['actual_return_date']) ? htmlspecialchars(formatDate($__rb['actual_return_date'], 'M d, Y')) : '—',
+                ];
+            }
+            aiPrintTable(['Item Name', 'QR Code', 'College/Office', 'Borrower', 'Date Returned'], $__rows);
+            ?>
+        </div>
         <?php endif; ?>
     </div>
 
@@ -1510,7 +1670,7 @@ displayMessage();
          attached (see user/requests.php), so this lists the open tickets
          themselves rather than filtering inventory by status. -->
     <div id="tab-maintenance" style="display: <?php echo $current_tab === 'maintenance' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($maintenance_items_page) > 0):
                 foreach ($maintenance_items_page as $req):
                     $__requester = $all_users_by_id[$req['user_id']] ?? null;
@@ -1562,7 +1722,7 @@ displayMessage();
 
         <!-- Pagination for Maintenance Tickets -->
         <?php if ($pages_maintenance > 1): ?>
-        <nav style="display: flex; justify-content: center; gap: 8px;">
+        <nav class="ai-no-print" style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_maintenance; $i++): ?>
                 <a href="inventory.php?tab=maintenance&page_maintenance=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_maintenance ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
@@ -1570,11 +1730,30 @@ displayMessage();
             <?php endfor; ?>
         </nav>
         <?php endif; ?>
+
+        <div class="ai-print-only">
+            <?php
+            $__pd = getAllDepartmentNames();
+            $__rows = [];
+            foreach ($maintenance_requests as $req) {
+                $__requester = $all_users_by_id[$req['user_id']] ?? null;
+                $__dept_name = ($__requester['college_id'] ?? null) && isset($__pd[$__requester['college_id']]) ? $__pd[$__requester['college_id']] : '—';
+                $__rows[] = [
+                    htmlspecialchars($req['request_number'] ?? ''),
+                    htmlspecialchars($req['item_name'] ?? $req['service_description'] ?? 'Service Request'),
+                    htmlspecialchars($__requester['full_name'] ?? '—'),
+                    htmlspecialchars($__dept_name),
+                    htmlspecialchars(ucfirst($req['status'])),
+                ];
+            }
+            aiPrintTable(['Request #', 'Item / Description', 'Requested By', 'College/Office', 'Status'], $__rows);
+            ?>
+        </div>
     </div>
 
     <!-- USER-OWNED ITEMS TAB -->
     <div id="tab-owned" style="display: <?php echo $current_tab === 'owned' ? 'block' : 'none'; ?>; margin-bottom: 40px;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
             <?php if (count($owned_items_page) > 0):
                 foreach ($owned_items_page as $group):
                     $owner_user  = findById($users, $group['user_id']);
@@ -1640,7 +1819,7 @@ displayMessage();
         
         <!-- Pagination for Owned Items -->
         <?php if ($pages_owned > 1): ?>
-        <nav style="display: flex; justify-content: center; gap: 8px;">
+        <nav class="ai-no-print" style="display: flex; justify-content: center; gap: 8px;">
             <?php for ($i = 1; $i <= $pages_owned; $i++): ?>
                 <a href="inventory.php?tab=owned&page_owned=<?php echo $i; ?>&sort=<?php echo urlencode($filter_sort); ?>" class="btn btn-sm <?php echo $i === $current_page_owned ? 'ai-btn-primary' : 'ai-btn-secondary'; ?>" style="min-width: 40px;">
                     <?php echo $i; ?>
@@ -1648,6 +1827,50 @@ displayMessage();
             <?php endfor; ?>
         </nav>
         <?php endif; ?>
+
+        <div class="ai-print-only">
+            <?php
+            $__pd = getAllDepartmentNames();
+            $__rows = [];
+            foreach ($grouped_owned as $group) {
+                $__owner = findById($users, $group['user_id']);
+                $conditions = array_unique(array_column($group['units'], 'condition'));
+                $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
+                $dept_name = ($group['college_id'] ?? null) && isset($__pd[$group['college_id']]) ? $__pd[$group['college_id']] : '—';
+                $__rows[] = [
+                    htmlspecialchars($group['item_name']),
+                    htmlspecialchars($__owner['full_name'] ?? 'Unknown User'),
+                    htmlspecialchars((string)($group['year_owned'] ?? '—')),
+                    htmlspecialchars($dept_name),
+                    (string)count($group['units']),
+                    htmlspecialchars($cond_label),
+                ];
+            }
+            aiPrintTable(['Item Name', 'Owner', 'Year Owned', 'College/Office', 'Units', 'Condition'], $__rows);
+            ?>
+        </div>
+    </div>
+
+    <!-- Signature block (print only) -->
+    <div class="ai-print-only">
+        <div class="ai-print-signatures">
+            <div class="ai-print-sig">
+                <div class="ai-print-sig-line"><?php echo htmlspecialchars($current_user['full_name']); ?></div>
+                <div class="ai-print-sig-role">Prepared by</div>
+            </div>
+            <div class="ai-print-sig">
+                <div class="ai-print-sig-line">&nbsp;</div>
+                <div class="ai-print-sig-role">Certified Correct</div>
+            </div>
+            <div class="ai-print-sig">
+                <div class="ai-print-sig-line">&nbsp;</div>
+                <div class="ai-print-sig-role">Noted by</div>
+            </div>
+        </div>
+        <div class="ai-print-footer">
+            ManageMo &mdash; Pampanga State University &mdash; Report printed on <?php echo date('F d, Y h:i A'); ?>
+            &nbsp;|&nbsp; Generated by <?php echo htmlspecialchars($current_user['full_name']); ?>
+        </div>
     </div>
     <?php endif; ?>
 </div>
@@ -1782,6 +2005,48 @@ displayMessage();
 .ai-tab-active .ai-tab-badge {
     background: rgba(139,0,0,0.10);
     color: #8B0000;
+}
+
+/* ── Print report (formal document look — letterhead, ruled table, signature) ── */
+.ai-print-only { display: none; }
+.ai-print-btn {
+    background:#fff !important; border:1px solid #e5e7eb !important;
+    border-radius:6px !important; font-weight:700 !important; color:#374151 !important;
+    padding:9px 16px !important; font-size:0.87rem !important;
+    text-decoration:none; display:inline-flex; align-items:center; gap:7px;
+}
+.ai-print-btn:hover { background:#f7f7f7 !important; }
+
+@media print {
+    .ai-no-print, .sidebar, .sidebar-toggle-btn, .topbar, nav { display: none !important; }
+    .main-wrapper { padding: 0 !important; margin: 0 !important; }
+    .container-fluid { padding: 0 !important; }
+    body { background: #fff !important; font-family: 'Times New Roman', Times, Georgia, serif !important; }
+
+    .ai-print-only { display: block !important; }
+
+    .ai-print-header { text-align: center; padding-bottom: 6px; }
+    .ai-print-header .republic { font-size: 12pt; font-style: italic; color: #000; margin: 0; }
+    .ai-print-header h2 { font-size: 17pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; color: #000; margin: 2px 0 0; }
+    .ai-print-header p { font-size: 11pt; color: #000; margin: 2px 0 0; }
+    .ai-print-rule { border-top: 3px solid #000; border-bottom: 1px solid #000; height: 5px; line-height: 5px; font-size: 0; margin: 6px 0 16px; }
+    .ai-print-title { text-align: center; font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-decoration: underline; color: #000; margin-bottom: 12px; }
+    .ai-print-meta { font-size: 10.5pt; color: #000; margin-bottom: 16px; }
+    .ai-print-meta div { margin-bottom: 2px; }
+    .ai-print-meta strong { display: inline-block; min-width: 140px; }
+
+    .ai-print-table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 10px; }
+    .ai-print-table th, .ai-print-table td { border: 0.75pt solid #000 !important; padding: 5px 8px !important; font-size: 9pt !important; color: #000 !important; }
+    .ai-print-table th { background: #e5e5e5 !important; text-transform: uppercase; font-size: 8pt !important; text-align: left; }
+
+    .ai-print-signatures { display: flex !important; justify-content: space-between; gap: 20px; margin-top: 50px; page-break-inside: avoid; }
+    .ai-print-sig { flex: 1; text-align: center; font-size: 10pt; }
+    .ai-print-sig-line { border-top: 0.75pt solid #000; margin-bottom: 4px; padding-top: 4px; font-weight: bold; text-transform: uppercase; }
+    .ai-print-sig-role { color: #333; }
+
+    .ai-print-footer { margin-top: 18px; padding-top: 8px; border-top: 0.5pt solid #999; font-size: 8pt; color: #555; text-align: center; }
+
+    @page { size: landscape; margin: 15mm; }
 }
 </style>
 
