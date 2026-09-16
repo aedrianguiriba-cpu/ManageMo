@@ -246,6 +246,17 @@ function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $ex
             'color'    => '#15803d', 'bg' => '#dcfce7', 'icon' => '✓',
             'detail'   => 'This request has now been fully processed. Thank you.',
         ],
+        'return_reminder' => [
+            'subject'  => !empty($extra['overdue']) ? 'Overdue Item — Please Return' : 'Reminder: Please Return Your Borrowed Item',
+            'headline' => !empty($extra['overdue']) ? 'Your borrowed item is overdue' : 'Friendly reminder to return your item',
+            'color'    => !empty($extra['overdue']) ? '#b91c1c' : '#b45309',
+            'bg'       => !empty($extra['overdue']) ? '#fee2e2' : '#fef3c7',
+            'icon'     => !empty($extra['overdue']) ? '⚠' : '⏰',
+            'detail'   => (!empty($extra['due_date'])
+                            ? (!empty($extra['overdue']) ? 'It was due back on ' : 'It is due back on ') . $extra['due_date'] . '. '
+                            : '')
+                        . 'Please return it to the property custodian\'s office at your earliest convenience.',
+        ],
     ];
 
     if (!isset($messages[$stage])) return false;

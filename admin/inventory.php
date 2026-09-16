@@ -215,6 +215,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logActivity($current_user['id'], 'UPDATE', "Marked '{$unit['item_name']}' (unit #$unit_id) as returned", 'inventory', $unit_id);
         redirectWithMessage('inventory.php?tab=borrowed', "'{$unit['item_name']}' marked as returned.", 'success');
 
+    } elseif ($action === 'notify_borrower') {
+        $unit_id = (int)($_POST['unit_id'] ?? 0);
+        $unit    = $unit_id ? findById(getInventory(), $unit_id) : null;
+        if (!$unit || $unit['status'] !== 'borrowed') {
+            redirectWithMessage('inventory.php?tab=borrowed', 'That item is not currently borrowed.', 'danger');
+        }
+
+        $open_borrow = null;
+        foreach (getBorrowRecords() as $br) {
+            if ((int)$br['inventory_id'] === $unit_id && in_array($br['status'], ['active', 'overdue'])) {
+                $open_borrow = $br;
+                break;
+            }
+        }
+        if (!$open_borrow) {
+            redirectWithMessage('inventory.php?tab=borrowed', 'No active borrow record found for this unit.', 'danger');
+        }
+
+        $borrower = findById(getUsers(), (int)$open_borrow['user_id']);
+        if (!$borrower) {
+            redirectWithMessage('inventory.php?tab=borrowed', 'Could not find the borrower for this unit.', 'danger');
+        }
+
+        $orig_request = !empty($open_borrow['request_id']) ? findById(getRequests(), (int)$open_borrow['request_id']) : null;
+        $ref_number   = $orig_request['request_number'] ?? $unit['qr_code_id'];
+        $due_date     = $open_borrow['expected_return_date'] ?? null;
+        $is_overdue   = $due_date && $due_date < date('Y-m-d');
+
+        $sent = sendStatusEmail($borrower['email'], $borrower['full_name'], $ref_number, 'return_reminder', [
+            'items'     => [['name' => $unit['item_name'], 'qty' => 1]],
+            'due_date'  => $due_date ? formatDate($due_date, 'M d, Y') : null,
+            'overdue'   => $is_overdue,
+        ]);
+        notifyUser((int)$borrower['id'],
+            $is_overdue ? 'Overdue item reminder' : 'Return reminder',
+            "Please return '{$unit['item_name']}'" . ($due_date ? ' by ' . formatDate($due_date, 'M d, Y') : '') . '.',
+            $is_overdue ? 'danger' : 'info', 'user/borrow-records.php');
+        logActivity($current_user['id'], 'NOTIFY', "Sent return reminder for '{$unit['item_name']}' (unit #$unit_id) to {$borrower['full_name']}", 'inventory', $unit_id);
+
+        redirectWithMessage('inventory.php?tab=borrowed', $sent
+            ? "Reminder email sent to {$borrower['full_name']}."
+            : "In-app reminder sent to {$borrower['full_name']} (email not sent — SMTP not configured).", $sent ? 'success' : 'warning');
+
     }
 }
 
@@ -1321,12 +1364,20 @@ displayMessage();
                         <?php endif; ?>
                     </div>
                     <?php if ($u['status'] === 'borrowed'): ?>
-                    <form method="POST" action="?action=mark_returned" onsubmit="return confirm('Mark this unit as returned?')" style="margin:0;flex-shrink:0;">
-                        <input type="hidden" name="unit_id" value="<?php echo (int)$u['id']; ?>">
-                        <button type="submit" class="ai-btn-sm" style="background:rgba(239,68,68,0.12);color:#dc2626;border:none;border-radius:6px;white-space:nowrap;" title="Click to mark as returned">
-                            <i class="fas fa-undo"></i> Mark as Returned
-                        </button>
-                    </form>
+                    <div style="display:flex;gap:6px;flex-shrink:0;">
+                        <form method="POST" action="?action=notify_borrower" onsubmit="return confirm('Send a return reminder email to this borrower?')" style="margin:0;">
+                            <input type="hidden" name="unit_id" value="<?php echo (int)$u['id']; ?>">
+                            <button type="submit" class="ai-btn-sm" style="background:rgba(29,78,216,0.12);color:#1d4ed8;border:none;border-radius:6px;white-space:nowrap;" title="Email the borrower a return reminder">
+                                <i class="fas fa-envelope"></i> Notify
+                            </button>
+                        </form>
+                        <form method="POST" action="?action=mark_returned" onsubmit="return confirm('Mark this unit as returned?')" style="margin:0;">
+                            <input type="hidden" name="unit_id" value="<?php echo (int)$u['id']; ?>">
+                            <button type="submit" class="ai-btn-sm" style="background:rgba(239,68,68,0.12);color:#dc2626;border:none;border-radius:6px;white-space:nowrap;" title="Click to mark as returned">
+                                <i class="fas fa-undo"></i> Mark as Returned
+                            </button>
+                        </form>
+                    </div>
                     <?php else: ?>
                     <span class="ai-badge ai-badge-success" style="white-space:nowrap;"><i class="fas fa-check"></i> Returned</span>
                     <?php endif; ?>
