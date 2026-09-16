@@ -908,10 +908,36 @@ displayMessage();
     }));
     usort($maintenance_requests, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
 
+    // "Requested"/"Borrowed" should sort by when that actually happened (request
+    // submitted / item borrowed), not by the inventory row's original creation
+    // date — an old item requested five minutes ago is more recent activity than
+    // a brand-new item nobody's touched yet. Map each unit to the request/borrow
+    // record that put it in that state, and fall back to created_at only if none
+    // is found (e.g. legacy data).
+    // Inventory sits at status='requested' from submission (pending) all the way
+    // through approval, until it's actually delivered — so both request statuses
+    // can be the one currently "holding" a requested unit.
+    $__pending_request_by_unit = [];
+    foreach (getRequests() as $__r) {
+        if (!in_array($__r['status'], ['pending', 'approved']) || empty($__r['inventory_id'])) continue;
+        $__uid = (int)$__r['inventory_id'];
+        if (!isset($__pending_request_by_unit[$__uid]) || $__r['created_at'] > $__pending_request_by_unit[$__uid]['created_at']) {
+            $__pending_request_by_unit[$__uid] = $__r;
+        }
+    }
+    $__latestActivity = function(array $item, array $map) {
+        $rec = $map[(int)$item['id']] ?? null;
+        return $rec['created_at'] ?? $item['created_at'];
+    };
+
     usort($all_active_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
     usort($available_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
-    usort($requested_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
-    usort($borrowed_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
+    usort($requested_items, function($a, $b) use ($__pending_request_by_unit, $__latestActivity) {
+        return strcmp($__latestActivity($b, $__pending_request_by_unit), $__latestActivity($a, $__pending_request_by_unit));
+    });
+    usort($borrowed_items, function($a, $b) use ($__active_borrows_by_unit, $__latestActivity) {
+        return strcmp($__latestActivity($b, $__active_borrows_by_unit), $__latestActivity($a, $__active_borrows_by_unit));
+    });
     usort($owned_items, function($a, $b){ return strcmp($b['created_at'], $a['created_at']); });
 
     $status_colors = ['available'=>'success','requested'=>'info','borrowed'=>'warning','maintenance'=>'info'];
