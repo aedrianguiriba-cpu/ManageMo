@@ -1057,7 +1057,7 @@ displayMessage();
             <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== '' || $filter_acq !== '' || $filter_sort !== 'newest'): ?>
             <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?>" class="btn ai-btn-secondary btn-sm">Clear</a>
             <?php endif; ?>
-            <button type="button" class="btn ai-print-btn btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print Report</button>
+            <button type="button" class="btn ai-print-btn btn-sm" onclick="downloadInventoryReport()"><i class="fas fa-file-pdf"></i> Download PDF</button>
         </div>
     </form>
 
@@ -1086,7 +1086,7 @@ displayMessage();
         'maintenance' => 'Maintenance Tickets Report', 'owned' => 'User-Owned Items Report',
     ];
     ?>
-    <div class="ai-print-only">
+    <div class="ai-print-only" id="invPrintLetterhead">
         <div class="ai-print-header">
             <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" style="width:60px;height:60px;" alt="PSU Logo">
             <p class="republic">Republic of the Philippines</p>
@@ -1094,7 +1094,7 @@ displayMessage();
             <p>ManageMo &mdash; Inventory &amp; Asset Management System</p>
         </div>
         <div class="ai-print-rule"></div>
-        <div class="ai-print-title"><?php echo $__tab_titles[$current_tab] ?? 'Inventory Report'; ?></div>
+        <div class="ai-print-title" id="invPrintTitle"><?php echo $__tab_titles[$current_tab] ?? 'Inventory Report'; ?></div>
         <div class="ai-print-meta">
             <div><strong>Campus / College / Office:</strong> <?php
                 if ($filter_dept !== '') {
@@ -1232,7 +1232,7 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
-        <div class="ai-print-only">
+        <div class="ai-print-only" id="printTable-all">
             <?php
             $__pd = getAllDepartmentNames();
             $__rows = [];
@@ -1349,7 +1349,7 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
-        <div class="ai-print-only">
+        <div class="ai-print-only" id="printTable-available">
             <?php
             $__pd = getAllDepartmentNames();
             $__rows = [];
@@ -1430,7 +1430,7 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
-        <div class="ai-print-only">
+        <div class="ai-print-only" id="printTable-requested">
             <?php
             $__pd = getAllDepartmentNames();
             $__rows = [];
@@ -1569,7 +1569,7 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
-        <div class="ai-print-only">
+        <div class="ai-print-only" id="printTable-borrowed-notret">
             <?php
             $__pd = getAllDepartmentNames();
             $__rows = [];
@@ -1652,7 +1652,7 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
-        <div class="ai-print-only">
+        <div class="ai-print-only" id="printTable-borrowed-returned">
             <?php
             $__pd = getAllDepartmentNames();
             $__rows = [];
@@ -1740,7 +1740,7 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
-        <div class="ai-print-only">
+        <div class="ai-print-only" id="printTable-maintenance">
             <?php
             $__pd = getAllDepartmentNames();
             $__rows = [];
@@ -1837,7 +1837,7 @@ displayMessage();
         </nav>
         <?php endif; ?>
 
-        <div class="ai-print-only">
+        <div class="ai-print-only" id="printTable-owned">
             <?php
             $__pd = getAllDepartmentNames();
             $__rows = [];
@@ -1861,7 +1861,7 @@ displayMessage();
     </div>
 
     <!-- Signature block (print only) -->
-    <div class="ai-print-only">
+    <div class="ai-print-only" id="invPrintSignature">
         <div class="ai-print-signatures">
             <div class="ai-print-sig">
                 <div class="ai-print-sig-line"><?php echo htmlspecialchars($current_user['full_name']); ?></div>
@@ -2110,6 +2110,65 @@ function openGroupModal(group) {
     new bootstrap.Modal(document.getElementById('detailModal')).show();
 }
 
+// Shared with downloadInventoryReport() below and setTab() — kept as a single
+// source of truth so the popup title and the browser tab title never drift.
+var invPrintTitles = {
+    all: 'All Items Report', available: 'Available Items Report', requested: 'Requested Items Report',
+    borrowed: 'Borrowed Items Report', maintenance: 'Maintenance Tickets Report', owned: 'User-Owned Items Report'
+};
+var currentInvTab = '<?php echo htmlspecialchars($current_tab); ?>';
+// The Borrowed sub-tab (Not Returned / Returned) always reloads the page (plain
+// links, not client-side toggled), so this stays accurate for the whole load.
+var invBorrowSubTab = '<?php echo htmlspecialchars($filter_borrow); ?>';
+
+// Opens a clean, standalone copy of the report for the currently active tab —
+// no app chrome, no tab navigation, just the letterhead/table/signature — and
+// triggers the browser's print dialog, where "Save as PDF" downloads it.
+function downloadInventoryReport() {
+    var tableId = 'printTable-' + currentInvTab;
+    if (currentInvTab === 'borrowed') {
+        tableId = invBorrowSubTab === 'returned' ? 'printTable-borrowed-returned' : 'printTable-borrowed-notret';
+    }
+    var letterheadEl = document.getElementById('invPrintLetterhead');
+    var tableEl      = document.getElementById(tableId);
+    var signatureEl  = document.getElementById('invPrintSignature');
+    if (!letterheadEl || !tableEl || !signatureEl) return;
+
+    var title = invPrintTitles[currentInvTab] || 'Inventory Report';
+    document.getElementById('invPrintTitle').textContent = title;
+
+    var win = window.open('', '_blank', 'width=1000,height=750,scrollbars=yes');
+    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+        + '<title>' + title + '</title>'
+        + '<style>'
+        + 'body{font-family:"Times New Roman",Times,Georgia,serif;background:#fff;margin:0;padding:24px;color:#000;}'
+        + '.ai-print-header{text-align:center;padding-bottom:6px;}'
+        + '.ai-print-header .republic{font-size:12pt;font-style:italic;margin:0;}'
+        + '.ai-print-header h2{font-size:17pt;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;margin:2px 0 0;}'
+        + '.ai-print-header p{font-size:11pt;margin:2px 0 0;}'
+        + '.ai-print-rule{border-top:3px solid #000;border-bottom:1px solid #000;height:5px;line-height:5px;font-size:0;margin:6px 0 16px;}'
+        + '.ai-print-title{text-align:center;font-size:14pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;text-decoration:underline;margin-bottom:12px;}'
+        + '.ai-print-meta{font-size:10.5pt;margin-bottom:16px;}'
+        + '.ai-print-meta div{margin-bottom:2px;}'
+        + '.ai-print-meta strong{display:inline-block;min-width:140px;}'
+        + '.ai-print-table{width:100%;border-collapse:collapse;margin-bottom:10px;}'
+        + '.ai-print-table th,.ai-print-table td{border:.75pt solid #000;padding:5px 8px;font-size:9pt;}'
+        + '.ai-print-table th{background:#e5e5e5;text-transform:uppercase;font-size:8pt;text-align:left;}'
+        + '.ai-print-signatures{display:flex;justify-content:space-between;gap:20px;margin-top:50px;}'
+        + '.ai-print-sig{flex:1;text-align:center;font-size:10pt;}'
+        + '.ai-print-sig-line{border-top:.75pt solid #000;margin-bottom:4px;padding-top:4px;font-weight:bold;text-transform:uppercase;}'
+        + '.ai-print-sig-role{color:#333;}'
+        + '.ai-print-footer{margin-top:18px;padding-top:8px;border-top:.5pt solid #999;font-size:8pt;color:#555;text-align:center;}'
+        + '@page{size:landscape;margin:15mm;}'
+        + '</style></head><body>'
+        + letterheadEl.innerHTML
+        + tableEl.innerHTML
+        + signatureEl.innerHTML
+        + '<script>window.onload=function(){window.print();};<\/script>'
+        + '</body></html>');
+    win.document.close();
+}
+
 // Toggle tabs
 function setTab(tabName) {
     // Remove active class from all tab buttons
@@ -2154,6 +2213,7 @@ function setTab(tabName) {
         all: 'All Items', available: 'Available Items', requested: 'Requested Items',
         borrowed: 'Borrowed Items', maintenance: 'Maintenance Tickets', owned: 'User-Owned Items'
     };
+    currentInvTab = tabName;
     if (invTabTitles[tabName]) {
         document.title = invTabTitles[tabName] + ' - Inventory - ManageMo - PSU Asset Management';
     }
