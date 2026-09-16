@@ -1057,6 +1057,7 @@ displayMessage();
             <?php if ($filter_search !== '' || $filter_college_id !== '' || $filter_category !== '' || $filter_acq !== '' || $filter_sort !== 'newest'): ?>
             <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?>" class="btn ai-btn-secondary btn-sm">Clear</a>
             <?php endif; ?>
+            <button type="button" class="btn ai-print-btn btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
             <button type="button" class="btn ai-print-btn btn-sm" onclick="downloadInventoryReport()"><i class="fas fa-file-pdf"></i> Download PDF</button>
         </div>
     </form>
@@ -2159,12 +2160,15 @@ function downloadInventoryReport() {
         + '.ai-print-sig-line{border-top:.75pt solid #000;margin-bottom:4px;padding-top:4px;font-weight:bold;text-transform:uppercase;}'
         + '.ai-print-sig-role{color:#333;}'
         + '.ai-print-footer{margin-top:18px;padding-top:8px;border-top:.5pt solid #999;font-size:8pt;color:#555;text-align:center;}'
-        + '@page{size:landscape;margin:15mm;}'
+        + '.ai-download-toolbar{text-align:center;margin-bottom:20px;font-family:Arial,sans-serif;}'
+        + '.ai-download-toolbar button{background:#8B0000;color:#fff;border:none;border-radius:6px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;}'
+        + '.ai-download-toolbar button:hover{background:#6B0000;}'
+        + '@media print{.ai-download-toolbar{display:none !important;}@page{size:landscape;margin:15mm;}}'
         + '</style></head><body>'
+        + '<div class="ai-download-toolbar"><button onclick="window.print()">Save as PDF / Print</button></div>'
         + letterheadEl.innerHTML
         + tableEl.innerHTML
         + signatureEl.innerHTML
-        + '<script>window.onload=function(){window.print();};<\/script>'
         + '</body></html>');
     win.document.close();
 }
