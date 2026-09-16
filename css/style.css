@@ -767,3 +767,54 @@ footer {
     /* Footer tighter */
     footer { margin-top: 20px; }
 }
+
+/* ================================================
+   SKELETON LOADER — shown on every page (see includes/header.php
+   and includes/footer.php) while the DOM/assets finish loading.
+   ================================================ */
+#skeletonLoader {
+    position: fixed; inset: 0; z-index: 99999;
+    background: var(--bg-muted);
+    display: flex;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+#skeletonLoader.sk-hidden { opacity: 0; pointer-events: none; }
+
+.sk-sidebar {
+    width: 250px; height: 100%; flex-shrink: 0;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+}
+.sk-main { flex: 1; min-width: 0; padding: 24px; overflow: hidden; }
+.sk-topbar {
+    height: 56px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    margin: -24px -24px 24px;
+    padding: 0 24px;
+    display: flex; align-items: center;
+}
+
+.sk-block {
+    background: linear-gradient(90deg, #e7e7e7 25%, #f2f2f2 37%, #e7e7e7 63%);
+    background-size: 400% 100%;
+    animation: sk-shimmer 1.4s ease infinite;
+    border-radius: 6px;
+}
+@keyframes sk-shimmer {
+    0%   { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+.sk-line { height: 14px; margin-bottom: 12px; }
+.sk-card { height: 90px; border-radius: 8px; }
+.sk-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.sk-grid-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+@media (max-width: 768px) {
+    .sk-sidebar { display: none; }
+    .sk-kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .sk-grid-row { grid-template-columns: 1fr; }
+}
