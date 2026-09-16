@@ -2221,6 +2221,14 @@ function setTab(tabName) {
     if (invTabTitles[tabName]) {
         document.title = invTabTitles[tabName] + ' - Inventory - ManageMo - PSU Asset Management';
     }
+    // The print letterhead's title is only rendered once server-side (whichever
+    // tab was active at page load) — without this, switching tabs client-side
+    // and hitting Print (not Download, which already updates it separately)
+    // would keep showing whatever tab was active on the original page load.
+    var printTitleEl = document.getElementById('invPrintTitle');
+    if (printTitleEl && invPrintTitles[tabName]) {
+        printTitleEl.textContent = invPrintTitles[tabName];
+    }
 }
 
 function openOwnedGroupModal(group, ownerName) {
