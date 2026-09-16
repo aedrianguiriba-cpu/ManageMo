@@ -286,42 +286,52 @@ function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $ex
     }
 }
 
-// Renders the branded HTML shell used by sendStatusEmail(). Inline CSS only —
-// email clients strip <style> blocks and external stylesheets.
+// Renders the branded HTML shell used by sendStatusEmail() — styled as a formal
+// university notice/memo (letterhead, serif type, ruled tables) rather than a
+// modern SaaS transactional email. Inline CSS only — email clients strip
+// <style> blocks and external stylesheets.
 function buildStatusEmailHtml($to_name, $request_number, array $m, array $extra = []) {
     $safeName   = htmlspecialchars($to_name);
     $safeReqNum = htmlspecialchars($request_number);
     $safeHead   = htmlspecialchars($m['headline']);
     $safeDetail = htmlspecialchars($m['detail']);
-    $color      = $m['color'];
-    $bg         = $m['bg'];
-    $icon       = $m['icon'];
+    // Only the accent color carries over — used sparingly (rule lines, the
+    // status label) rather than as a decorative badge/background.
+    $accent     = $m['color'];
+    $noticeType = strtoupper($safeHead);
 
-    // ── Request summary strip — always shown, so every email carries the basics
-    // (request #, when, method) even without an itemized list.
+    // ── Summary table — a plain ruled two-column table, like a memo's
+    // reference block, always shown so every notice carries the basics.
     $summary_rows = '';
     $summary_rows .= '<tr>'
-        . '<td style="padding:7px 0;font-size:12.5px;color:#6b7280;width:140px;">Reference No.</td>'
-        . '<td style="padding:7px 0;font-size:13px;color:#1a1d23;font-weight:700;font-family:Consolas,Menlo,monospace;">' . $safeReqNum . '</td>'
+        . '<td style="padding:8px 12px;font-size:12.5px;color:#333;border:1px solid #999;width:160px;">Reference No.</td>'
+        . '<td style="padding:8px 12px;font-size:12.5px;color:#000;font-weight:bold;border:1px solid #999;font-family:Consolas,Menlo,monospace;">' . $safeReqNum . '</td>'
         . '</tr>';
     if (!empty($extra['receiving_method'])) {
         $summary_rows .= '<tr>'
-            . '<td style="padding:7px 0;font-size:12.5px;color:#6b7280;">Receiving Method</td>'
-            . '<td style="padding:7px 0;font-size:13px;color:#1a1d23;font-weight:600;">' . htmlspecialchars(ucfirst($extra['receiving_method'])) . '</td>'
+            . '<td style="padding:8px 12px;font-size:12.5px;color:#333;border:1px solid #999;">Receiving Method</td>'
+            . '<td style="padding:8px 12px;font-size:12.5px;color:#000;font-weight:bold;border:1px solid #999;">' . htmlspecialchars(ucfirst($extra['receiving_method'])) . '</td>'
             . '</tr>';
     }
     if (!empty($extra['scheduled_date'])) {
         $summary_rows .= '<tr>'
-            . '<td style="padding:7px 0;font-size:12.5px;color:#6b7280;">Scheduled Date</td>'
-            . '<td style="padding:7px 0;font-size:13px;color:#1a1d23;font-weight:600;">' . htmlspecialchars($extra['scheduled_date']) . '</td>'
+            . '<td style="padding:8px 12px;font-size:12.5px;color:#333;border:1px solid #999;">Scheduled Date</td>'
+            . '<td style="padding:8px 12px;font-size:12.5px;color:#000;font-weight:bold;border:1px solid #999;">' . htmlspecialchars($extra['scheduled_date']) . '</td>'
             . '</tr>';
     }
-    $summary_block = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0 4px;background:#f9fafb;border:1px solid #eef0f3;border-radius:10px;">'
-        . '<tr><td style="padding:14px 18px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' . $summary_rows . '</table></td></tr>'
+    if (!empty($extra['due_date'])) {
+        $summary_rows .= '<tr>'
+            . '<td style="padding:8px 12px;font-size:12.5px;color:#333;border:1px solid #999;">Due Date</td>'
+            . '<td style="padding:8px 12px;font-size:12.5px;color:#000;font-weight:bold;border:1px solid #999;">' . htmlspecialchars($extra['due_date']) . '</td>'
+            . '</tr>';
+    }
+    $summary_block = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border-collapse:collapse;">'
+        . $summary_rows
         . '</table>';
 
-    // ── Itemized list — populated for stages that pass $extra['items'] (e.g.
-    // out for delivery), so the recipient sees exactly what to expect.
+    // ── Itemized list — a plain ruled table, populated for stages that pass
+    // $extra['items'] (e.g. out for delivery), so the recipient sees exactly
+    // what to expect.
     $items_block = '';
     $items = $extra['items'] ?? [];
     if (!empty($items)) {
@@ -334,55 +344,80 @@ function buildStatusEmailHtml($to_name, $request_number, array $m, array $extra 
                 !empty($it['condition']) ? ucfirst(htmlspecialchars($it['condition'])) . ' condition' : null,
                 !empty($it['qr'])        ? 'QR: ' . htmlspecialchars($it['qr'])       : null,
             ]);
-            $meta_line = $meta ? '<div style="font-size:11.5px;color:#9ca3af;margin-top:2px;">' . implode(' &bull; ', $meta) . '</div>' : '';
+            $meta_line = $meta ? '<div style="font-size:11px;color:#555;margin-top:2px;font-style:italic;">' . implode(' &bull; ', $meta) . '</div>' : '';
             $item_rows .= '<tr>'
-                . '<td style="padding:11px 14px;border-bottom:1px solid #f0f0f0;font-size:13.5px;color:#1a1d23;font-weight:600;">' . $name . $meta_line . '</td>'
-                . '<td style="padding:11px 14px;border-bottom:1px solid #f0f0f0;font-size:13.5px;color:#374151;text-align:center;white-space:nowrap;">x' . $qty . '</td>'
+                . '<td style="padding:8px 12px;border:1px solid #999;font-size:13px;color:#000;">' . $name . $meta_line . '</td>'
+                . '<td style="padding:8px 12px;border:1px solid #999;font-size:13px;color:#000;text-align:center;white-space:nowrap;">' . $qty . '</td>'
                 . '</tr>';
         }
-        $items_block = '<div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#8B0000;margin:22px 0 8px;">Items in This Request (' . count($items) . ')</div>'
-            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eef0f3;border-radius:10px;overflow:hidden;">'
-            . '<tr style="background:#faf5f5;">'
-            . '<td style="padding:9px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#8B0000;">Item</td>'
-            . '<td style="padding:9px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#8B0000;text-align:center;">Qty</td>'
+        $items_block = '<div style="font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:0.4px;color:#000;margin:22px 0 6px;">Item(s) Covered by This Notice</div>'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">'
+            . '<tr>'
+            . '<td style="padding:7px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.3px;color:#000;border:1px solid #999;background:#e5e5e5;">Item</td>'
+            . '<td style="padding:7px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.3px;color:#000;border:1px solid #999;background:#e5e5e5;text-align:center;">Qty</td>'
             . '</tr>'
             . $item_rows
             . '</table>';
     }
 
-    $year = date('Y');
+    $year  = date('Y');
+    $today = date('F d, Y');
 
     return <<<HTML
 <!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#eef0f3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef0f3;padding:40px 16px;">
+<body style="margin:0;padding:0;background:#ffffff;font-family:'Times New Roman',Times,Georgia,serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:32px 16px;">
 <tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,0.06),0 4px 16px rgba(16,24,40,0.08);">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;">
+
+  <!-- Letterhead -->
   <tr>
-    <td style="background:#8B0000;padding:26px 32px;">
-      <span style="color:#ffffff;font-size:19px;font-weight:800;letter-spacing:0.3px;">ManageMo</span>
-      <div style="color:rgba(255,255,255,0.78);font-size:12px;margin-top:3px;letter-spacing:0.2px;">Pampanga State University &mdash; Inventory &amp; Asset Management</div>
+    <td align="center" style="padding-bottom:6px;">
+      <div style="font-size:12px;font-style:italic;color:#000;">Republic of the Philippines</div>
+      <div style="font-size:17px;font-weight:bold;letter-spacing:0.4px;text-transform:uppercase;color:#000;margin-top:2px;">Pampanga State University</div>
+      <div style="font-size:11px;color:#000;margin-top:2px;">ManageMo &mdash; Inventory &amp; Asset Management System</div>
     </td>
   </tr>
   <tr>
-    <td style="padding:0;background:{$color};height:4px;line-height:4px;font-size:0;">&nbsp;</td>
+    <td style="padding:6px 0 18px;">
+      <div style="border-top:3px solid #000;border-bottom:1px solid #000;height:5px;line-height:5px;font-size:0;">&nbsp;</div>
+    </td>
   </tr>
+
+  <!-- Notice title -->
   <tr>
-    <td style="padding:34px 32px 8px;">
-      <div style="display:inline-block;width:54px;height:54px;line-height:54px;text-align:center;border-radius:50%;background:{$bg};color:{$color};font-size:25px;margin-bottom:20px;">{$icon}</div>
-      <div style="font-size:15px;color:#6b7280;margin-bottom:4px;">Dear {$safeName},</div>
-      <div style="font-size:20px;font-weight:800;color:#1a1d23;margin-bottom:16px;line-height:1.35;">{$safeHead}</div>
-      <p style="font-size:14.5px;line-height:1.65;color:#374151;margin:0;">{$safeDetail}</p>
+    <td align="center" style="padding-bottom:16px;">
+      <div style="font-size:14px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;text-decoration:underline;color:{$accent};">{$noticeType}</div>
+    </td>
+  </tr>
+
+  <!-- Body -->
+  <tr>
+    <td style="padding:0 6px;">
+      <div style="font-size:12.5px;color:#000;margin-bottom:14px;">Date: {$today}</div>
+      <p style="font-size:13.5px;line-height:1.6;color:#000;margin:0 0 12px;">Dear {$safeName},</p>
+      <p style="font-size:13.5px;line-height:1.7;color:#000;margin:0;text-align:justify;">{$safeDetail}</p>
       {$summary_block}
       {$items_block}
     </td>
   </tr>
+
+  <!-- Signature block -->
   <tr>
-    <td style="padding:28px 32px 30px;">
-      <div style="border-top:1px solid #eef0f3;padding-top:18px;font-size:11.5px;color:#9ca3af;line-height:1.7;">
-        This is an automated message from the ManageMo inventory system &mdash; please do not reply directly to this email. For questions about this request, contact the property custodian's office.
-        <div style="margin-top:10px;color:#c1c5cc;">&copy; {$year} Pampanga State University &bull; ManageMo</div>
+    <td style="padding:36px 6px 4px;">
+      <div style="font-size:13px;color:#000;">Respectfully,</div>
+      <div style="font-size:13px;font-weight:bold;text-transform:uppercase;margin-top:34px;color:#000;">Property Custodian's Office</div>
+      <div style="font-size:12px;color:#000;">Pampanga State University</div>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="padding:26px 6px 0;">
+      <div style="border-top:1px solid #999;padding-top:12px;font-size:10.5px;color:#555;line-height:1.6;">
+        This is a system-generated notice from ManageMo and requires no signature to be valid. Please do not reply directly to this email &mdash; for inquiries, contact the Property Custodian's Office.
+        <div style="margin-top:6px;">&copy; {$year} Pampanga State University</div>
       </div>
     </td>
   </tr>
