@@ -198,8 +198,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
         if ($notif_user) {
             $__reqnum = $gid ?? $trigger_req['request_number'];
+            // List which units were approved and which were auto-disapproved (unchecked),
+            // so a partially-approved request doesn't just say "approved" with no context.
+            $__approved_items = [];
+            foreach ($group_reqs as $__gr) {
+                $__gr_inv = !empty($__gr['inventory_id']) ? findById(getInventory(), (int)$__gr['inventory_id']) : null;
+                $__approved_items[] = [
+                    'name'     => $__gr_inv['item_name'] ?? ($__gr['service_description'] ?? 'Item'),
+                    'qty'      => (int)($__gr['quantity_requested'] ?? 1),
+                    'category' => $__gr_inv['category'] ?? null,
+                    'qr'       => $__gr['qr_code_id'] ?? ($__gr_inv['qr_code_id'] ?? null),
+                    'condition'=> $__gr_inv['condition'] ?? null,
+                ];
+            }
+            $__disapproved_items = [];
+            foreach ($unchecked_reqs as $__gr) {
+                $__gr_inv = !empty($__gr['inventory_id']) ? findById(getInventory(), (int)$__gr['inventory_id']) : null;
+                $__disapproved_items[] = [
+                    'name'   => $__gr_inv['item_name'] ?? ($__gr['service_description'] ?? 'Item'),
+                    'reason' => 'Not selected for approval — other unit(s) in this request were approved instead.',
+                ];
+            }
             sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, 'approved',
-                ['is_pickup' => ($trigger_req['receiving_method'] ?? '') === 'pickup']);
+                [
+                    'is_pickup'          => ($trigger_req['receiving_method'] ?? '') === 'pickup',
+                    'items'              => $__approved_items,
+                    'disapproved_items'  => $__disapproved_items,
+                ]);
             notifyUser((int)$notif_user['id'], 'Request approved', "Your request ($__reqnum) has been approved.", 'success', 'user/my-requests.php');
         }
         redirectWithMessage('requests.php?action=view&' . $redirect_param, 'Request approved successfully!', 'success');
