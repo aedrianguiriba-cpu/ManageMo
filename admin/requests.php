@@ -241,6 +241,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action_type === 'mark_out_for_delivery') {
         $scheduled_date = sanitizeInput($_POST['scheduled_delivery_date'] ?? '');
+        // Only approved units actually move to delivery — a unit left unchecked at
+        // approval time was auto-disapproved and must not be dragged along here.
+        $group_reqs = array_values(array_filter($group_reqs, fn($gr) => $gr['status'] === 'approved'));
         foreach ($group_reqs as $gr) {
             dbUpdateRequest((int)$gr['id'], [
                 'delivery_status'         => 'out_for_delivery',
@@ -266,11 +269,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'condition'=> $__gr_inv['condition'] ?? null,
                 ];
             }
+            // Any unit from this same request group that got disapproved (e.g. auto-
+            // disapproved for being unchecked at approval) — call these out by name in
+            // the email so the requester understands why they're short those items.
+            $__disapproved_items = [];
+            if ($gid) {
+                foreach (getRequests() as $__dr) {
+                    if (($__dr['group_id'] ?? '') !== $gid || $__dr['status'] !== 'disapproved') continue;
+                    $__dr_inv = !empty($__dr['inventory_id']) ? findById(getInventory(), (int)$__dr['inventory_id']) : null;
+                    $__disapproved_items[] = [
+                        'name'   => $__dr_inv['item_name'] ?? ($__dr['service_description'] ?? 'Item'),
+                        'reason' => $__dr['disapproval_reason'] ?? null,
+                    ];
+                }
+            }
             sendStatusEmail($notif_user['email'], $notif_user['full_name'], $__reqnum, $stage,
                 [
                     'scheduled_date' => $scheduled_date ? formatDate($scheduled_date, 'M d, Y') : null,
                     'items'          => $__email_items,
                     'receiving_method' => $recv_method,
+                    'disapproved_items' => $__disapproved_items,
                 ]);
             notifyUser((int)$notif_user['id'],
                 $recv_method === 'pickup' ? 'Ready for pickup' : 'Out for delivery',
@@ -282,6 +300,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($action_type === 'mark_delivered') {
         $req_user = findById(getUsers(), (int)($trigger_req['user_id'] ?? 0));
+        // Same guard as mark_out_for_delivery — a disapproved unit must never get
+        // dragged into 'delivered' just because it shares a group_id.
+        $group_reqs = array_values(array_filter($group_reqs, fn($gr) => $gr['status'] === 'approved'));
         foreach ($group_reqs as $gr) {
             dbUpdateRequest((int)$gr['id'], ['delivery_status' => 'delivered', 'status' => 'delivered']);
             processDeliveredRequestUnit($gr, $req_user);

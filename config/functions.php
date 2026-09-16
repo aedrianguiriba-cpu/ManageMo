@@ -360,6 +360,31 @@ function buildStatusEmailHtml($to_name, $request_number, array $m, array $extra 
             . '</table>';
     }
 
+    // ── Disapproved items notice — when a request group is only partially
+    // approved, list which item(s) were NOT approved so the recipient
+    // understands why they're short those specific items on this notice.
+    $disapproved_block = '';
+    $disapproved_items = $extra['disapproved_items'] ?? [];
+    if (!empty($disapproved_items)) {
+        $dis_rows = '';
+        foreach ($disapproved_items as $di) {
+            $dname   = htmlspecialchars($di['name'] ?? 'Item');
+            $dreason = !empty($di['reason']) ? htmlspecialchars($di['reason']) : 'No reason recorded';
+            $dis_rows .= '<tr>'
+                . '<td style="padding:8px 12px;border:1px solid #999;font-size:13px;color:#000;">' . $dname . '</td>'
+                . '<td style="padding:8px 12px;border:1px solid #999;font-size:12px;color:#333;font-style:italic;">' . $dreason . '</td>'
+                . '</tr>';
+        }
+        $disapproved_block = '<div style="font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:0.4px;color:#b91c1c;margin:22px 0 6px;">Item(s) Not Approved — Not Included</div>'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">'
+            . '<tr>'
+            . '<td style="padding:7px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.3px;color:#000;border:1px solid #999;background:#e5e5e5;">Item</td>'
+            . '<td style="padding:7px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:0.3px;color:#000;border:1px solid #999;background:#e5e5e5;">Reason</td>'
+            . '</tr>'
+            . $dis_rows
+            . '</table>';
+    }
+
     $year  = date('Y');
     $today = date('F d, Y');
 
@@ -400,6 +425,7 @@ function buildStatusEmailHtml($to_name, $request_number, array $m, array $extra 
       <p style="font-size:13.5px;line-height:1.7;color:#000;margin:0;text-align:justify;">{$safeDetail}</p>
       {$summary_block}
       {$items_block}
+      {$disapproved_block}
     </td>
   </tr>
 
