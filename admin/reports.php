@@ -86,47 +86,6 @@ function rpInventoryRow($item, $rownum, $all_depts) {
     <?php
 }
 
-// --- CSV export (uses the same filtered dataset the on-screen report shows) ---
-if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    $filename = "managemo_{$report_type}_report_" . date('Y-m-d') . '.csv';
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    $out = fopen('php://output', 'w');
-    fprintf($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel opens ₱/special chars correctly
-
-    if ($report_type === 'inventory') {
-        fputcsv($out, ['QR Code', 'Item Name', 'Category', 'College/Office', 'Location', 'Quantity', 'Condition', 'Status', 'Cost', 'Purchase Date']);
-        foreach ($inv_data as $i) {
-            fputcsv($out, [
-                $i['qr_code_id'], $i['item_name'], $i['category'], deptName($all_depts, $i['college_id'] ?? ''),
-                $i['location'], $i['quantity'], $i['condition'], $i['status'],
-                number_format((float)($i['cost'] ?? 0), 2), $i['purchase_date'] ?? '',
-            ]);
-        }
-    } elseif ($report_type === 'requests') {
-        fputcsv($out, ['Request #', 'Requester', 'Type', 'Item/Description', 'Quantity', 'Urgency', 'Status', 'Date', 'Return Date']);
-        foreach ($req_data as $r) {
-            $inv = !empty($r['inventory_id']) ? findById($all_inventory, (int)$r['inventory_id']) : null;
-            fputcsv($out, [
-                $r['request_number'], reqUserName($all_users, $r['user_id']), ucfirst($r['request_type']),
-                $inv['item_name'] ?? ($r['service_description'] ?? '—'), $r['quantity_requested'] ?? 1,
-                ucfirst($r['urgency']), ucfirst($r['status']), substr($r['created_at'], 0, 10), $r['expected_return_date'] ?? '',
-            ]);
-        }
-    } else { // users
-        fputcsv($out, ['Full Name', 'Email', 'Phone', 'Role', 'Department', 'Status', 'Joined']);
-        foreach ($usr_data as $u) {
-            fputcsv($out, [
-                $u['full_name'], $u['email'], $u['phone'] ?? '', ucfirst($u['role']),
-                deptName($all_depts, $u['college_id'] ?? ''),
-                $u['is_active'] ? 'Active' : 'Inactive', substr($u['created_at'], 0, 10),
-            ]);
-        }
-    }
-    fclose($out);
-    exit;
-}
-
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
@@ -441,10 +400,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <button type="button" class="rp-btn rp-btn-print" onclick="window.print()">
                         <i class="fas fa-print"></i> Print Report
                     </button>
-                    <a class="rp-btn" style="background:#15803d;color:#fff !important;"
-                       href="?<?php echo http_build_query(array_merge($_GET, ['export' => 'csv'])); ?>">
-                        <i class="fas fa-file-csv"></i> Export CSV
-                    </a>
+                    <button type="button" class="rp-btn" style="background:#15803d;color:#fff !important;" onclick="downloadReportPDF()">
+                        <i class="fas fa-file-pdf"></i> Download PDF
+                    </button>
                 </form>
             </div>
         </div><!-- /.rp-no-print -->
@@ -772,5 +730,58 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
     </div><!-- /.rp-printable -->
 </div>
+
+<script>
+// Opens a clean, standalone copy of the current report — no filters, no tabs,
+// no app chrome — in a new window, with an explicit "Save as PDF" button
+// (kept separate from the "Print Report" button, which prints the live page).
+function downloadReportPDF() {
+    var source = document.querySelector('.rp-printable');
+    if (!source) return;
+    var clone = source.cloneNode(true);
+    clone.querySelectorAll('.rp-no-print, .rp-screen-only').forEach(function(el) { el.remove(); });
+
+    var win = window.open('', '_blank', 'width=1000,height=750,scrollbars=yes');
+    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+        + '<title>Report</title>'
+        + '<style>'
+        + 'body{font-family:"Times New Roman",Times,Georgia,serif;background:#fff;margin:0;padding:24px;color:#000;}'
+        + '.rp-print-header,.rp-print-header-rule,.rp-print-title,.rp-print-meta,.rp-print-only,.rp-print-signatures,.rp-print-footer{display:block;}'
+        + '.rp-print-header{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;padding-bottom:8px;margin-bottom:4px;}'
+        + '.rp-print-header-logo{width:60px;height:60px;margin-bottom:4px;}'
+        + '.rp-print-header-republic{font-size:10pt;font-style:italic;margin:0;}'
+        + '.rp-print-header-text h2{font-size:14pt;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin:0;color:#000;}'
+        + '.rp-print-header-text p{font-size:8.5pt;color:#000;margin:1px 0 0;}'
+        + '.rp-print-header-rule{border:none;border-top:2.5pt solid #000;border-bottom:.75pt solid #000;height:4pt;margin:6px 0 14px;}'
+        + '.rp-print-title{text-align:center;font-size:12pt;font-weight:700;text-decoration:underline;text-underline-offset:3px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}'
+        + '.rp-print-meta{font-size:9pt;color:#000;margin-bottom:16px;}'
+        + '.rp-print-meta div{margin-bottom:2px;}'
+        + '.rp-print-meta strong{display:inline-block;min-width:150px;}'
+        + '.rp-card{box-shadow:none;border:none;}'
+        + '.rp-card-head{display:none;}'
+        + '.rp-table{border-collapse:collapse;width:100%;table-layout:auto;}'
+        + '.rp-table th,.rp-table td{border:.75pt solid #000;padding:5px 8px;}'
+        + '.rp-table th{background:#e5e5e5;font-size:7.5pt;text-transform:uppercase;text-align:center;}'
+        + '.rp-table td{font-size:8pt;}'
+        + '.rp-badge{font-size:7pt;padding:1px 6px;border:.75pt solid #000;background:transparent;color:#000;font-weight:600;}'
+        + '.rp-summary-grid{border:.75pt solid #000;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:16px 20px;}'
+        + '.rp-summary-item{text-align:center;}'
+        + '.rp-summary-val{font-size:14pt;color:#000;font-weight:900;}'
+        + '.rp-summary-lbl{font-size:7pt;color:#000;text-transform:uppercase;}'
+        + '.rp-print-signatures{display:flex;justify-content:space-between;gap:20px;margin-top:56px;}'
+        + '.rp-print-sig{flex:1;text-align:center;font-size:8.5pt;}'
+        + '.rp-print-sig-line{border-top:.75pt solid #000;margin-bottom:4px;padding-top:4px;font-weight:700;text-transform:uppercase;}'
+        + '.rp-print-sig-role{color:#333;}'
+        + '.rp-print-footer{margin-top:20px;padding-top:8px;border-top:.5pt solid #999;font-size:7pt;color:#555;text-align:center;}'
+        + '.rp-download-toolbar{text-align:center;margin-bottom:20px;font-family:Arial,sans-serif;}'
+        + '.rp-download-toolbar button{background:#8B0000;color:#fff;border:none;border-radius:6px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;}'
+        + '@media print{.rp-download-toolbar{display:none !important;}@page{size:landscape;margin:15mm;}}'
+        + '</style></head><body>'
+        + '<div class="rp-download-toolbar"><button onclick="window.print()">Save as PDF / Print</button></div>'
+        + clone.innerHTML
+        + '</body></html>');
+    win.document.close();
+}
+</script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
