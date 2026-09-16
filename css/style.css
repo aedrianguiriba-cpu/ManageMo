@@ -769,52 +769,52 @@ footer {
 }
 
 /* ================================================
-   SKELETON LOADER — shown on every page (see includes/header.php
+   LOGO LOADER — shown on every page (see includes/header.php
    and includes/footer.php) while the DOM/assets finish loading.
    ================================================ */
 #skeletonLoader {
     position: fixed; inset: 0; z-index: 99999;
-    background: var(--bg-muted);
-    display: flex;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
     opacity: 1;
     transition: opacity 0.3s ease;
 }
 #skeletonLoader.sk-hidden { opacity: 0; pointer-events: none; }
 
-.sk-sidebar {
-    width: 250px; height: 100%; flex-shrink: 0;
-    background: var(--bg);
-    border-right: 1px solid var(--border);
-    padding: 20px 16px;
-}
-.sk-main { flex: 1; min-width: 0; padding: 24px; overflow: hidden; }
-.sk-topbar {
-    height: 56px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-    margin: -24px -24px 24px;
-    padding: 0 24px;
-    display: flex; align-items: center;
+.sk-loader-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
 }
 
-.sk-block {
-    background: linear-gradient(90deg, #e7e7e7 25%, #f2f2f2 37%, #e7e7e7 63%);
-    background-size: 400% 100%;
-    animation: sk-shimmer 1.4s ease infinite;
-    border-radius: 6px;
+.sk-logo-ring {
+    position: relative;
+    width: 96px; height: 96px;
+    display: flex; align-items: center; justify-content: center;
 }
-@keyframes sk-shimmer {
-    0%   { background-position: 100% 50%; }
-    100% { background-position: 0 50%; }
+.sk-logo-ring::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 4px solid var(--border);
+    border-top-color: var(--primary);
+    animation: sk-spin 0.9s linear infinite;
+}
+.sk-logo-img {
+    width: 60px; height: 60px;
+    object-fit: contain;
+    border-radius: 50%;
+    animation: sk-pulse 1.4s ease-in-out infinite;
+}
+@keyframes sk-spin {
+    100% { transform: rotate(360deg); }
+}
+@keyframes sk-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(0.92); opacity: 0.75; }
 }
 
-.sk-line { height: 14px; margin-bottom: 12px; }
-.sk-card { height: 90px; border-radius: 8px; }
-.sk-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
-.sk-grid-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-
-@media (max-width: 768px) {
-    .sk-sidebar { display: none; }
-    .sk-kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .sk-grid-row { grid-template-columns: 1fr; }
+.sk-loader-text {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-2);
+    letter-spacing: 0.4px;
 }
