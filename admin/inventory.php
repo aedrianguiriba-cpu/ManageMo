@@ -238,19 +238,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirectWithMessage('inventory.php?tab=borrowed', 'Could not find the borrower for this unit.', 'danger');
         }
 
-        $orig_request = !empty($open_borrow['request_id']) ? findById(getRequests(), (int)$open_borrow['request_id']) : null;
-        $ref_number   = $orig_request['request_number'] ?? $unit['qr_code_id'];
-        $due_date     = $open_borrow['expected_return_date'] ?? null;
-        $is_overdue   = $due_date && $due_date < date('Y-m-d');
+        $orig_request  = !empty($open_borrow['request_id']) ? findById(getRequests(), (int)$open_borrow['request_id']) : null;
+        $ref_number    = $orig_request['request_number'] ?? $unit['qr_code_id'];
+        $due_date      = $open_borrow['expected_return_date'] ?? null;
+        $is_overdue    = $due_date && $due_date < date('Y-m-d');
+        $custom_message = sanitizeInput($_POST['custom_message'] ?? '');
 
         $sent = sendStatusEmail($borrower['email'], $borrower['full_name'], $ref_number, 'return_reminder', [
-            'items'     => [['name' => $unit['item_name'], 'qty' => 1]],
-            'due_date'  => $due_date ? formatDate($due_date, 'M d, Y') : null,
-            'overdue'   => $is_overdue,
+            'items'          => [['name' => $unit['item_name'], 'qty' => 1]],
+            'due_date'       => $due_date ? formatDate($due_date, 'M d, Y') : null,
+            'overdue'        => $is_overdue,
+            'custom_message' => $custom_message,
         ]);
         notifyUser((int)$borrower['id'],
             $is_overdue ? 'Overdue item reminder' : 'Return reminder',
-            "Please return '{$unit['item_name']}'" . ($due_date ? ' by ' . formatDate($due_date, 'M d, Y') : '') . '.',
+            "Please return '{$unit['item_name']}'" . ($due_date ? ' by ' . formatDate($due_date, 'M d, Y') : '') . '.' . ($custom_message ? ' Note: ' . $custom_message : ''),
             $is_overdue ? 'danger' : 'info', 'user/borrow-records.php');
         logActivity($current_user['id'], 'NOTIFY', "Sent return reminder for '{$unit['item_name']}' (unit #$unit_id) to {$borrower['full_name']}", 'inventory', $unit_id);
 
@@ -1402,12 +1404,16 @@ displayMessage();
                     </div>
                     <?php if ($u['status'] === 'borrowed'): ?>
                     <div style="display:flex;gap:6px;flex-shrink:0;">
-                        <form method="POST" action="?action=notify_borrower" onsubmit="return confirm('Send a return reminder email to this borrower?')" style="margin:0;">
-                            <input type="hidden" name="unit_id" value="<?php echo (int)$u['id']; ?>">
-                            <button type="submit" class="ai-btn-sm" style="background:rgba(29,78,216,0.12);color:#1d4ed8;border:none;border-radius:6px;white-space:nowrap;" title="Email the borrower a return reminder">
-                                <i class="fas fa-envelope"></i> Notify
-                            </button>
-                        </form>
+                        <button type="button" class="ai-btn-sm" style="background:rgba(29,78,216,0.12);color:#1d4ed8;border:none;border-radius:6px;white-space:nowrap;" title="Email the borrower a return reminder"
+                            onclick='openNotifyModal(<?php echo (int)$u["id"]; ?>, <?php echo json_encode([
+                                "item_name" => $u["item_name"],
+                                "qr_code_id" => $u["qr_code_id"] ?? "",
+                                "borrower" => $__borrower ?? "",
+                                "due" => $__due ? formatDate($__due, "M d, Y") : "",
+                                "overdue" => (bool)$__overdue,
+                            ]); ?>)'>
+                            <i class="fas fa-envelope"></i> Notify
+                        </button>
                         <form method="POST" action="?action=mark_returned" onsubmit="return confirm('Mark this unit as returned?')" style="margin:0;">
                             <input type="hidden" name="unit_id" value="<?php echo (int)$u['id']; ?>">
                             <button type="submit" class="ai-btn-sm" style="background:rgba(239,68,68,0.12);color:#dc2626;border:none;border-radius:6px;white-space:nowrap;" title="Click to mark as returned">
@@ -2013,6 +2019,42 @@ function openOwnedGroupModal(group, ownerName) {
     </div>
 </div>
 
+<!-- Notify Borrower Modal -->
+<div class="modal fade" id="notifyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="border-radius:8px;border:1px solid #e5e7eb;">
+            <div class="modal-header" style="border-bottom:1px solid #e5e7eb;">
+                <div>
+                    <h5 class="modal-title" style="font-size:1.05rem;font-weight:700;margin-bottom:3px;"><i class="fas fa-envelope me-2" style="color:#1d4ed8;"></i>Send Return Reminder</h5>
+                    <small style="color:rgba(0,0,0,0.45);font-size:0.8rem;">Emails the borrower (and sends an in-app notification) reminding them to return this item.</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="?action=notify_borrower">
+                <div class="modal-body" style="padding:24px;">
+                    <input type="hidden" name="unit_id" id="notifyUnitId">
+                    <div style="background:#f7f7f7;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+                        <div style="font-weight:700;color:#1a1d23;" id="notifyItemName"></div>
+                        <div style="font-size:0.78rem;color:rgba(0,0,0,0.55);font-family:monospace;margin-top:2px;" id="notifyQr"></div>
+                        <div style="font-size:0.83rem;margin-top:8px;"><i class="fas fa-user me-1" style="color:rgba(0,0,0,0.4);"></i><span id="notifyBorrower"></span></div>
+                        <div style="font-size:0.83rem;font-weight:600;margin-top:4px;" id="notifyDueWrap">
+                            <i class="fas fa-calendar-alt me-1"></i><span id="notifyDue"></span>
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold">Additional Message <span class="text-muted fw-normal">(optional)</span></label>
+                        <textarea class="form-control" name="custom_message" rows="3" placeholder="Add a personal note to include in the reminder email…"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #e5e7eb;">
+                    <button type="button" class="btn ai-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn ai-btn-primary" style="background:#1d4ed8;border-color:#1d4ed8;"><i class="fas fa-paper-plane"></i> Send Reminder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 function openAddUnitsModal(group) {
     var firstUnit = group.units[0];
@@ -2025,6 +2067,25 @@ function openAddUnitsModal(group) {
     document.querySelector('#addUnitsModal select[name="condition"]').value = 'good';
     document.querySelector('#addUnitsModal input[name="purchase_date"]').value = '';
     new bootstrap.Modal(document.getElementById('addUnitsModal')).show();
+}
+
+function openNotifyModal(unitId, details) {
+    details = details || {};
+    document.getElementById('notifyUnitId').value = unitId;
+    document.getElementById('notifyItemName').textContent = details.item_name || '—';
+    document.getElementById('notifyQr').textContent = details.qr_code_id || '';
+    document.getElementById('notifyBorrower').textContent = details.borrower || 'Unknown borrower';
+    var dueWrap = document.getElementById('notifyDueWrap');
+    var dueEl = document.getElementById('notifyDue');
+    if (details.due) {
+        dueWrap.style.display = '';
+        dueWrap.style.color = details.overdue ? '#dc2626' : 'rgba(0,0,0,0.65)';
+        dueEl.textContent = (details.overdue ? 'Overdue since ' : 'Due ') + details.due;
+    } else {
+        dueWrap.style.display = 'none';
+    }
+    document.querySelector('#notifyModal textarea[name="custom_message"]').value = '';
+    new bootstrap.Modal(document.getElementById('notifyModal')).show();
 }
 </script>
 

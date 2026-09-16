@@ -255,7 +255,8 @@ function sendStatusEmail($to_email, $to_name, $request_number, $stage, array $ex
             'detail'   => (!empty($extra['due_date'])
                             ? (!empty($extra['overdue']) ? 'It was due back on ' : 'It is due back on ') . $extra['due_date'] . '. '
                             : '')
-                        . 'Please return it to the property custodian\'s office at your earliest convenience.',
+                        . 'Please return it to the property custodian\'s office at your earliest convenience.'
+                        . (!empty($extra['custom_message']) ? ' ' . $extra['custom_message'] : ''),
         ],
     ];
 
