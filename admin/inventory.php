@@ -1304,12 +1304,20 @@ displayMessage();
                 <?php foreach ($group['units'] as $u):
                     $__br = $__active_borrows_by_unit[(int)$u['id']] ?? null;
                     $__borrower = $__br ? ($all_users_by_id[$__br['user_id']]['full_name'] ?? 'Unknown user') : null;
+                    $__due = $__br['expected_return_date'] ?? null;
+                    $__overdue = $__due && $__due < date('Y-m-d');
                 ?>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:7px 10px;">
                     <div style="min-width:0;">
                         <div style="font-size:0.72rem;font-weight:700;color:#b45309;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars($u['qr_code_id']); ?></div>
                         <?php if ($__borrower): ?>
                         <div style="font-size:0.7rem;color:rgba(0,0,0,0.55);"><i class="fas fa-user me-1"></i><?php echo htmlspecialchars($__borrower); ?></div>
+                        <?php endif; ?>
+                        <?php if ($__due): ?>
+                        <div style="font-size:0.7rem;font-weight:600;<?php echo $__overdue ? 'color:#dc2626;' : 'color:rgba(0,0,0,0.55);'; ?>">
+                            <i class="fas <?php echo $__overdue ? 'fa-exclamation-triangle' : 'fa-calendar-alt'; ?> me-1"></i>
+                            <?php echo $__overdue ? 'Overdue since ' : 'Due '; ?><?php echo formatDate($__due, 'M d, Y'); ?>
+                        </div>
                         <?php endif; ?>
                     </div>
                     <?php if ($u['status'] === 'borrowed'): ?>
