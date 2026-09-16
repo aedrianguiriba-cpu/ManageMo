@@ -126,6 +126,22 @@ foreach ($dept_stats as $ds) {
 $maintenance_total  = count(filterByColumn($all_inventory, 'status', 'maintenance'));
 $requested_total    = count(filterByColumn($all_inventory, 'status', 'requested'));
 $computed_available = $total_items - $borrowed_items - $maintenance_total - $requested_total;
+
+// Requests trend — daily count over the last 14 days, so the dashboard has a
+// real time-series graph instead of only point-in-time snapshots.
+$trend_days = 14;
+$trend_labels = [];
+$trend_counts = [];
+$trend_map = [];
+foreach ($all_requests as $r) {
+    $d = substr($r['created_at'], 0, 10);
+    $trend_map[$d] = ($trend_map[$d] ?? 0) + 1;
+}
+for ($i = $trend_days - 1; $i >= 0; $i--) {
+    $d = date('Y-m-d', strtotime("-$i days"));
+    $trend_labels[] = date('M d', strtotime($d));
+    $trend_counts[] = $trend_map[$d] ?? 0;
+}
 ?>
 <style>
 /* ── KPI grid ── */
@@ -240,6 +256,9 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
 
 /* ── Quick action buttons ── */
 .qa-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.qa-grid-wide { grid-template-columns:repeat(6,1fr); }
+@media(max-width:1100px){ .qa-grid-wide{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:600px) { .qa-grid-wide{ grid-template-columns:1fr; } }
 .qa-btn {
     display:flex; align-items:center; gap:12px; padding:14px 16px;
     border-radius:6px; border:1px solid #e5e7eb;
@@ -319,68 +338,8 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
         </div>
     </div>
 
-    <!-- ── Department Inventory Bar Chart ── -->
-    <div class="adash-card" style="margin-bottom:18px;">
-        <div class="adash-card-head">
-            <div class="adash-card-title">
-                <span class="adash-card-icon"><i class="fas fa-building"></i></span>
-                Department Inventory Overview
-            </div>
-            <a href="inventory-campus.php" class="adash-viewall"><i class="fas fa-arrow-right"></i> View All</a>
-        </div>
-        <canvas id="deptBar" height="80"></canvas>
-    </div>
-
-    <!-- ── Department Summary Table ── -->
-    <div class="adash-card" style="margin-bottom:18px;">
-        <div class="adash-card-head">
-            <div class="adash-card-title">
-                <span class="adash-card-icon"><i class="fas fa-table"></i></span>
-                Department Summary
-            </div>
-        </div>
-        <div class="table-responsive">
-            <table class="adash-table">
-                <thead><tr>
-                    <th>Department / Campus</th>
-                    <th>Type</th>
-                    <th>Total</th>
-                    <th>Borrowed</th>
-                    <th>Requested</th>
-                    <th>Maintenance</th>
-                    <th></th>
-                </tr></thead>
-                <tbody>
-                    <?php if (empty($dept_stats)): ?>
-                    <tr><td colspan="7" style="text-align:center;padding:24px;color:#999;">No items tagged with a college/office/campus yet.</td></tr>
-                    <?php endif; ?>
-                    <?php foreach ($dept_stats as $dept): ?>
-                    <tr>
-                        <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($dept['name']); ?></div></td>
-                        <td>
-                            <?php if ($dept['type'] === 'campus'): ?>
-                            <span class="adash-badge" style="background:rgba(124,58,237,.10);color:#7c3aed;"><i class="fas fa-map-marker-alt"></i>Campus</span>
-                            <?php elseif ($dept['type'] === 'office'): ?>
-                            <span class="adash-badge b-gray"><i class="fas fa-briefcase"></i>Office</span>
-                            <?php else: ?>
-                            <span class="adash-badge" style="background:rgba(29,78,216,.10);color:#1d4ed8;"><i class="fas fa-graduation-cap"></i>College</span>
-                            <?php endif; ?>
-                        </td>
-                        <td><span style="font-weight:800;color:#0f172a;font-size:.95rem;"><?php echo $dept['stats']['total']; ?></span></td>
-                        <td><span class="adash-badge b-amber"><i class="fas fa-circle"></i><?php echo $dept['stats']['borrowed']; ?></span></td>
-                        <td><span class="adash-badge b-green"><i class="fas fa-circle"></i><?php echo $dept['stats']['requested']; ?></span></td>
-                        <td><span class="adash-badge b-blue"><i class="fas fa-circle"></i><?php echo $dept['stats']['maintenance']; ?></span></td>
-                        <td><button onclick="openDeptModal('<?php echo htmlspecialchars($dept['code']); ?>')" class="adash-viewall" style="padding:5px 10px;font-size:.75rem;background:none;border:none;cursor:pointer;"><i class="fas fa-eye"></i> View</button></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- ── Charts Row ── -->
+    <!-- ── Charts Row (primary focus of the dashboard) ── -->
     <div class="row g-4 mb-4">
-
         <!-- Item Status Doughnut -->
         <div class="col-lg-4">
             <div class="adash-card h-100" style="margin-bottom:0;">
@@ -427,66 +386,115 @@ $computed_available = $total_items - $borrowed_items - $maintenance_total - $req
                     <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#15803d;"></div>Approved</div>
                     <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#dc2626;"></div>Disapproved</div>
                 </div>
-                <div class="mt-3">
-                    <div class="req-stat-item" style="--dot-color:#b45309;">
-                        <div class="req-stat-dot" style="background:#b45309;"></div>
-                        <span class="req-stat-label">Pending Review</span>
-                        <span class="req-stat-count"><?php echo $pending; ?></span>
-                    </div>
-                    <div class="req-stat-item" style="--dot-color:#15803d;">
-                        <div class="req-stat-dot" style="background:#15803d;"></div>
-                        <span class="req-stat-label">Approved</span>
-                        <span class="req-stat-count"><?php echo $approved; ?></span>
-                    </div>
-                    <div class="req-stat-item" style="--dot-color:#dc2626;">
-                        <div class="req-stat-dot" style="background:#dc2626;"></div>
-                        <span class="req-stat-label">Disapproved</span>
-                        <span class="req-stat-count"><?php echo $disapproved; ?></span>
-                    </div>
-                </div>
-                <a href="requests.php" class="adash-viewall mt-3 w-100 justify-content-center d-flex"
-                   style="background:#8B0000;color:#fff;border-color:#8B0000;padding:10px 18px;font-size:.84rem;">
-                    <i class="fas fa-list-check me-2"></i> Review All Requests
-                </a>
             </div>
         </div>
 
-        <!-- Quick Actions -->
+        <!-- Requests Trend Line -->
         <div class="col-lg-4">
             <div class="adash-card h-100" style="margin-bottom:0;">
                 <div class="adash-card-head">
                     <div class="adash-card-title">
-                        <span class="adash-card-icon"><i class="fas fa-bolt"></i></span>
-                        Quick Actions
+                        <span class="adash-card-icon"><i class="fas fa-chart-line"></i></span>
+                        Requests Trend (14 Days)
                     </div>
                 </div>
-                <div class="qa-grid">
-                    <a href="inventory.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="color:#8B0000;"><i class="fas fa-warehouse"></i></div>
-                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Manage Inventory</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">View all items</div></div>
-                    </a>
-                    <a href="inventory.php?action=add" class="qa-btn">
-                        <div class="qa-btn-icon" style="color:#15803d;"><i class="fas fa-plus-circle"></i></div>
-                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Add New Item</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Register asset</div></div>
-                    </a>
-                    <a href="requests.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="color:#b45309;"><i class="fas fa-clipboard-check"></i></div>
-                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Review Requests</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;"><?php echo $pending; ?> pending</div></div>
-                    </a>
-                    <a href="analytics.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="color:#1d4ed8;"><i class="fas fa-chart-bar"></i></div>
-                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Analytics</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Reports &amp; insights</div></div>
-                    </a>
-                    <a href="inventory-campus.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="color:#7c3aed;"><i class="fas fa-map-marked-alt"></i></div>
-                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">By Department</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">College/office breakdown</div></div>
-                    </a>
-                    <a href="settings.php" class="qa-btn">
-                        <div class="qa-btn-icon" style="color:#64748b;"><i class="fas fa-cog"></i></div>
-                        <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Settings</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">System config</div></div>
-                    </a>
-                </div>
+                <canvas id="trendLine" height="200"></canvas>
             </div>
+        </div>
+    </div>
+
+    <!-- ── Department Inventory Bar Chart ── -->
+    <div class="adash-card" style="margin-bottom:18px;">
+        <div class="adash-card-head">
+            <div class="adash-card-title">
+                <span class="adash-card-icon"><i class="fas fa-building"></i></span>
+                Department Inventory Overview
+            </div>
+            <a href="inventory-campus.php" class="adash-viewall"><i class="fas fa-arrow-right"></i> View All</a>
+        </div>
+        <canvas id="deptBar" height="70"></canvas>
+    </div>
+
+    <!-- ── Quick Actions ── -->
+    <div class="adash-card" style="margin-bottom:18px;">
+        <div class="adash-card-head">
+            <div class="adash-card-title">
+                <span class="adash-card-icon"><i class="fas fa-bolt"></i></span>
+                Quick Actions
+            </div>
+        </div>
+        <div class="qa-grid qa-grid-wide">
+            <a href="inventory.php" class="qa-btn">
+                <div class="qa-btn-icon" style="color:#8B0000;"><i class="fas fa-warehouse"></i></div>
+                <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Manage Inventory</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">View all items</div></div>
+            </a>
+            <a href="inventory.php?action=add" class="qa-btn">
+                <div class="qa-btn-icon" style="color:#15803d;"><i class="fas fa-plus-circle"></i></div>
+                <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Add New Item</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Register asset</div></div>
+            </a>
+            <a href="requests.php" class="qa-btn">
+                <div class="qa-btn-icon" style="color:#b45309;"><i class="fas fa-clipboard-check"></i></div>
+                <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Review Requests</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;"><?php echo $pending; ?> pending</div></div>
+            </a>
+            <a href="analytics.php" class="qa-btn">
+                <div class="qa-btn-icon" style="color:#1d4ed8;"><i class="fas fa-chart-bar"></i></div>
+                <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Analytics</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">Reports &amp; insights</div></div>
+            </a>
+            <a href="inventory-campus.php" class="qa-btn">
+                <div class="qa-btn-icon" style="color:#7c3aed;"><i class="fas fa-map-marked-alt"></i></div>
+                <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">By Department</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">College/office breakdown</div></div>
+            </a>
+            <a href="settings.php" class="qa-btn">
+                <div class="qa-btn-icon" style="color:#64748b;"><i class="fas fa-cog"></i></div>
+                <div><div style="font-weight:700;font-size:.82rem;color:#0f172a;">Settings</div><div style="font-size:.72rem;color:#94a3b8;margin-top:2px;">System config</div></div>
+            </a>
+        </div>
+    </div>
+
+    <!-- ── Department Summary Table ── -->
+    <div class="adash-card" style="margin-bottom:18px;">
+        <div class="adash-card-head">
+            <div class="adash-card-title">
+                <span class="adash-card-icon"><i class="fas fa-table"></i></span>
+                Department Summary
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="adash-table">
+                <thead><tr>
+                    <th>Department / Campus</th>
+                    <th>Type</th>
+                    <th>Total</th>
+                    <th>Borrowed</th>
+                    <th>Requested</th>
+                    <th>Maintenance</th>
+                    <th></th>
+                </tr></thead>
+                <tbody>
+                    <?php if (empty($dept_stats)): ?>
+                    <tr><td colspan="7" style="text-align:center;padding:24px;color:#999;">No items tagged with a college/office/campus yet.</td></tr>
+                    <?php endif; ?>
+                    <?php foreach ($dept_stats as $dept): ?>
+                    <tr>
+                        <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($dept['name']); ?></div></td>
+                        <td>
+                            <?php if ($dept['type'] === 'campus'): ?>
+                            <span class="adash-badge" style="background:rgba(124,58,237,.10);color:#7c3aed;"><i class="fas fa-map-marker-alt"></i>Campus</span>
+                            <?php elseif ($dept['type'] === 'office'): ?>
+                            <span class="adash-badge b-gray"><i class="fas fa-briefcase"></i>Office</span>
+                            <?php else: ?>
+                            <span class="adash-badge" style="background:rgba(29,78,216,.10);color:#1d4ed8;"><i class="fas fa-graduation-cap"></i>College</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><span style="font-weight:800;color:#0f172a;font-size:.95rem;"><?php echo $dept['stats']['total']; ?></span></td>
+                        <td><span class="adash-badge b-amber"><i class="fas fa-circle"></i><?php echo $dept['stats']['borrowed']; ?></span></td>
+                        <td><span class="adash-badge b-green"><i class="fas fa-circle"></i><?php echo $dept['stats']['requested']; ?></span></td>
+                        <td><span class="adash-badge b-blue"><i class="fas fa-circle"></i><?php echo $dept['stats']['maintenance']; ?></span></td>
+                        <td><button onclick="openDeptModal('<?php echo htmlspecialchars($dept['code']); ?>')" class="adash-viewall" style="padding:5px 10px;font-size:.75rem;background:none;border:none;cursor:pointer;"><i class="fas fa-eye"></i> View</button></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -1039,6 +1047,41 @@ document.addEventListener('DOMContentLoaded', function () {
                     beginAtZero: true,
                     grid: { color: '#f0f0f0' },
                     ticks: { font: { size: 11 }, color: '#888', stepSize: 1 }
+                }
+            },
+            animation: { duration: 600 }
+        }
+    });
+
+    // Requests Trend Line
+    new Chart(document.getElementById('trendLine'), {
+        type: 'line',
+        data: {
+            labels: <?php echo json_encode($trend_labels); ?>,
+            datasets: [{
+                label: 'Requests',
+                data: <?php echo json_encode($trend_counts); ?>,
+                borderColor: '#8B0000',
+                backgroundColor: 'rgba(139,0,0,0.08)',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 2.5,
+                pointBackgroundColor: '#8B0000',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 10 }, color: '#888', maxRotation: 0, autoSkip: true, maxTicksLimit: 7 }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f0f0f0' },
+                    ticks: { font: { size: 11 }, color: '#888', stepSize: 1, precision: 0 }
                 }
             },
             animation: { duration: 600 }
