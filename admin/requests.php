@@ -133,8 +133,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $selected_unit_ids = isset($_POST['unit_ids']) && is_array($_POST['unit_ids'])
         ? array_map('intval', $_POST['unit_ids'])
         : null;
+    // Units that were part of the group but got left unchecked. On approve, these
+    // must not just sit at 'pending' forever — auto-disapprove them and free up
+    // their inventory, rather than leaving stock stranded in limbo.
+    $unchecked_reqs = [];
     if ($selected_unit_ids !== null) {
-        $group_reqs = array_values(array_filter($group_reqs, fn($gr) => in_array((int)$gr['id'], $selected_unit_ids)));
+        $unchecked_reqs = array_values(array_filter($group_reqs, fn($gr) => !in_array((int)$gr['id'], $selected_unit_ids)));
+        $group_reqs     = array_values(array_filter($group_reqs, fn($gr) => in_array((int)$gr['id'], $selected_unit_ids)));
     }
 
     if ($action_type === 'approve') {
@@ -169,6 +174,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($gr['request_type'] === 'service') dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'maintenance']);
                 if ($gr['request_type'] === 'item')    dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'requested']);
             }
+        }
+        // Units left unchecked don't just sit at 'pending' — auto-disapprove them
+        // and release their inventory back to available, same as a normal disapproval.
+        foreach ($unchecked_reqs as $gr) {
+            dbUpdateRequest((int)$gr['id'], [
+                'status'             => 'disapproved',
+                'approved_by'        => $current_user['id'],
+                'approved_at'        => date('Y-m-d H:i:s'),
+                'disapproval_reason' => 'Not selected for approval — other unit(s) in this request were approved instead.',
+            ]);
+            if (!empty($gr['inventory_id'])) {
+                $inv = findById(getInventory(), (int)$gr['inventory_id']);
+                if ($inv && in_array($inv['status'], ['requested', 'maintenance'])) {
+                    dbUpdateInventory((int)$gr['inventory_id'], ['status' => 'available', 'college_id' => null]);
+                }
+            }
+        }
+        if (!empty($unchecked_reqs)) {
+            logActivity($current_user['id'], 'DISAPPROVE', "Auto-disapproved " . count($unchecked_reqs) . " unselected unit(s) in group $gid", 'requests', $request_id);
         }
         logActivity($current_user['id'], 'APPROVE', "Approved group $gid (" . count($group_reqs) . " units)", 'requests', $request_id);
         $notif_user = findById(getUsers(), $trigger_req['user_id'] ?? 0);
@@ -1023,7 +1047,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             <?php endif; ?>
             <?php if ($__pending): ?>
             <p style="font-size:.78rem;color:rgba(0,0,0,0.42);margin-bottom:10px;">
-                <i class="fas fa-info-circle me-1"></i>All units are selected by default — uncheck any unit you want to approve/disapprove separately (e.g. one is out of stock).
+                <i class="fas fa-info-circle me-1"></i>All units are selected by default. Unchecking a unit and clicking Approve will automatically disapprove that unit and return it to available inventory (e.g. one is out of stock).
             </p>
             <?php endif; ?>
             <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
