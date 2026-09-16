@@ -808,7 +808,19 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         $all_reqs_for_view = getRequests();
         if ($view_group_id) {
             $group_view_reqs = array_values(array_filter($all_reqs_for_view, fn($r) => ($r['group_id'] ?? '') === $view_group_id));
-            $request = $group_view_reqs[0] ?? null;
+            // A group can now have mixed unit statuses (e.g. some approved, one
+            // auto-disapproved for being unchecked at approval time). Picking the
+            // group's first row as "the" representative status broke down here —
+            // if that particular unit happened to be the disapproved one, every
+            // status-gated action button (out for delivery, delivered, etc.) for
+            // the WHOLE group would vanish even though other units were still
+            // progressing normally. Prefer a still-live unit as the representative;
+            // only fall back to the first row if every unit was disapproved.
+            $request = null;
+            foreach ($group_view_reqs as $__gvr) {
+                if ($__gvr['status'] !== 'disapproved') { $request = $__gvr; break; }
+            }
+            if (!$request) $request = $group_view_reqs[0] ?? null;
         } elseif ($view_single_id) {
             $request = findById($all_reqs_for_view, $view_single_id);
             $group_view_reqs = $request && !empty($request['group_id'])
