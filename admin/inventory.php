@@ -1,5 +1,14 @@
 <?php
-$page_title = 'Inventory Management';
+$__inv_tab_titles = [
+    'all'         => 'All Items',
+    'available'   => 'Available Items',
+    'requested'   => 'Requested Items',
+    'borrowed'    => 'Borrowed Items',
+    'maintenance' => 'Maintenance Tickets',
+    'owned'       => 'User-Owned Items',
+];
+$__inv_tab = $_GET['tab'] ?? 'all';
+$page_title = isset($__inv_tab_titles[$__inv_tab]) ? $__inv_tab_titles[$__inv_tab] . ' - Inventory' : 'Inventory Management';
 require_once dirname(__DIR__) . '/config/functions.php';
 
 requireAdmin();
@@ -2137,6 +2146,17 @@ function setTab(tabName) {
 
     // Update URL without reload
     window.history.pushState({tab: tabName}, '', 'inventory.php?tab=' + tabName);
+
+    // Keep the browser tab title in sync with whichever inventory tab is active —
+    // mirrors the server-side title so it doesn't go stale after a client-side
+    // switch (no page reload happens here).
+    var invTabTitles = {
+        all: 'All Items', available: 'Available Items', requested: 'Requested Items',
+        borrowed: 'Borrowed Items', maintenance: 'Maintenance Tickets', owned: 'User-Owned Items'
+    };
+    if (invTabTitles[tabName]) {
+        document.title = invTabTitles[tabName] + ' - Inventory - ManageMo - PSU Asset Management';
+    }
 }
 
 function openOwnedGroupModal(group, ownerName) {
