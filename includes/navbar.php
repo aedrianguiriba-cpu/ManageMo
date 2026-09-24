@@ -121,6 +121,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link <?php echo $current_page === 'get-app.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>user/get-app.php" title="Get the Mobile App">
+                    <span class="nav-icon"><i class="fas fa-mobile-alt"></i></span>
+                    <span class="nav-text">Get the App</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link <?php echo $current_page === 'settings.php' ? 'active' : ''; ?>" href="<?php echo BASE_URL; ?>user/settings.php" title="Settings">
                     <span class="nav-icon"><i class="fas fa-cog"></i></span>
                     <span class="nav-text">Settings</span>

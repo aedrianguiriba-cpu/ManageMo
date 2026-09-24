@@ -1,0 +1,8 @@
+# Serve APKs with the correct Android MIME type and force a download
+# instead of some browsers trying to render/preview the binary.
+<IfModule mod_mime.c>
+    AddType application/vnd.android.package-archive .apk
+</IfModule>
+<FilesMatch "\.apk$">
+    Header set Content-Disposition attachment
+</FilesMatch>
