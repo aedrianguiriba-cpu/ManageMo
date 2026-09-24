@@ -14,10 +14,15 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 // it's excluded from the FTP deploy again (see deploy.yml). The APK stays
 // in the repo either way, so this URL keeps working regardless.
 $apk_download_url = 'https://raw.githubusercontent.com/aedrianguiriba-cpu/ManageMo/main/android_app/ManageMo.apk';
+// android_app/ is excluded from the FTP deploy, so the APK never lands on
+// this server's disk in production — file_exists() here would always be
+// false even though the GitHub CDN copy above is genuinely downloadable.
+// Only use the local file (present in dev checkouts) to show size/date.
 $apk_full_path = dirname(__DIR__) . '/android_app/ManageMo.apk';
-$apk_exists = file_exists($apk_full_path);
-$apk_size_mb = $apk_exists ? round(filesize($apk_full_path) / 1048576, 1) : 0;
-$apk_modified = $apk_exists ? date('M d, Y', filemtime($apk_full_path)) : '';
+$apk_exists = true;
+$apk_local_exists = file_exists($apk_full_path);
+$apk_size_mb = $apk_local_exists ? round(filesize($apk_full_path) / 1048576, 1) : null;
+$apk_modified = $apk_local_exists ? date('M d, Y', filemtime($apk_full_path)) : null;
 ?>
 <div class="main-wrapper">
 <div class="container-fluid mt-4 pb-5" style="max-width:760px;">
@@ -41,9 +46,11 @@ $apk_modified = $apk_exists ? date('M d, Y', filemtime($apk_full_path)) : '';
                 <div style="font-weight:800;font-size:1.05rem;color:#1a1d23;">
                     <i class="fas fa-mobile-screen-button me-2" style="color:#8B0000;"></i>Android APK
                 </div>
+                <?php if ($apk_size_mb !== null): ?>
                 <div style="font-size:0.82rem;color:#6b7280;margin-top:4px;">
                     <?php echo $apk_size_mb; ?> MB &middot; Updated <?php echo htmlspecialchars($apk_modified); ?>
                 </div>
+                <?php endif; ?>
             </div>
             <a href="<?php echo $apk_download_url; ?>" download="ManageMo.apk"
                style="background:#8B0000;color:#fff;font-weight:700;border-radius:10px;padding:12px 26px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-size:0.95rem;box-shadow:0 2px 8px rgba(139,0,0,0.25);">
