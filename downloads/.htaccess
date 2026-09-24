@@ -1,8 +1,8 @@
-# Serve APKs with the correct Android MIME type and force a download
-# instead of some browsers trying to render/preview the binary.
+# Serve APKs with the correct Android MIME type. (No mod_headers directive
+# here on purpose — Content-Disposition forcing wasn't needed since the
+# download page's <a download> attribute already forces the download
+# client-side, and mod_headers isn't guaranteed available/allowed on every
+# host, which is what broke the live site when it was here.)
 <IfModule mod_mime.c>
     AddType application/vnd.android.package-archive .apk
 </IfModule>
-<FilesMatch "\.apk$">
-    Header set Content-Disposition attachment
-</FilesMatch>
