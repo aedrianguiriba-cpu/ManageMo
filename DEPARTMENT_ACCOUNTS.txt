@@ -1,0 +1,57 @@
+DEPARTMENT CUSTODIAN ACCOUNTS
+==============================
+
+One seeded login account per college, office, and campus, used to own that
+department's demo Owned Items. Created September 24, 2026.
+
+** Change these before using this outside a local/demo environment **
+   -- every account currently shares the same password.
+
+
+COLLEGES (8)
+------------
+ID  Abbr   Department                                              Email                        Password
+10  CAS    College of Arts and Sciences (CAS)                      cas.custodian@psu.edu.ph      Custodian@123
+11  CBS    College of Business Studies (CBS)                       cbs.custodian@psu.edu.ph      Custodian@123
+12  CCS    College of Computing Studies (CCS)                      ccs.custodian@psu.edu.ph      Custodian@123
+13  CEA    College of Engineering and Architecture (CEA)            cea.custodian@psu.edu.ph      Custodian@123
+14  CHTM   College of Hospitality and Tourism Management (CHTM)     chtm.custodian@psu.edu.ph     Custodian@123
+15  CIT    College of Industrial Technology (CIT)                   cit.custodian@psu.edu.ph      Custodian@123
+16  COE    College of Education (COE)                               coe.custodian@psu.edu.ph      Custodian@123
+17  CSSP   College of Social Sciences and Philosophy (CSSP)         cssp.custodian@psu.edu.ph     Custodian@123
+
+
+OFFICES (14)
+------------
+ID  Abbr    Department                                                    Email                          Password
+18  FBO     Finance and Budget Office (FBO)                                fbo.custodian@psu.edu.ph        Custodian@123
+19  GCC     Guidance and Counseling Center (GCC)                           gcc.custodian@psu.edu.ph        Custodian@123
+20  HRMO    Human Resource Management Office (HRMO)                       hrmo.custodian@psu.edu.ph       Custodian@123
+21  ICTO    Information and Communications Technology Office (ICTO)       icto.custodian@psu.edu.ph       Custodian@123
+22  OSAS    Office of Student Affairs and Services (OSAS)                 osas.custodian@psu.edu.ph       Custodian@123
+23  OUP     Office of the University President (OUP)                      oup.custodian@psu.edu.ph        Custodian@123
+24  OUR     Office of the University Registrar (OUR)                      our.custodian@psu.edu.ph        Custodian@123
+25  OVPAA   Office of the VP for Academic Affairs (OVPAA)                ovpaa.custodian@psu.edu.ph      Custodian@123
+26  OVPAF   Office of the VP for Administration & Finance (OVPAF)        ovpaf.custodian@psu.edu.ph      Custodian@123
+27  OVPRDE  Office of the VP for Research, Development & Extension (OVPRDE)  ovprde.custodian@psu.edu.ph Custodian@123
+28  PDO     Planning and Development Office (PDO)                          pdo.custodian@psu.edu.ph        Custodian@123
+29  PMO     Procurement Management Office (PMO)                            pmo.custodian@psu.edu.ph        Custodian@123
+30  PPMO    Physical Plant and Maintenance Office (PPMO)                  ppmo.custodian@psu.edu.ph       Custodian@123
+31  ULib    University Library (ULib)                                     ulib.custodian@psu.edu.ph       Custodian@123
+
+
+CAMPUSES (8)
+------------
+ID  Abbr                     Department                     Email                                          Password
+32  APALITCAMPUS             Apalit Campus                  apalitcampus.custodian@psu.edu.ph             Custodian@123
+33  CANDABACAMPUS             Candaba Campus                 candabacampus.custodian@psu.edu.ph            Custodian@123
+34  CITYOFSANFERNANDOCAMPUS   City of San Fernando Campus    cityofsanfernandocampus.custodian@psu.edu.ph  Custodian@123
+35  LUBAOCAMPUS               Lubao Campus                   lubaocampus.custodian@psu.edu.ph              Custodian@123
+36  MAINCAMPUS                Main Campus                    maincampus.custodian@psu.edu.ph               Custodian@123
+37  MEXICOCAMPUS              Mexico Campus                  mexicocampus.custodian@psu.edu.ph             Custodian@123
+38  PORACCAMPUS               Porac Campus                   poraccampus.custodian@psu.edu.ph              Custodian@123
+39  SANTOTOMASCAMPUS          Santo Tomas Campus              santotomascampus.custodian@psu.edu.ph         Custodian@123
+
+
+------------------------------
+Total: 30 accounts.

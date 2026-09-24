@@ -26,6 +26,13 @@ foreach (getDepartmentCampuses() as $campus) {
     if ($campus['abbreviation'] === '') continue;
     $owners[] = ['code' => $campus['abbreviation'], 'name' => $campus['name'], 'type' => 'campus'];
 }
+// Owned Items live in a separate table (user_owned_items) — a department can
+// have owned items with zero inventory rows tagged to it (e.g. every Available
+// item is deliberately untagged now), so it must be counted alongside
+// inventory rather than only checking $all_inventory for "does this dept have
+// anything at all".
+$all_owned_items = getUserOwnedItems();
+
 $dept_stats = [];
 $total_items = 0;
 $available_items = 0;
@@ -33,15 +40,9 @@ $borrowed_items = 0;
 
 foreach ($owners as $owner) {
     $owner_inventory = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $owner['code']));
-    if (empty($owner_inventory)) continue;
+    $owner_owned     = array_values(array_filter($all_owned_items, fn($i) => ($i['college_id'] ?? '') === $owner['code']));
+    if (empty($owner_inventory) && empty($owner_owned)) continue;
     $status_counts = countByStatus($owner_inventory);
-
-    // Count requested items for this college/office/campus
-    $owner_inventory_ids = array_column($owner_inventory, 'id');
-    $requested_count = 0;
-    foreach ($owner_inventory_ids as $inv_id) {
-        $requested_count += count(filterByColumn($all_requests, 'inventory_id', $inv_id));
-    }
 
     $dept_stats[] = [
         'code' => $owner['code'],
@@ -50,13 +51,25 @@ foreach ($owners as $owner) {
         'stats' => [
             'total' => count($owner_inventory),
             'borrowed' => $status_counts['borrowed'] ?? 0,
-            'requested' => $requested_count,
+            // Current status, same as Borrowed/Maintenance — not "has ever
+            // appeared on any request regardless of how long ago it was
+            // delivered/completed/disapproved", which drifted from reality.
+            'requested' => $status_counts['requested'] ?? 0,
             'maintenance' => $status_counts['maintenance'] ?? 0,
+            'owned' => count($owner_owned),
         ],
     ];
     $total_items += count($owner_inventory);
     $borrowed_items += $status_counts['borrowed'] ?? 0;
 }
+
+// Pagination for the Department Summary table — the chart/modal above still
+// use the full $dept_stats list, only the table itself is paginated.
+$dept_page_size    = 10;
+$dept_page         = max(1, (int)($_GET['dept_page'] ?? 1));
+$dept_total_pages  = max(1, (int)ceil(count($dept_stats) / $dept_page_size));
+$dept_page         = min($dept_page, $dept_total_pages);
+$dept_stats_page   = array_slice($dept_stats, ($dept_page - 1) * $dept_page_size, $dept_page_size);
 
 // Items with no college/office/campus assigned still count toward totals.
 $unassigned_inventory = array_values(array_filter($all_inventory, fn($i) => empty($i['college_id'])));
@@ -108,6 +121,7 @@ $owned_by_user = array_reduce($user_owned_items, function($carry, $item) {
 $modal_depts_json = json_encode($dept_stats);
 $all_inventory_json = json_encode($all_inventory);
 $all_requests_json = json_encode($all_requests);
+$all_owned_items_json = json_encode($user_owned_items);
 ?>
 
 <?php
@@ -117,11 +131,13 @@ $dept_names_js     = [];
 $dept_totals_js    = [];
 $dept_borrowed_js  = [];
 $dept_maint_js     = [];
+$dept_owned_js     = [];
 foreach ($dept_stats as $ds) {
-    $dept_names_js[]    = $ds['name'];
+    $dept_names_js[]    = $ds['code'];
     $dept_totals_js[]   = $ds['stats']['total'];
     $dept_borrowed_js[] = $ds['stats']['borrowed'];
     $dept_maint_js[]    = $ds['stats']['maintenance'];
+    $dept_owned_js[]    = $ds['stats']['owned'];
 }
 $maintenance_total  = count(filterByColumn($all_inventory, 'status', 'maintenance'));
 $requested_total    = count(filterByColumn($all_inventory, 'status', 'requested'));
@@ -452,7 +468,7 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
     </div>
 
     <!-- ── Department Summary Table ── -->
-    <div class="adash-card" style="margin-bottom:18px;">
+    <div class="adash-card" id="dept-summary" style="margin-bottom:18px;">
         <div class="adash-card-head">
             <div class="adash-card-title">
                 <span class="adash-card-icon"><i class="fas fa-table"></i></span>
@@ -468,15 +484,16 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
                     <th>Borrowed</th>
                     <th>Requested</th>
                     <th>Maintenance</th>
+                    <th>Owned</th>
                     <th></th>
                 </tr></thead>
                 <tbody>
                     <?php if (empty($dept_stats)): ?>
-                    <tr><td colspan="7" style="text-align:center;padding:24px;color:#999;">No items tagged with a college/office/campus yet.</td></tr>
+                    <tr><td colspan="8" style="text-align:center;padding:24px;color:#999;">No inventory or owned items tagged with a college/office/campus yet.</td></tr>
                     <?php endif; ?>
-                    <?php foreach ($dept_stats as $dept): ?>
+                    <?php foreach ($dept_stats_page as $dept): ?>
                     <tr>
-                        <td><div style="font-weight:700;color:#0f172a;"><?php echo htmlspecialchars($dept['name']); ?></div></td>
+                        <td><div style="font-weight:700;color:#0f172a;" title="<?php echo htmlspecialchars($dept['name']); ?>"><?php echo htmlspecialchars($dept['code']); ?></div></td>
                         <td>
                             <?php if ($dept['type'] === 'campus'): ?>
                             <span class="adash-badge" style="background:rgba(124,58,237,.10);color:#7c3aed;"><i class="fas fa-map-marker-alt"></i>Campus</span>
@@ -490,12 +507,26 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
                         <td><span class="adash-badge b-amber"><i class="fas fa-circle"></i><?php echo $dept['stats']['borrowed']; ?></span></td>
                         <td><span class="adash-badge b-green"><i class="fas fa-circle"></i><?php echo $dept['stats']['requested']; ?></span></td>
                         <td><span class="adash-badge b-blue"><i class="fas fa-circle"></i><?php echo $dept['stats']['maintenance']; ?></span></td>
+                        <td><span class="adash-badge" style="background:rgba(99,102,241,.10);color:#4338ca;"><i class="fas fa-circle"></i><?php echo $dept['stats']['owned']; ?></span></td>
                         <td><button onclick="openDeptModal('<?php echo htmlspecialchars($dept['code']); ?>')" class="adash-viewall" style="padding:5px 10px;font-size:.75rem;background:none;border:none;cursor:pointer;"><i class="fas fa-eye"></i> View</button></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
+        <?php if ($dept_total_pages > 1): ?>
+        <div style="display:flex;justify-content:center;gap:8px;padding:16px;border-top:1px solid #f0f0f0;">
+            <?php for ($i = 1; $i <= $dept_total_pages; $i++): ?>
+            <a href="dashboard.php?dept_page=<?php echo $i; ?>#dept-summary"
+               style="min-width:34px;text-align:center;border-radius:6px;padding:6px 0;font-size:.82rem;font-weight:700;text-decoration:none;
+                      background:<?php echo $i === $dept_page ? '#8B0000' : '#f7f7f7'; ?>;
+                      color:<?php echo $i === $dept_page ? '#fff' : '#555'; ?>;
+                      border:1px solid <?php echo $i === $dept_page ? '#8B0000' : '#e5e7eb'; ?>;">
+                <?php echo $i; ?>
+            </a>
+            <?php endfor; ?>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- ── Recent Requests + Recent Items ── -->
@@ -853,6 +884,12 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
                 <div class="campus-section-title">Requested Items</div>
                 <div id="modalRequestedItems" class="campus-items-list"></div>
             </div>
+
+            <!-- Owned Items Section -->
+            <div class="campus-section">
+                <div class="campus-section-title">Owned Items</div>
+                <div id="modalOwnedItems" class="campus-items-list"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -862,6 +899,7 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
 const deptsData = <?php echo $modal_depts_json; ?>;
 const inventoryData = <?php echo $all_inventory_json; ?>;
 const requestsData = <?php echo $all_requests_json; ?>;
+const ownedItemsData = <?php echo $all_owned_items_json; ?>;
 
 function openDeptModal(deptCode) {
     const dept = deptsData.find(d => d.code === deptCode);
@@ -904,10 +942,13 @@ function openDeptModal(deptCode) {
         : '<div class="campus-empty">No maintenance items</div>';
     document.getElementById('modalMaintenanceItems').innerHTML = maintenanceHtml;
     
-    // Filter requested items for this department
+    // Filter requested items for this department — only the item's CURRENT
+    // status counts as "requested" (matches the Requested badge in the summary
+    // table above), not every request that ever referenced this item including
+    // ones long since delivered/completed/disapproved.
     const requestedItems = requestsData.filter(req => {
         const item = inventoryData.find(inv => inv.id === req.inventory_id);
-        return item && item.college_id === deptCode;
+        return item && item.college_id === deptCode && item.status === 'requested';
     });
     const requestedHtml = requestedItems.length > 0
         ? requestedItems.map(req => {
@@ -929,6 +970,21 @@ function openDeptModal(deptCode) {
         }).join('')
         : '<div class="campus-empty">No requested items</div>';
     document.getElementById('modalRequestedItems').innerHTML = requestedHtml;
+
+    // Filter owned items for this department (separate table — user_owned_items)
+    const ownedItems = ownedItemsData.filter(item => item.college_id === deptCode);
+    const ownedHtml = ownedItems.length > 0
+        ? ownedItems.map(item => `
+            <div class="campus-item">
+                <div class="campus-item-text">
+                    <div class="campus-item-name">${item.item_name}</div>
+                    <div class="campus-item-detail">Qty: ${item.quantity} • ${item.category}</div>
+                </div>
+                <div class="campus-item-badge" style="background:rgba(99,102,241,.12);color:#4338ca;">Owned</div>
+            </div>
+        `).join('')
+        : '<div class="campus-empty">No owned items</div>';
+    document.getElementById('modalOwnedItems').innerHTML = ownedHtml;
 
     // Show modal
     document.getElementById('campusModal').classList.add('active');
@@ -1024,6 +1080,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     data: <?php echo json_encode($dept_maint_js); ?>,
                     backgroundColor: 'rgba(37,99,235,0.15)',
                     borderColor: '#2563eb',
+                    borderWidth: 1.5,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Owned',
+                    data: <?php echo json_encode($dept_owned_js); ?>,
+                    backgroundColor: 'rgba(99,102,241,0.15)',
+                    borderColor: '#6366f1',
                     borderWidth: 1.5,
                     borderRadius: 4
                 }

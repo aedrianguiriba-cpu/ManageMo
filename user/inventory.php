@@ -24,15 +24,16 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 // units are retired stock and never shown to users, in any tab.
 $all_campus_inventory = array_values(array_filter(getInventory(), fn($i) => !in_array($i['status'], ['condemned', 'disposed', 'owned'])));
 
-// Stats
+// Stats — all sourced from the item's actual current status, same as Borrowed/
+// Maintenance. "Requested" used to count any item that had EVER appeared on any
+// request (regardless of whether that request was long since delivered,
+// completed, or disapproved), which drifted further from reality the longer the
+// system ran — an item shows as "requested" only while it's actually still in
+// that status.
 $inv_total     = count($all_campus_inventory);
 $inv_borrowed  = count(filterByColumn($all_campus_inventory, 'status', 'borrowed'));
 $inv_maint     = count(filterByColumn($all_campus_inventory, 'status', 'maintenance'));
-
-// Count items with active requests
-$all_requests = getRequests();
-$requested_inv_ids = array_unique(array_column($all_requests, 'inventory_id'));
-$inv_requested = count(array_filter($all_campus_inventory, fn($i) => in_array($i['id'], $requested_inv_ids)));
+$inv_requested = count(filterByColumn($all_campus_inventory, 'status', 'requested'));
 
 // Get user's owned items
 $all_owned_items = getUserOwnedItems();
@@ -67,12 +68,7 @@ if (!$status_filter && $current_tab === 'borrowed') {
 $filtered_items = $all_campus_inventory;
 
 if (!empty($status_filter) && $status_filter !== 'owned') {
-    if ($status_filter === 'requested') {
-        // Filter items with active requests
-        $filtered_items = array_values(array_filter($filtered_items, fn($item) => in_array($item['id'], $requested_inv_ids)));
-    } else {
-        $filtered_items = filterByColumn($filtered_items, 'status', $status_filter);
-    }
+    $filtered_items = filterByColumn($filtered_items, 'status', $status_filter);
 }
 
 if (!empty($category_filter)) {
@@ -509,7 +505,7 @@ foreach ($all_borrows as $br) {
         <form method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
             <input type="hidden" name="facq" value="<?php echo htmlspecialchars($acq_filter); ?>">
-            <div class="col-md-4">
+            <div class="<?php echo $current_tab === 'all' ? 'col-md-4' : 'col-md-6'; ?>">
                 <label class="inv-filter-label"><i class="fas fa-search me-1"></i>Search</label>
                 <input type="text" class="form-control" name="search"
                        placeholder="Item name, category..."
@@ -526,6 +522,15 @@ foreach ($all_borrows as $br) {
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php if ($current_tab === 'all'): ?>
+            <!-- Status only makes sense on "All Items" — the Available/Borrowed tabs
+                 already imply their own status, and letting it be overridden there
+                 used to show e.g. borrowed items under a tab still labeled "Available"
+                 with no visual indication why, which is exactly the "leaking" bug the
+                 tab-navigation comment above warns about. "My Owned Items" was also
+                 removed from this list entirely — it's not a real inventory status,
+                 it silently jumped you to a whole separate tab/table, which is its
+                 own confusing surprise; use the "My Owned Items" tab for that instead. -->
             <div class="col-md-2">
                 <label class="inv-filter-label"><i class="fas fa-circle me-1"></i>Status</label>
                 <select class="form-select" name="status">
@@ -534,9 +539,9 @@ foreach ($all_borrows as $br) {
                     <option value="borrowed"    <?php echo $status_filter === 'borrowed'     ? 'selected' : ''; ?>>Borrowed</option>
                     <option value="requested"   <?php echo $status_filter === 'requested'    ? 'selected' : ''; ?>>Requested</option>
                     <option value="maintenance" <?php echo $status_filter === 'maintenance'  ? 'selected' : ''; ?>>Maintenance</option>
-                    <option value="owned"       <?php echo $status_filter === 'owned'        ? 'selected' : ''; ?>>My Owned Items</option>
                 </select>
             </div>
+            <?php endif; ?>
             <div class="col-md-3 d-flex gap-2">
                 <button type="submit" class="btn inv-search-btn flex-fill">
                     <i class="fas fa-search me-1"></i> Search

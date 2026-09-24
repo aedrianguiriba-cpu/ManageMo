@@ -115,6 +115,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .ic-badge-danger    { background:rgba(239,68,68,0.12);  color:#dc2626; }
 .ic-badge-info      { background:rgba(59,130,246,0.12); color:#1d4ed8; }
 .ic-badge-secondary { background:rgba(0,0,0,0.07);       color:#555; }
+.ic-badge-owned     { background:rgba(99,102,241,0.12);  color:#4338ca; }
 
 .ic-btn-view {
     background:#8B0000 !important;
@@ -284,11 +285,21 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         <button onclick="ovTab('campuses')" id="ov-tab-campuses" class="ov-tab" style="flex:1;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;background:transparent;color:#555;">Campuses</button>
     </div>
 
+    <?php
+    // Owned Items (user_owned_items) are keyed by college_id just like inventory,
+    // but live in a separate table — fetch once and slice per department below
+    // rather than re-querying inside every loop iteration.
+    $all_owned_items = getUserOwnedItems();
+    function icOwnedCount(array $allOwned, string $abbr): int {
+        return count(array_filter($allOwned, fn($o) => ($o['college_id'] ?? '') === $abbr));
+    }
+    ?>
     <!-- ── Colleges ── -->
     <div id="ov-panel-colleges" class="ic-grid ic-dept-grid">
         <?php foreach (getMainCampusColleges() as $abbr => $fullname):
             $dept_items  = array_values(array_filter(getInventory(), fn($i) => ($i['college_id'] ?? '') === $abbr));
             $dept_status = countByStatus($dept_items);
+            $dept_owned_count = icOwnedCount($all_owned_items, $abbr);
         ?>
         <div class="ic-campus-card">
             <div class="ic-campus-header">
@@ -296,10 +307,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="ic-campus-loc"><?php echo htmlspecialchars($fullname); ?></div>
             </div>
             <div class="ic-status-list">
-                <div class="ic-status-row">
-                    <span class="ic-status-lbl">Owned</span>
-                    <span class="ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $dept_status['available'] ?? 0; ?></span>
-                </div>
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Borrowed</span>
                     <span class="ic-badge ic-badge-warning"><?php echo $dept_status['borrowed'] ?? 0; ?></span>
@@ -311,6 +318,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Requested</span>
                     <span class="ic-badge ic-badge-secondary"><?php echo $dept_status['requested'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Owned Items</span>
+                    <span class="ic-badge" style="background:rgba(99,102,241,0.12); color:#4338ca;"><?php echo $dept_owned_count; ?></span>
                 </div>
             </div>
             <button onclick="openDeptInventoryModal('<?php echo htmlspecialchars($abbr); ?>', '<?php echo htmlspecialchars($abbr . ' — ' . $fullname); ?>')" class="ic-btn-view">
@@ -325,6 +336,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         <?php foreach (getMainCampusOffices() as $abbr => $fullname):
             $dept_items  = array_values(array_filter(getInventory(), fn($i) => ($i['college_id'] ?? '') === $abbr));
             $dept_status = countByStatus($dept_items);
+            $dept_owned_count = icOwnedCount($all_owned_items, $abbr);
         ?>
         <div class="ic-campus-card">
             <div class="ic-campus-header">
@@ -332,10 +344,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="ic-campus-loc"><?php echo htmlspecialchars($fullname); ?></div>
             </div>
             <div class="ic-status-list">
-                <div class="ic-status-row">
-                    <span class="ic-status-lbl">Owned</span>
-                    <span class="ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $dept_status['available'] ?? 0; ?></span>
-                </div>
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Borrowed</span>
                     <span class="ic-badge ic-badge-warning"><?php echo $dept_status['borrowed'] ?? 0; ?></span>
@@ -347,6 +355,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Requested</span>
                     <span class="ic-badge ic-badge-secondary"><?php echo $dept_status['requested'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Owned Items</span>
+                    <span class="ic-badge" style="background:rgba(99,102,241,0.12); color:#4338ca;"><?php echo $dept_owned_count; ?></span>
                 </div>
             </div>
             <button onclick="openDeptInventoryModal('<?php echo htmlspecialchars($abbr); ?>', '<?php echo htmlspecialchars($abbr . ' — ' . $fullname); ?>')" class="ic-btn-view">
@@ -363,6 +375,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             // same way a college/office does, via its abbreviation in college_id.
             $camp_items  = array_values(array_filter(getInventory(), fn($i) => ($i['college_id'] ?? '') === $c['abbreviation']));
             $camp_status = countByStatus($camp_items);
+            $camp_owned_count = icOwnedCount($all_owned_items, $c['abbreviation']);
         ?>
         <div class="ic-campus-card">
             <div class="ic-campus-header">
@@ -374,10 +387,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <?php endif; ?>
             <div class="ic-status-list">
                 <div class="ic-status-row">
-                    <span class="ic-status-lbl">Owned</span>
-                    <span class="ic-badge" style="background:rgba(34,197,94,0.12); color:#15803d;"><?php echo $camp_status['available'] ?? 0; ?></span>
-                </div>
-                <div class="ic-status-row">
                     <span class="ic-status-lbl">Borrowed</span>
                     <span class="ic-badge ic-badge-warning"><?php echo $camp_status['borrowed'] ?? 0; ?></span>
                 </div>
@@ -388,6 +397,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="ic-status-row">
                     <span class="ic-status-lbl">Requested</span>
                     <span class="ic-badge ic-badge-secondary"><?php echo $camp_status['requested'] ?? 0; ?></span>
+                </div>
+                <div class="ic-status-row">
+                    <span class="ic-status-lbl">Owned Items</span>
+                    <span class="ic-badge" style="background:rgba(99,102,241,0.12); color:#4338ca;"><?php echo $camp_owned_count; ?></span>
                 </div>
             </div>
             <button onclick="openInventoryModal('<?php echo htmlspecialchars($c['abbreviation']); ?>', '', '<?php echo htmlspecialchars($c['name']); ?>')" class="ic-btn-view">
@@ -571,6 +584,27 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <button class="ic-modal-close" onclick="closeInventoryModal()">&times;</button>
         </div>
         <div class="ic-modal-body">
+            <!-- Broken out to match the status stats on each department card —
+                 Borrowed/Maintenance/Requested come from inventory, Owned Items from
+                 user_owned_items — tabbed instead of one merged list so they stay organized. -->
+            <div id="modalTabs" style="display:flex;gap:6px;margin-bottom:16px;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;flex-wrap:wrap;max-width:560px;">
+                <button type="button" id="modalTabBtnBorrowed" onclick="icModalSwitchTab('borrowed')"
+                        style="flex:1;min-width:110px;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;">
+                    Borrowed <span id="modalTabCountBorrowed" class="ic-badge ic-badge-secondary" style="margin-left:4px;"></span>
+                </button>
+                <button type="button" id="modalTabBtnMaintenance" onclick="icModalSwitchTab('maintenance')"
+                        style="flex:1;min-width:110px;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;">
+                    Maintenance <span id="modalTabCountMaintenance" class="ic-badge ic-badge-secondary" style="margin-left:4px;"></span>
+                </button>
+                <button type="button" id="modalTabBtnRequested" onclick="icModalSwitchTab('requested')"
+                        style="flex:1;min-width:110px;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;">
+                    Requested <span id="modalTabCountRequested" class="ic-badge ic-badge-secondary" style="margin-left:4px;"></span>
+                </button>
+                <button type="button" id="modalTabBtnOwned" onclick="icModalSwitchTab('owned')"
+                        style="flex:1;min-width:110px;padding:8px 0;border:none;border-radius:6px;font-size:.84rem;font-weight:700;cursor:pointer;">
+                    Owned Items <span id="modalTabCountOwned" class="ic-badge ic-badge-secondary" style="margin-left:4px;"></span>
+                </button>
+            </div>
             <div id="modalContent">
                 <div class="ic-modal-empty">
                     <i class="fas fa-spinner fa-spin"></i>
@@ -583,8 +617,39 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
 <script>
 var icAllInventory = <?php echo json_encode(getInventory()); ?>;
-var icModalItems = [];      // this campus/college's raw item rows
-var icModalSortBy = 'name'; // 'name' | 'quantity' | 'status'
+// user_owned_items rows, normalized to look like inventory rows (status:'owned')
+// so they can share the same modal table/grouping/badge code below — this is
+// the table that actually carries per-department data now that Available
+// items are deliberately untagged (college_id = null).
+var icAllOwned = <?php echo json_encode(array_map(fn($o) => array_merge($o, ['status' => 'owned']), getUserOwnedItems())); ?>;
+// Split by status per tab, matching the stat rows on each department card.
+var icModalByTab = { borrowed: [], maintenance: [], requested: [], owned: [] };
+var icModalTab = 'borrowed'; // 'borrowed' | 'maintenance' | 'requested' | 'owned'
+var icModalSortBy = 'name';  // 'name' | 'quantity' | 'status'
+
+function icModalStyleTabs() {
+    var tabs = { borrowed: 'modalTabBtnBorrowed', maintenance: 'modalTabBtnMaintenance', requested: 'modalTabBtnRequested', owned: 'modalTabBtnOwned' };
+    Object.keys(tabs).forEach(function(key) {
+        var btn = document.getElementById(tabs[key]);
+        if (key === icModalTab) {
+            btn.style.background = '#fff';
+            btn.style.color = '#8B0000';
+            btn.style.boxShadow = '0 1px 4px rgba(0,0,0,.10)';
+        } else {
+            btn.style.background = 'transparent';
+            btn.style.color = '#555';
+            btn.style.boxShadow = 'none';
+        }
+        document.getElementById('modalTabCount' + key.charAt(0).toUpperCase() + key.slice(1)).textContent = icModalByTab[key].length;
+    });
+}
+
+function icModalSwitchTab(tab) {
+    icModalTab = tab;
+    icModalStyleTabs();
+    var searchEl = document.getElementById('icModalSearch');
+    renderInventoryModal(searchEl ? searchEl.value : '');
+}
 
 // Overview tabs: Colleges, Offices — two independent lists.
 function ovTab(tab) {
@@ -618,6 +683,16 @@ function icGroupItems(items) {
     return Object.values(groups);
 }
 
+function icModalBuildTabs(deptAbbr) {
+    var deptInv = icAllInventory.filter(item => item.college_id === deptAbbr);
+    icModalByTab = {
+        borrowed:    deptInv.filter(item => item.status === 'borrowed'),
+        maintenance: deptInv.filter(item => item.status === 'maintenance'),
+        requested:   deptInv.filter(item => item.status === 'requested'),
+        owned:       icAllOwned.filter(item => item.college_id === deptAbbr),
+    };
+}
+
 // Colleges/offices are global — this filters inventory by department abbreviation.
 function openDeptInventoryModal(deptCode, deptName) {
     const modal = document.getElementById('inventoryModal');
@@ -626,8 +701,10 @@ function openDeptInventoryModal(deptCode, deptName) {
     modalTitle.textContent = deptName + ' - Inventory Items';
     modal.classList.add('active');
 
-    icModalItems = icAllInventory.filter(item => item.college_id === deptCode);
+    icModalBuildTabs(deptCode);
+    icModalTab = 'borrowed';
     icModalSortBy = 'name';
+    icModalStyleTabs();
     renderInventoryModal('');
 }
 
@@ -640,8 +717,10 @@ function openInventoryModal(campusAbbr, filterCode, campusName) {
     modalTitle.textContent = campusName + ' - Inventory Items';
     modal.classList.add('active');
 
-    icModalItems = icAllInventory.filter(item => item.college_id === campusAbbr);
+    icModalBuildTabs(campusAbbr);
+    icModalTab = 'borrowed';
     icModalSortBy = 'name';
+    icModalStyleTabs();
     renderInventoryModal('');
 }
 
@@ -649,7 +728,7 @@ function renderInventoryModal(searchTerm) {
     const modalContent = document.getElementById('modalContent');
     const term = (searchTerm || '').toLowerCase().trim();
 
-    let items = icModalItems;
+    let items = icModalByTab[icModalTab] || [];
     if (term) {
         items = items.filter(function(item) {
             return item.item_name.toLowerCase().indexOf(term) !== -1
@@ -680,7 +759,8 @@ function renderInventoryModal(searchTerm) {
     html += '</div>';
 
     if (groups.length === 0) {
-        html += '<div class="ic-modal-empty"><i class="fas fa-inbox"></i><p>No inventory items match.</p></div>';
+        var tabLabels = { borrowed: 'borrowed items', maintenance: 'maintenance tickets', requested: 'requested items', owned: 'owned items' };
+        html += '<div class="ic-modal-empty"><i class="fas fa-inbox"></i><p>No ' + (tabLabels[icModalTab] || 'items') + ' match.</p></div>';
         modalContent.innerHTML = html;
         return;
     }
@@ -719,6 +799,7 @@ function getStatusBadgeClass(status) {
         case 'maintenance': return 'ic-badge-info';
         case 'requested': return 'ic-badge-secondary';
         case 'damaged': return 'ic-badge-danger';
+        case 'owned': return 'ic-badge-owned';
         default: return 'ic-badge-secondary';
     }
 }
