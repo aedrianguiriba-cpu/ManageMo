@@ -30,7 +30,6 @@ jobs:
           exclude: |
             **/.git*
             **/node_modules/**
-            **.htaccess
             mobile_app/**
             android_app/**
 
