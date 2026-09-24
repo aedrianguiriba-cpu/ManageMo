@@ -142,7 +142,9 @@ class _DeliveryList extends StatelessWidget {
           final accent = completed ? AppColors.success : AppColors.primary;
           final icon = completed ? Icons.check_circle_outline : Icons.local_shipping_outlined;
           return ListView.separated(
-            padding: const EdgeInsets.all(16),
+            // Extra bottom padding so the last card isn't hidden behind the
+            // floating nav bar, which now overlays the content (extendBody).
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             itemCount: deliveries.length,
             separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, i) {

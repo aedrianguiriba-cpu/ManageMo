@@ -35,7 +35,9 @@ class DashboardScreen extends StatelessWidget {
           final completed = snapshot.data?[1] ?? const <DeliveryItem>[];
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            // Extra bottom padding so the last card isn't hidden behind the
+            // floating nav bar, which now overlays the content (extendBody).
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             children: [
               _WelcomeCard(user: user),
               const SizedBox(height: 16),

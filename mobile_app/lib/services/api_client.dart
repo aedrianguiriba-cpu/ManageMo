@@ -45,6 +45,8 @@ class AppUser {
   final String email;
   final String role;
   final int? campusId;
+  final String? collegeId;
+  final String? phone;
 
   AppUser({
     required this.id,
@@ -52,6 +54,8 @@ class AppUser {
     required this.email,
     required this.role,
     required this.campusId,
+    this.collegeId,
+    this.phone,
   });
 
   Map<String, dynamic> toJson() => {
@@ -60,6 +64,8 @@ class AppUser {
         'email': email,
         'role': role,
         'campus_id': campusId,
+        'college_id': collegeId,
+        'phone': phone,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
@@ -68,6 +74,8 @@ class AppUser {
         email: json['email'] as String,
         role: json['role'] as String,
         campusId: json['campus_id'] == null ? null : int.tryParse(json['campus_id'].toString()),
+        collegeId: json['college_id'] as String?,
+        phone: json['phone'] as String?,
       );
 }
 
@@ -80,11 +88,44 @@ class ApiClient {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kUserKey);
     if (raw == null) return null;
+    AppUser user;
     try {
-      return AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      user = AppUser.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       return null;
     }
+    // A session saved before this admin-block existed (or restored on a
+    // device that shares storage) shouldn't stay signed in — same rule as
+    // login() now enforces up front.
+    if (user.role != 'user') {
+      await prefs.remove(_kUserKey);
+      return null;
+    }
+    // Re-fetch the live row so fields added to AppUser after this session
+    // was first cached (college_id, phone) — or any edit an admin made since
+    // — actually show up, instead of the account looking stuck on whatever
+    // was true (or simply absent) at the last login. Falls back to the
+    // cached copy if offline rather than failing the whole restore.
+    try {
+      final rows = await SupabaseRest.select('users', 'id=eq.${user.id}');
+      final row = rows.firstOrNull;
+      if (row != null) {
+        final refreshed = AppUser(
+          id: user.id,
+          fullName: row['full_name'] as String? ?? user.fullName,
+          email: row['email'] as String? ?? user.email,
+          role: row['role'] as String? ?? user.role,
+          campusId: row['campus_id'] == null ? null : int.tryParse(row['campus_id'].toString()),
+          collegeId: row['college_id'] as String?,
+          phone: row['phone'] as String?,
+        );
+        await _saveUser(refreshed);
+        return refreshed;
+      }
+    } catch (_) {
+      // Offline or request failed — keep going with the cached copy below.
+    }
+    return user;
   }
 
   static Future<void> _saveUser(AppUser user) async {
@@ -115,12 +156,22 @@ class ApiClient {
       throw ApiException('Invalid email or password.');
     }
 
+    // Admin accounts belong on the web dashboard, not the mobile scanner app —
+    // checked after the password so a wrong password on an admin account still
+    // reports "Invalid email or password," not "you're an admin" (no account
+    // enumeration via role).
+    if (row['role'] != 'user') {
+      throw ApiException('Admin accounts can\'t log in here — please use the web dashboard instead.');
+    }
+
     final user = AppUser(
       id: row['id'] is int ? row['id'] as int : int.parse(row['id'].toString()),
       fullName: row['full_name'] as String,
       email: row['email'] as String,
       role: row['role'] as String,
       campusId: row['campus_id'] == null ? null : int.tryParse(row['campus_id'].toString()),
+      collegeId: row['college_id'] as String?,
+      phone: row['phone'] as String?,
     );
     await _saveUser(user);
     return user;
