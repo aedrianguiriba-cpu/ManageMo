@@ -32,7 +32,6 @@ jobs:
             **/node_modules/**
             **.htaccess
             mobile_app/**
-            android_app/**
 
       - name: Commit sync state to repository
         env:

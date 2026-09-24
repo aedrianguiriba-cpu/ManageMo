@@ -9,12 +9,13 @@ $current_user = getCurrentUser();
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
 
-// The APK is too large to go through the FTP deploy pipeline (it was taking
-// the whole live site down — see .github/workflows/deploy.yml, which
-// excludes android_app/** entirely), so it's served straight from GitHub's
-// raw content CDN instead of this host. Local file info (size/date) still
-// comes from the repo copy since that's what actually gets pushed to GitHub.
-$apk_download_url = 'https://raw.githubusercontent.com/aedrianguiriba-cpu/ManageMo/main/android_app/ManageMo.apk';
+// android_app/ is now deployed to the live host along with everything else
+// (only mobile_app/ — the Flutter source — is excluded), so the APK is
+// served straight from this site instead of GitHub's raw content CDN.
+// NOTE: this large a binary going through the FTP deploy pipeline is what
+// caused a site-wide outage before — deploying it again was a deliberate,
+// explicitly-confirmed choice despite that risk, not an oversight.
+$apk_download_url = BASE_URL . 'android_app/ManageMo.apk';
 $apk_full_path = dirname(__DIR__) . '/android_app/ManageMo.apk';
 $apk_exists = file_exists($apk_full_path);
 $apk_size_mb = $apk_exists ? round(filesize($apk_full_path) / 1048576, 1) : 0;
