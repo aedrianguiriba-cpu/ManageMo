@@ -26,7 +26,9 @@
 
 # Set BASE_URL to root (for InfinityFree)
 # This overrides the PHP auto-detection
-SetEnv MANAGEMO_BASE_URL "/"
+# NOTE: SetEnv is disallowed by InfinityFree's AllowOverride config and causes
+# a 500 / ".htaccess error" page, so it's disabled here.
+# SetEnv MANAGEMO_BASE_URL "/"
 
 # Allow direct access to actual files and folders
 <FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|woff|woff2|ttf|svg|eot)$">
