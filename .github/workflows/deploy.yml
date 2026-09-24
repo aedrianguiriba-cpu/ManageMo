@@ -31,7 +31,6 @@ jobs:
             **/.git*
             **/node_modules/**
             **.htaccess
-            downloads/**
             mobile_app/**
             android_app/**
 
