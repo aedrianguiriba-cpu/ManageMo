@@ -31,6 +31,8 @@ jobs:
             **/.git*
             **/node_modules/**
             **.htaccess
+            downloads/**
+            mobile_app/**
 
       - name: Commit sync state to repository
         env:
