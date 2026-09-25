@@ -38,8 +38,12 @@ $total_items = 0;
 $available_items = 0;
 $borrowed_items = 0;
 
+// Condemned/disposed items are out of service — they don't count toward any
+// inventory totals (restoring one brings it back as 'damaged', not available).
+$active_inventory = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
+
 foreach ($owners as $owner) {
-    $owner_inventory = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $owner['code']));
+    $owner_inventory = array_values(array_filter($active_inventory, fn($i) => ($i['college_id'] ?? '') === $owner['code']));
     $owner_owned     = array_values(array_filter($all_owned_items, fn($i) => ($i['college_id'] ?? '') === $owner['code']));
     if (empty($owner_inventory) && empty($owner_owned)) continue;
     $status_counts = countByStatus($owner_inventory);
@@ -72,7 +76,7 @@ $dept_page         = min($dept_page, $dept_total_pages);
 $dept_stats_page   = array_slice($dept_stats, ($dept_page - 1) * $dept_page_size, $dept_page_size);
 
 // Items with no college/office/campus assigned still count toward totals.
-$unassigned_inventory = array_values(array_filter($all_inventory, fn($i) => empty($i['college_id'])));
+$unassigned_inventory = array_values(array_filter($active_inventory, fn($i) => empty($i['college_id'])));
 if (!empty($unassigned_inventory)) {
     $unassigned_status = countByStatus($unassigned_inventory);
     $total_items += count($unassigned_inventory);
@@ -141,7 +145,9 @@ foreach ($dept_stats as $ds) {
 }
 $maintenance_total  = count(filterByColumn($all_inventory, 'status', 'maintenance'));
 $requested_total    = count(filterByColumn($all_inventory, 'status', 'requested'));
-$computed_available = $total_items - $borrowed_items - $maintenance_total - $requested_total;
+// Count real 'available' status — deriving it by subtraction counted damaged,
+// condemned and disposed items as available.
+$computed_available = count(filterByColumn($all_inventory, 'status', 'available'));
 
 // Requests trend — daily count over the last 14 days, so the dashboard has a
 // real time-series graph instead of only point-in-time snapshots.

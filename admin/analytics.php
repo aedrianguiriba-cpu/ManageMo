@@ -149,6 +149,8 @@ if ($campus_id) {
 }
 $owner_code = $college_id ?: $campus_abbr;
 $filtered_inventory = $owner_code ? filterByColumn($all_inventory,'college_id',$owner_code) : $all_inventory;
+// Condemned/disposed items are out of service — keep them out of the totals.
+$filtered_inventory = array_values(array_filter($filtered_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
 $filtered_requests = array_filter($all_requests, function($r) use ($date_from,$date_to){
     $d = substr($r['created_at'],0,10); return $d >= $date_from && $d <= $date_to;
 });
