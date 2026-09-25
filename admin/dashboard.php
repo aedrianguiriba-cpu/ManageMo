@@ -39,7 +39,7 @@ $available_items = 0;
 $borrowed_items = 0;
 
 // Condemned/disposed items are out of service — they don't count toward any
-// inventory totals (restoring one brings it back as 'damaged', not available).
+// inventory totals.
 $active_inventory = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
 
 foreach ($owners as $owner) {

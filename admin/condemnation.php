@@ -108,8 +108,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWithMessage('condemnation.php?tab=disposed', 'Item marked as disposed.', 'success');
 
     } elseif ($action_type === 'restore' && $item_id > 0) {
+        // Restored items go back to 'available' — there's no separate "damaged"
+        // status tracked anywhere else in the app, so parking it there would
+        // just leave the item invisible from the Available count indefinitely.
         dbUpdateInventory($item_id, [
-            'status'              => 'damaged',
+            'status'              => 'available',
             'condemnation_reason' => null,
             'condemned_at'        => null,
             'condemned_by'        => null,
@@ -139,9 +142,9 @@ $all_department_names = getAllDepartmentNames(); // includes campuses, for displ
 $all_users      = getUsers();
 
 // Build tab lists (re-index with array_values for clean iteration)
-// "Evaluate" includes every item not already condemned/disposed, so admins can condemn any item, not just damaged/maintenance ones.
+// "Evaluate" includes every item not already condemned/disposed, so admins can condemn any item, not just maintenance ones.
 // Items currently out on a request/borrow are mid-use and shouldn't be condemnable
-// until they're back in the admin's hands (available/maintenance/damaged, etc.).
+// until they're back in the admin's hands (available/maintenance, etc.).
 // 'owned' units (transferred to a user via an acquire request) are excluded
 // too — they're not up for condemnation, they belong to someone now (see the
 // Owned Items tab in Inventory instead).
@@ -300,7 +303,6 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
 .cd-badge-evaluate  { background: rgba(245,158,11,0.12); color: #b45309; }
 .cd-badge-condemned { background: rgba(139,0,0,0.12);    color: #8B0000; }
 .cd-badge-disposed  { background: rgba(0,0,0,0.07);       color: #555; }
-.cd-badge-damaged   { background: rgba(239,68,68,0.12);   color: #dc2626; }
 .cd-badge-maintenance { background: rgba(245,158,11,0.12); color: #b45309; }
 
 /* Condition badges */
@@ -592,7 +594,6 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
                 $status_badge = match($row['status'] ?? '') {
                     'condemned'   => 'cd-badge-condemned',
                     'disposed'    => 'cd-badge-disposed',
-                    'damaged'     => 'cd-badge-damaged',
                     'maintenance' => 'cd-badge-maintenance',
                     default       => 'cd-badge-evaluate',
                 };

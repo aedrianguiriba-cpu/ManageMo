@@ -425,7 +425,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                             <option value="borrowed"    <?php echo $status_f==='borrowed'   ?'selected':''; ?>>Borrowed</option>
                             <option value="maintenance" <?php echo $status_f==='maintenance'?'selected':''; ?>>Maintenance</option>
                             <option value="requested"   <?php echo $status_f==='requested'  ?'selected':''; ?>>Requested</option>
-                            <option value="damaged"     <?php echo $status_f==='damaged'    ?'selected':''; ?>>Damaged</option>
                             <?php elseif($report_type === 'requests'): ?>
                             <option value="pending"     <?php echo $status_f==='pending'    ?'selected':''; ?>>Pending</option>
                             <option value="approved"    <?php echo $status_f==='approved'   ?'selected':''; ?>>Approved</option>
@@ -460,7 +459,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
         $inv_bor       = count(filterByColumn($inv_scope,'status','borrowed'));
         $inv_requested = count(filterByColumn($inv_scope,'status','requested'));
         $inv_maint     = count(filterByColumn($inv_scope,'status','maintenance'));
-        $inv_damaged   = count(filterByColumn($inv_scope,'status','damaged'));
 
         // Pagination
         $total_inv = count($display_inv);
@@ -502,10 +500,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#1d4ed8;"><?php echo $inv_maint; ?></div>
                     <div class="rp-summary-lbl">Maintenance</div>
-                </div>
-                <div class="rp-summary-item">
-                    <div class="rp-summary-val" style="color:#dc2626;"><?php echo $inv_damaged; ?></div>
-                    <div class="rp-summary-lbl">Damaged</div>
                 </div>
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#8B0000;">&#8369;<?php echo number_format($inv_value, 0); ?></div>

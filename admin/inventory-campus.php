@@ -798,7 +798,6 @@ function getStatusBadgeClass(status) {
         case 'borrowed': return 'ic-badge-warning';
         case 'maintenance': return 'ic-badge-info';
         case 'requested': return 'ic-badge-secondary';
-        case 'damaged': return 'ic-badge-danger';
         case 'owned': return 'ic-badge-owned';
         default: return 'ic-badge-secondary';
     }

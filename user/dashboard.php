@@ -402,7 +402,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     $ib_status_cfg = [
                         'available'   => ['bg' => '#d1fae5', 'color' => '#065f46', 'label' => 'Available'],
                         'borrowed'    => ['bg' => '#dbeafe', 'color' => '#1e40af', 'label' => 'Borrowed'],
-                        'damaged'     => ['bg' => '#fee2e2', 'color' => '#991b1b', 'label' => 'Damaged'],
                         'maintenance' => ['bg' => '#fef3c7', 'color' => '#92400e', 'label' => 'Maintenance'],
                         'requested'   => ['bg' => '#f3e8ff', 'color' => '#6b21a8', 'label' => 'Requested'],
                     ];
@@ -530,7 +529,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                             $item_status_styles = [
                                 'available'   => ['bg' => '#d1fae5', 'color' => '#065f46'],
                                 'borrowed'    => ['bg' => '#e8f0fe', 'color' => '#1558b0'],
-                                'damaged'     => ['bg' => '#fee2e2', 'color' => '#991b1b'],
                                 'maintenance' => ['bg' => '#fef3c7', 'color' => '#92400e'],
                             ];
                             $cat_icons = [
