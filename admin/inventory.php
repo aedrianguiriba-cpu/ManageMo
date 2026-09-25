@@ -1171,10 +1171,11 @@ displayMessage();
                     // Requested/borrowed units are mid-use and condemnation.php itself
                     // refuses to condemn them — so only offer the button when at least
                     // one unit in this group is actually condemnable, and point it at
-                    // that unit rather than blindly at units[0].
-                    $__all_condemnable_unit = null;
+                    // those units — the Condemnation page then lets the admin tick
+                    // exactly which of them to condemn instead of the whole group.
+                    $__all_condemnable_ids = [];
                     foreach ($group['units'] as $__u) {
-                        if (!in_array($__u['status'], ['requested', 'borrowed'])) { $__all_condemnable_unit = $__u; break; }
+                        if (!in_array($__u['status'], ['requested', 'borrowed'])) $__all_condemnable_ids[] = (int)$__u['id'];
                     }
         ?>
         <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
@@ -1210,8 +1211,8 @@ displayMessage();
                     onclick="openGroupModal(<?php echo htmlspecialchars(json_encode($group)); ?>)">
                     <i class="fas fa-eye"></i> View &amp; Manage
                 </button>
-                <?php if ($__all_condemnable_unit): ?>
-                <a href="condemnation.php?tab=evaluate&condemn=<?php echo $__all_condemnable_unit['id']; ?>" class="ai-btn-sm" style="background:rgba(139,0,0,0.10);color:#8B0000;border:none;border-radius:8px;white-space:nowrap;" title="Condemn this unit">
+                <?php if ($__all_condemnable_ids): ?>
+                <a href="condemnation.php?tab=evaluate&condemn_group=<?php echo implode(',', $__all_condemnable_ids); ?>" class="ai-btn-sm" style="background:rgba(139,0,0,0.10);color:#8B0000;border:none;border-radius:8px;white-space:nowrap;" title="Choose which units to condemn">
                     <i class="fas fa-ban"></i> Condemn
                 </a>
                 <?php endif; ?>
@@ -2096,7 +2097,7 @@ function openGroupModal(group) {
             '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;text-align:center;">'
             + '<img src="' + apiBase + encodeURIComponent(unit.qr_code_id) + '" alt="QR" style="width:100px;height:100px;border-radius:6px;margin-bottom:8px;">'
             + '<div style="font-family:monospace;font-size:0.67rem;word-break:break-all;margin-bottom:6px;color:rgba(0,0,0,0.55);background:rgba(0,0,0,0.03);padding:4px;border-radius:4px;">' + unit.qr_code_id + '</div>'
-            + '<div style="font-size:0.78rem;font-weight:700;color:#1a1d23;margin-bottom:4px;">' + baseName + ' #' + (idx + 1) + '</div>'
+            + '<div style="font-size:0.78rem;font-weight:700;color:#1a1d23;margin-bottom:4px;">' + baseName + ' #' + (unit.unit_no || idx + 1) + '</div>'
             + '<span class="ai-badge ai-badge-' + sc + '" style="font-size:0.7rem;margin-bottom:8px;">' + unit.status + '</span>'
             + '<div style="display:flex;gap:4px;justify-content:center;margin-top:6px;">'
             + '<a href="inventory.php?action=edit&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit"><i class="fas fa-edit"></i></a>'
@@ -2262,7 +2263,7 @@ function openOwnedGroupModal(group, ownerName) {
         row.innerHTML =
             (qr ? '<img src="' + qrApiBase + encodeURIComponent(qr) + '" alt="QR" style="width:48px;height:48px;border-radius:4px;flex-shrink:0;">' : '<div style="width:48px;height:48px;background:#e5e7eb;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="fas fa-qrcode" style="color:#9ca3af;font-size:1.1rem;"></i></div>')
             + '<div style="flex:1;min-width:0;">'
-            + '<span style="font-weight:700;color:#1a1d23;">' + group.item_name + ' #' + (idx + 1) + '</span>'
+            + '<span style="font-weight:700;color:#1a1d23;">' + group.item_name + ' #' + (unit.unit_no || idx + 1) + '</span>'
             + '<span style="color:rgba(0,0,0,0.45);font-size:0.78rem;margin-left:8px;">' + cond + '</span>'
             + (qr ? '<div style="font-family:monospace;font-size:0.65rem;color:rgba(139,0,0,0.7);background:rgba(139,0,0,0.06);padding:2px 5px;border-radius:3px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + qr + '</div>' : '')
             + '</div>'

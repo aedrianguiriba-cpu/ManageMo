@@ -858,7 +858,7 @@ function showOwnedGroup(group) {
             (qr ? '<img src="' + qrApiBase + encodeURIComponent(qr) + '" alt="QR" style="width:48px;height:48px;border-radius:4px;flex-shrink:0;">'
                 : '<div style="width:48px;height:48px;background:#e5e7eb;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><i class="fas fa-qrcode" style="color:#9ca3af;font-size:1.1rem;"></i></div>')
             + '<div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;">'
-            + '<span style="font-weight:700;color:#1a1d23;">' + group.item_name + ' #' + (idx + 1)
+            + '<span style="font-weight:700;color:#1a1d23;">' + group.item_name + ' #' + (unit.unit_no || idx + 1)
             +   ' <span style="font-weight:400;color:rgba(0,0,0,0.50);font-size:0.78rem;">· ' + cond + '</span></span>'
             + '<span style="color:rgba(0,0,0,0.55);font-size:0.78rem;"><i class="fas fa-calendar" style="margin-right:4px;"></i>Year: ' + year + '</span>'
             + (qr ? '<span style="font-family:monospace;font-size:0.65rem;color:rgba(139,0,0,0.7);background:rgba(139,0,0,0.06);padding:2px 5px;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + qr + '</span>' : '')

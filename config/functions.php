@@ -127,12 +127,34 @@ function groupOwnedItems(array $items): array {
 
 // Groups inventory items. Uses group_id when present; falls back to item_name+category+college_id
 // (campus_id is no longer relied on for inventory — it's kept only to satisfy the NOT NULL column).
+function inventoryGroupKey(array $item): string {
+    return !empty($item['group_id'])
+        ? 'gid:' . $item['group_id']
+        : strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? '')) . '||' . ($item['college_id'] ?? '');
+}
+
+// Stable "unit number" of an inventory row within its item group (#1, #2, ...),
+// counted over the whole inventory in id order — condemned/disposed/borrowed
+// rows keep their number, so a unit reads the same on every page.
+function inventoryUnitNumber(int $item_id): ?int {
+    static $numbers = null;
+    if ($numbers === null) {
+        $numbers = [];
+        $counters = [];
+        foreach (getInventory() as $row) {
+            $key = inventoryGroupKey($row);
+            $counters[$key] = ($counters[$key] ?? 0) + 1;
+            $numbers[(int)$row['id']] = $counters[$key];
+        }
+    }
+    return $numbers[$item_id] ?? null;
+}
+
 function groupInventoryItems(array $items): array {
     $groups = [];
     foreach ($items as $item) {
-        $key = !empty($item['group_id'])
-            ? 'gid:' . $item['group_id']
-            : strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? '')) . '||' . ($item['college_id'] ?? '');
+        $key = inventoryGroupKey($item);
+        $item['unit_no'] = inventoryUnitNumber((int)$item['id']);
         if (!isset($groups[$key])) {
             $groups[$key] = [
                 'group_id'    => $item['group_id'] ?? null,

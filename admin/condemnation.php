@@ -11,23 +11,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $item_id     = (int)sanitizeInput($_POST['item_id'] ?? 0);
     $action_type = sanitizeInput($_POST['action'] ?? '');
 
-    if ($action_type === 'condemn' && $item_id > 0) {
-        $condemn_reason = sanitizeInput($_POST['condemn_reason'] ?? '');
+    // Condemns $condemn_qty units of one inventory row (null = the whole row).
+    // Returns false when the row can't be condemned (missing, or mid-use).
+    $condemnInventoryRow = function (int $item_id, ?int $condemn_qty, string $condemn_reason) use ($current_user): bool {
         // Snapshot the item's condition at the moment of condemnation — this is the
         // inspector's own record, distinct from the live inventory.condition field
         // (which could theoretically be edited later).
         $item_at_condemn = findById(getInventory(), $item_id);
-        if ($item_at_condemn && in_array($item_at_condemn['status'], ['requested', 'borrowed'])) {
-            redirectWithMessage('condemnation.php?tab=evaluate', 'This item is currently requested or borrowed and cannot be condemned.', 'danger');
+        if (!$item_at_condemn || in_array($item_at_condemn['status'], ['requested', 'borrowed', 'condemned', 'disposed', 'owned'])) {
+            return false;
         }
 
-        $batch_qty = (int)($item_at_condemn['quantity'] ?? 1);
-        // Selecting specific units in the modal posts one unit_slot[] entry per
-        // checked box — the units themselves are just numbered placeholders (this
-        // inventory row has no per-unit identity yet), so all that ultimately
-        // matters is how many were selected.
-        $selected_units = isset($_POST['unit_slot']) && is_array($_POST['unit_slot']) ? count($_POST['unit_slot']) : $batch_qty;
-        $condemn_qty    = max(1, min($batch_qty, $selected_units));
+        $batch_qty   = (int)($item_at_condemn['quantity'] ?? 1);
+        $condemn_qty = max(1, min($batch_qty, $condemn_qty ?? $batch_qty));
 
         $condemn_fields = [
             'status'                => 'condemned',
@@ -37,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'condemned_condition'   => $item_at_condemn['condition'] ?? null,
         ];
 
-        if ($item_at_condemn && $condemn_qty < $batch_qty) {
+        if ($condemn_qty < $batch_qty) {
             // This inventory row represents a batch of $batch_qty identical units (one
             // record, quantity > 1) — condemning it outright would take the WHOLE batch
             // out of service. Split off just the condemned quantity into its own new
@@ -64,6 +60,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             dbUpdateInventory($item_id, $condemn_fields);
             logActivity($current_user['id'], 'CONDEMN', "Condemned inventory item #$item_id", 'inventory', $item_id);
+        }
+        return true;
+    };
+
+    if ($action_type === 'condemn' && !empty($_POST['unit_pick']) && is_array($_POST['unit_pick'])) {
+        // Group mode (Inventory → All Items "Condemn"): the admin ticked specific
+        // units across the group's inventory rows. Each checkbox posts its row id,
+        // so a row with quantity > 1 posts its id once per ticked unit — tally
+        // them to know how many units of each row to condemn.
+        $condemn_reason = sanitizeInput($_POST['condemn_reason'] ?? '');
+        $picks = [];
+        foreach ($_POST['unit_pick'] as $pick) {
+            $pid = (int)$pick;
+            if ($pid > 0) $picks[$pid] = ($picks[$pid] ?? 0) + 1;
+        }
+        $done = 0;
+        foreach ($picks as $pid => $count) {
+            if ($condemnInventoryRow($pid, $count, $condemn_reason)) $done += $count;
+        }
+        if ($done === 0) {
+            redirectWithMessage('condemnation.php?tab=evaluate', 'None of the selected units could be condemned (they may be requested or borrowed).', 'danger');
+        }
+        redirectWithMessage('condemnation.php?tab=condemned', "$done unit(s) condemned successfully.", 'success');
+
+    } elseif ($action_type === 'condemn' && $item_id > 0) {
+        $condemn_reason = sanitizeInput($_POST['condemn_reason'] ?? '');
+        // Selecting specific units in the modal posts one unit_slot[] entry per
+        // checked box — the units themselves are just numbered placeholders (this
+        // inventory row has no per-unit identity yet), so all that ultimately
+        // matters is how many were selected.
+        $selected_units = isset($_POST['unit_slot']) && is_array($_POST['unit_slot']) ? count($_POST['unit_slot']) : null;
+        if (!$condemnInventoryRow($item_id, $selected_units, $condemn_reason)) {
+            redirectWithMessage('condemnation.php?tab=evaluate', 'This item is currently requested or borrowed and cannot be condemned.', 'danger');
         }
         redirectWithMessage('condemnation.php?tab=condemned', 'Item condemned successfully.', 'success');
 
@@ -527,6 +556,9 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
                     <td>
                         <div style="font-weight:700;font-size:0.88rem;color:#1a1d23;">
                             <?php echo htmlspecialchars($row['item_name']); ?>
+                            <?php if ($__unit_no = inventoryUnitNumber((int)$row['id'])): ?>
+                            <span style="font-weight:600;color:#8B0000;">#<?php echo $__unit_no; ?></span>
+                            <?php endif; ?>
                         </div>
                         <?php if (!empty($row['qr_code_id'])): ?>
                         <div style="font-size:0.72rem;font-family:monospace;color:rgba(139,0,0,0.65);margin-top:2px;">
@@ -597,6 +629,7 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
                         <button type="button" class="cd-btn-condemn"
                             onclick='openCondemnModal(<?php echo $row["id"]; ?>, <?php echo (int)($row["quantity"] ?? 1); ?>, <?php echo json_encode([
                                 "item_name" => $row["item_name"],
+                                "unit_no" => inventoryUnitNumber((int)$row["id"]),
                                 "qr_code_id" => $row["qr_code_id"] ?? "",
                                 "category" => $row["category"] ?? "",
                                 "cost" => (float)($row["cost"] ?? 0),
@@ -683,7 +716,7 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
                                 <th style="padding:6px 8px;text-align:left;"></th>
                                 <th style="padding:6px 8px;text-align:left;">Unit</th>
                                 <th style="padding:6px 8px;text-align:left;">QR Code</th>
-                                <th style="padding:6px 8px;text-align:left;">Category</th>
+                                <th style="padding:6px 8px;text-align:left;" id="condemnUnitColLabel">Category</th>
                                 <th style="padding:6px 8px;text-align:left;">Location</th>
                                 <th style="padding:6px 8px;text-align:right;">Cost</th>
                             </tr>
@@ -691,7 +724,10 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
                         <tbody id="condemnUnitList"></tbody>
                     </table>
                 </div>
-                <div style="font-size:0.75rem;color:#999;margin-top:6px;">
+                <div id="condemnGroupNote" style="font-size:0.75rem;color:#999;margin-top:6px;display:none;">
+                    <i class="fas fa-info-circle me-1"></i>Only the ticked units are condemned — the rest stay in active inventory. Requested or borrowed units aren't listed.
+                </div>
+                <div id="condemnBatchNote" style="font-size:0.75rem;color:#999;margin-top:6px;">
                     <i class="fas fa-info-circle me-1"></i>These units share one inventory record with no individual identity yet — condemning fewer than all of them splits the selected count into its own new condemned record, leaving the rest untouched.
                 </div>
             </div>
@@ -762,11 +798,58 @@ function condemnSelectAllUnits(select) {
     document.querySelectorAll('#condemnUnitList input[type="checkbox"]').forEach(function(cb) { cb.checked = select; });
     condemnUpdateSelectedCount();
 }
+// Group mode: pick specific units across all of an item group's inventory rows.
+// Each checkbox posts its row id; a row with quantity > 1 gets one checkbox per
+// unit (all posting the same id) and the server tallies how many to split off.
+function openCondemnGroupModal(details, units) {
+    details = details || {};
+    document.getElementById('condemnItemId').value = '';
+    document.getElementById('condemnItemName').textContent = details.item_name || '—';
+    document.getElementById('condemnReason').value = '';
+    document.getElementById('condemnForm').dataset.mode = 'group';
+    document.getElementById('condemnGroupNote').style.display = 'block';
+    document.getElementById('condemnBatchNote').style.display = 'none';
+    var unitList = document.getElementById('condemnUnitList');
+    unitList.innerHTML = '';
+    var n = 0;
+    (units || []).forEach(function(u) {
+        var qty = Math.max(1, parseInt(u.quantity, 10) || 1);
+        var costFmt = (parseFloat(u.cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        for (var k = 1; k <= qty; k++) {
+            n++;
+            var tr = document.createElement('tr');
+            tr.style.borderTop = '1px solid #f0f0f0';
+            tr.innerHTML =
+                '<td style="padding:5px 8px;"><input type="checkbox" name="unit_pick[]" value="' + parseInt(u.id, 10) + '" onchange="condemnUpdateSelectedCount()"></td>' +
+                '<td style="padding:5px 8px;font-weight:700;">Unit #' + (u.unit_no || n) + (qty > 1 ? ' <span style="font-weight:400;color:#999;">(batch ' + k + '/' + qty + ')</span>' : '') + '</td>' +
+                '<td style="padding:5px 8px;font-family:monospace;color:#8B0000;">' + _cdEsc(u.qr_code_id || '—') + '</td>' +
+                '<td style="padding:5px 8px;">' + _cdEsc(u.condition ? u.condition.charAt(0).toUpperCase() + u.condition.slice(1) : '—') + '</td>' +
+                '<td style="padding:5px 8px;">' + _cdEsc(u.location || '—') + '</td>' +
+                '<td style="padding:5px 8px;text-align:right;">₱' + costFmt + '</td>';
+            unitList.appendChild(tr);
+        }
+    });
+    document.getElementById('condemnQtyAvail').textContent = n;
+    document.getElementById('condemnUnitColLabel').textContent = 'Condition';
+    document.getElementById('condemnQtyWrap').style.display = 'block';
+    condemnUpdateSelectedCount();
+    document.getElementById('condemnModal').classList.add('open');
+}
+document.getElementById('condemnForm').addEventListener('submit', function(e) {
+    if (this.dataset.mode === 'group' && !document.querySelector('#condemnUnitList input[type="checkbox"]:checked')) {
+        e.preventDefault();
+        alert('Select at least one unit to condemn.');
+    }
+});
 function openCondemnModal(itemId, qty, details) {
     qty = qty || 1;
+    document.getElementById('condemnForm').dataset.mode = 'single';
+    document.getElementById('condemnGroupNote').style.display = 'none';
+    document.getElementById('condemnBatchNote').style.display = 'block';
+    document.getElementById('condemnUnitColLabel').textContent = 'Category';
     details = details || {};
     document.getElementById('condemnItemId').value = itemId;
-    document.getElementById('condemnItemName').textContent = details.item_name || '—';
+    document.getElementById('condemnItemName').textContent = (details.item_name || '—') + (details.unit_no ? ' #' + details.unit_no : '');
     document.getElementById('condemnReason').value = '';
     var qtyWrap = document.getElementById('condemnQtyWrap');
     var unitList = document.getElementById('condemnUnitList');
@@ -826,11 +909,34 @@ document.addEventListener('keydown', function(e) {
 // Deep-linked from Inventory's "Condemn" quick action
 openCondemnModal(<?php echo (int)$__condemn_item['id']; ?>, <?php echo (int)($__condemn_item['quantity'] ?? 1); ?>, <?php echo json_encode([
     'item_name'  => $__condemn_item['item_name'],
+    'unit_no'    => inventoryUnitNumber((int)$__condemn_item['id']),
     'qr_code_id' => $__condemn_item['qr_code_id'] ?? '',
     'category'   => $__condemn_item['category'] ?? '',
     'cost'       => (float)($__condemn_item['cost'] ?? 0),
     'location'   => $__condemn_item['location'] ?? '',
 ]); ?>);
+<?php endif; endif; ?>
+<?php if (!empty($_GET['condemn_group'])):
+    // Deep-linked from Inventory → All Items "Condemn": a comma-separated list of
+    // the group's inventory row ids. Only offer rows that can actually be condemned.
+    $__cg_ids   = array_filter(array_map('intval', explode(',', (string)$_GET['condemn_group'])));
+    $__cg_units = [];
+    foreach ($__cg_ids as $__cg_id) {
+        $__cg_row = findById($all_inventory, $__cg_id);
+        if (!$__cg_row || in_array($__cg_row['status'], ['requested', 'borrowed', 'condemned', 'disposed', 'owned'])) continue;
+        $__cg_units[] = [
+            'id'         => (int)$__cg_row['id'],
+            'unit_no'    => inventoryUnitNumber((int)$__cg_row['id']),
+            'quantity'   => (int)($__cg_row['quantity'] ?? 1),
+            'qr_code_id' => $__cg_row['qr_code_id'] ?? '',
+            'condition'  => $__cg_row['condition'] ?? '',
+            'location'   => $__cg_row['location'] ?? '',
+            'cost'       => (float)($__cg_row['cost'] ?? 0),
+        ];
+    }
+    if ($__cg_units):
+?>
+openCondemnGroupModal(<?php echo json_encode(['item_name' => findById($all_inventory, $__cg_units[0]['id'])['item_name'] ?? '']); ?>, <?php echo json_encode($__cg_units); ?>);
 <?php endif; endif; ?>
 </script>
 
