@@ -255,20 +255,45 @@ class ApiClient {
     String qrCodeId, {
     String? expectedGroupKey,
   }) async {
-    final matches = await SupabaseRest.select('requests', 'qr_code_id=eq.${Uri.encodeComponent(qrCodeId)}');
-    if (matches.isEmpty) {
-      throw ApiException('This QR code does not match any request.');
+    // A QR sticker is tied to the physical inventory unit, not to one request —
+    // the same unit gets the exact same code again the next time it's
+    // borrowed. A plain "qr_code_id=eq.X" lookup with no ordering can match
+    // ANY request row that ever used this code, including an old, already-
+    // completed one from a previous borrow cycle — which wrongly reports
+    // "already confirmed" for a unit that was never actually scanned this
+    // time around. Only ever match the request that's actually still out for
+    // delivery right now; there can be at most one, since a unit can't be
+    // dispatched on two deliveries at once.
+    final activeMatches = await SupabaseRest.select(
+      'requests',
+      'qr_code_id=eq.${Uri.encodeComponent(qrCodeId)}&delivery_status=eq.out_for_delivery',
+    );
+
+    final Map<String, dynamic> match;
+    if (activeMatches.isNotEmpty) {
+      match = activeMatches.first;
+    } else {
+      // Nothing currently out for delivery has this code — look up its most
+      // recent request (any status) just to give an accurate reason why.
+      final anyMatches = await SupabaseRest.select(
+        'requests',
+        'qr_code_id=eq.${Uri.encodeComponent(qrCodeId)}&order=updated_at.desc&limit=1',
+      );
+      if (anyMatches.isEmpty) {
+        throw ApiException('This QR code does not match any request.');
+      }
+      final latest = anyMatches.first;
+      if ((latest['user_id'] as num).toInt() != user.id) {
+        throw ApiException('This item was not requested by you.');
+      }
+      if (latest['delivery_status'] == 'delivered') {
+        throw ApiException('This item has already been confirmed.');
+      }
+      throw ApiException('This item is not out for delivery yet.');
     }
-    final match = matches.first;
 
     if ((match['user_id'] as num).toInt() != user.id) {
       throw ApiException('This item was not requested by you.');
-    }
-    if (match['delivery_status'] == 'delivered') {
-      throw ApiException('This item has already been confirmed.');
-    }
-    if (match['delivery_status'] != 'out_for_delivery') {
-      throw ApiException('This item is not out for delivery yet.');
     }
 
     if (expectedGroupKey != null) {
