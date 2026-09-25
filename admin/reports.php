@@ -29,10 +29,48 @@ $offices   = getMainCampusOffices();
 $all_depts = array_merge($colleges, $offices);
 
 // --- Filtered inventory ---
-$inv_data = $college_id ? filterByColumn($all_inventory, 'college_id', $college_id) : $all_inventory;
-if ($campus_id) $inv_data = filterByColumn($inv_data, 'campus_id', (int)$campus_id);
-if ($status_f) $inv_data = filterByColumn($inv_data, 'status', $status_f);
-$inv_value = array_sum(array_column($inv_data, 'cost'));
+// A campus "owns" inventory the same way a college/office does — via its
+// abbreviation stored in inventory.college_id (the legacy numeric campus_id
+// column is always coalesced to 1, so filtering on it matched everything or
+// nothing). Resolve the picked campus to its abbreviation first.
+$campus_abbr = '';
+if ($campus_id) {
+    $campus_row  = findById(getDepartmentCampuses(), (int)$campus_id);
+    $campus_abbr = $campus_row['abbreviation'] ?? '';
+}
+$owner_code = $college_id ?: $campus_abbr;
+$all_dept_names = getAllDepartmentNames(); // colleges, offices and campuses
+
+// Condemned/disposed items are out of service (they have their own report on
+// the Condemnation page), so they don't count toward the inventory totals.
+$inv_scope = array_values(array_filter($all_inventory, fn($i) =>
+    !in_array($i['status'], ['condemned', 'disposed'])
+    && (!$owner_code || ($i['college_id'] ?? '') === $owner_code)));
+
+// User-owned items live in their own table (user_owned_items). Map them onto
+// the inventory row shape so they list and count alongside inventory.
+$owned_scope = [];
+foreach (getUserOwnedItems() as $o) {
+    if ($owner_code && ($o['college_id'] ?? '') !== $owner_code) continue;
+    $owner = findById($all_users, (int)$o['user_id']);
+    $owned_scope[] = [
+        'qr_code_id'    => $o['qr_code_id'] ?? '',
+        'item_name'     => $o['item_name'],
+        'category'      => $o['category'] ?? '',
+        'college_id'    => $o['college_id'] ?? '',
+        'location'      => $owner ? 'Owner: ' . $owner['full_name'] : '',
+        'quantity'      => (int)($o['quantity'] ?? 1),
+        'condition'     => $o['condition'] ?? '',
+        'status'        => 'owned',
+        'cost'          => null,
+        'purchase_date' => $o['purchase_date'] ?? null,
+    ];
+}
+
+if ($status_f === 'owned')  $inv_data = $owned_scope;
+elseif ($status_f)          $inv_data = filterByColumn($inv_scope, 'status', $status_f);
+else                        $inv_data = array_merge($inv_scope, $owned_scope);
+$inv_value = array_sum(array_map(fn($i) => (float)($i['cost'] ?? 0), $inv_data));
 
 // --- Filtered requests ---
 $req_data = array_values(array_filter($all_requests, function($r) use ($date_from, $date_to) {
@@ -75,12 +113,12 @@ function rpInventoryRow($item, $rownum, $all_depts) {
         <td><span style="font-family:monospace;font-size:0.76rem;color:#8B0000;background:rgba(139,0,0,0.06);border-radius:4px;padding:1px 5px;"><?php echo htmlspecialchars($item['qr_code_id']); ?></span></td>
         <td style="font-weight:700;"><?php echo htmlspecialchars($item['item_name']); ?></td>
         <td><?php echo htmlspecialchars($item['category']); ?></td>
-        <td><?php echo htmlspecialchars(deptName($all_depts, $item['college_id'] ?? '')); ?></td>
+        <td><?php echo htmlspecialchars(deptName(getAllDepartmentNames(), $item['college_id'] ?? '')); ?></td>
         <td style="font-size:0.80rem;color:rgba(0,0,0,0.55);"><?php echo htmlspecialchars($item['location'] ?? ''); ?></td>
         <td style="text-align:center;font-weight:700;"><?php echo (int)$item['quantity']; ?></td>
         <td><?php echo ucfirst(htmlspecialchars($item['condition'] ?? '')); ?></td>
         <td><span class="rp-badge rp-badge-<?php echo $item['status']; ?>"><?php echo ucfirst($item['status']); ?></span></td>
-        <td style="text-align:right;"><?php echo number_format((float)($item['cost'] ?? 0), 2); ?></td>
+        <td style="text-align:right;"><?php echo $item['cost'] !== null ? number_format((float)$item['cost'], 2) : '—'; ?></td>
         <td style="font-size:0.79rem;color:rgba(0,0,0,0.50);"><?php echo $item['purchase_date'] ? date('M d, Y', strtotime($item['purchase_date'])) : '—'; ?></td>
     </tr>
     <?php
@@ -161,10 +199,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     font-size:0.71rem; font-weight:700;
 }
 .rp-badge-available  { background:rgba(34,197,94,0.12);  color:#15803d; }
-.rp-badge-owned      { background:rgba(34,197,94,0.12);  color:#15803d; }
+.rp-badge-owned      { background:rgba(124,58,237,0.12); color:#7c3aed; }
 .rp-badge-borrowed   { background:rgba(245,158,11,0.12); color:#b45309; }
 .rp-badge-requested  { background:rgba(34,197,94,0.12);  color:#22c55e; }
 .rp-badge-maintenance{ background:rgba(59,130,246,0.12); color:#1d4ed8; }
+.rp-badge-damaged    { background:rgba(239,68,68,0.12);  color:#dc2626; }
 .rp-badge-pending    { background:rgba(245,158,11,0.12); color:#b45309; }
 .rp-badge-approved   { background:rgba(34,197,94,0.12);  color:#15803d; }
 .rp-badge-disapproved{ background:rgba(239,68,68,0.12);  color:#dc2626; }
@@ -381,12 +420,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <select class="form-select" name="status" style="min-width:140px;">
                             <option value="">All</option>
                             <?php if ($report_type === 'inventory'): ?>
-                            <option value="available"   <?php echo $status_f==='available'  ?'selected':''; ?>>Owned</option>
+                            <option value="owned"       <?php echo $status_f==='owned'      ?'selected':''; ?>>User-Owned</option>
                             <option value="available"   <?php echo $status_f==='available'  ?'selected':''; ?>>Available</option>
                             <option value="borrowed"    <?php echo $status_f==='borrowed'   ?'selected':''; ?>>Borrowed</option>
                             <option value="maintenance" <?php echo $status_f==='maintenance'?'selected':''; ?>>Maintenance</option>
                             <option value="requested"   <?php echo $status_f==='requested'  ?'selected':''; ?>>Requested</option>
-                            <?php elseif ($report_type === 'requests'): ?>
+                            <option value="damaged"     <?php echo $status_f==='damaged'    ?'selected':''; ?>>Damaged</option>
+                            <?php elseif($report_type === 'requests'): ?>
                             <option value="pending"     <?php echo $status_f==='pending'    ?'selected':''; ?>>Pending</option>
                             <option value="approved"    <?php echo $status_f==='approved'   ?'selected':''; ?>>Approved</option>
                             <option value="disapproved" <?php echo $status_f==='disapproved'?'selected':''; ?>>Disapproved</option>
@@ -410,24 +450,21 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
         <?php /* ======== INVENTORY REPORT ======== */ if ($report_type === 'inventory'): ?>
         <?php
-        // If requested status filter, show only items with requests
         $display_inv = $inv_data;
-        if ($status_f === 'requested') {
-            $requested_inv_ids = array_unique(array_column($all_requests, 'inventory_id'));
-            $display_inv = array_values(array_filter($inv_data, fn($i) => in_array($i['id'], $requested_inv_ids)));
-        }
-        
-        $inv_avail = count(filterByColumn($inv_data,'status','available'));
-        $inv_bor   = count(filterByColumn($inv_data,'status','borrowed'));
-        $inv_maint = count(filterByColumn($inv_data,'status','maintenance'));
-        
-        // Count items with requests
-        $requested_inv_ids = array_unique(array_column($all_requests, 'inventory_id'));
-        $inv_requested = count(array_filter($inv_data, fn($i) => in_array($i['id'], $requested_inv_ids)));
-        
+
+        // Summary tiles always describe the whole scope (department filter only),
+        // using each item's current status.
+        $inv_owned     = count($owned_scope);
+        $inv_total_all = count($inv_scope) + $inv_owned;
+        $inv_avail     = count(filterByColumn($inv_scope,'status','available'));
+        $inv_bor       = count(filterByColumn($inv_scope,'status','borrowed'));
+        $inv_requested = count(filterByColumn($inv_scope,'status','requested'));
+        $inv_maint     = count(filterByColumn($inv_scope,'status','maintenance'));
+        $inv_damaged   = count(filterByColumn($inv_scope,'status','damaged'));
+
         // Pagination
         $total_inv = count($display_inv);
-        $total_pages = ceil($total_inv / $per_page);
+        $total_pages = (int)ceil($total_inv / $per_page);
         $page = min($page, $total_pages) ?: 1;
         $offset = ($page - 1) * $per_page;
         $paginated_inv = array_slice($display_inv, $offset, $per_page);
@@ -443,12 +480,12 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <!-- Summary row -->
             <div class="rp-summary-grid">
                 <div class="rp-summary-item">
-                    <div class="rp-summary-val"><?php echo count($inv_data); ?></div>
+                    <div class="rp-summary-val"><?php echo $inv_total_all; ?></div>
                     <div class="rp-summary-lbl">Total Items</div>
                 </div>
                 <div class="rp-summary-item">
-                    <div class="rp-summary-val" style="color:#15803d;"><?php echo $inv_avail; ?></div>
-                    <div class="rp-summary-lbl">Owned</div>
+                    <div class="rp-summary-val" style="color:#7c3aed;"><?php echo $inv_owned; ?></div>
+                    <div class="rp-summary-lbl">User-Owned</div>
                 </div>
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#15803d;"><?php echo $inv_avail; ?></div>
@@ -465,6 +502,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#1d4ed8;"><?php echo $inv_maint; ?></div>
                     <div class="rp-summary-lbl">Maintenance</div>
+                </div>
+                <div class="rp-summary-item">
+                    <div class="rp-summary-val" style="color:#dc2626;"><?php echo $inv_damaged; ?></div>
+                    <div class="rp-summary-lbl">Damaged</div>
                 </div>
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#8B0000;">&#8369;<?php echo number_format($inv_value, 0); ?></div>
@@ -534,22 +575,25 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $per_page, $total_inv); ?> of <?php echo $total_inv; ?> items
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <?php for ($p = 1; $p <= min($total_pages, 5); $p++): ?>
-                    <a href="?type=<?php echo $report_type; ?>&dept_id=<?php echo urlencode($dept_id); ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $p; ?>"
-                       style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:8px; font-size:0.85rem; font-weight:700; text-decoration:none; 
+                    <?php
+                    // Sliding window around the current page (plus first/last), so
+                    // every page is reachable — not just 1–5 and the last one.
+                    $__rp_qs = '?type=' . urlencode($report_type) . '&dept_id=' . urlencode($dept_id) . '&date_from=' . urlencode($date_from) . '&date_to=' . urlencode($date_to) . '&status=' . urlencode($status_f) . '&page=';
+                    $__rp_pages = array_unique(array_merge([1], range(max(1, $page - 2), min($total_pages, $page + 2)), [$total_pages]));
+                    sort($__rp_pages);
+                    $__rp_prev = 0;
+                    foreach ($__rp_pages as $p):
+                        if ($p - $__rp_prev > 1): ?>
+                    <span style="padding:0 4px; color:rgba(0,0,0,0.35); align-self:center;">...</span>
+                    <?php endif; $__rp_prev = $p; ?>
+                    <a href="<?php echo $__rp_qs . $p; ?>"
+                       style="display:inline-flex; align-items:center; justify-content:center; min-width:32px; height:32px; padding:0 6px; border-radius:6px; font-size:0.85rem; font-weight:700; text-decoration:none;
                               background:<?php echo $p === $page ? '#8B0000' : '#f7f7f7'; ?>;
                               color:<?php echo $p === $page ? '#fff' : '#555'; ?>;
                               border:<?php echo $p === $page ? 'none' : '1px solid #e5e7eb'; ?>;">
                         <?php echo $p; ?>
                     </a>
-                    <?php endfor; ?>
-                    <?php if ($total_pages > 5): ?>
-                    <span style="padding:0 8px; color:rgba(0,0,0,0.35);">...</span>
-                    <a href="?type=<?php echo $report_type; ?>&dept_id=<?php echo urlencode($dept_id); ?>&date_from=<?php echo $date_from; ?>&date_to=<?php echo $date_to; ?>&status=<?php echo $status_f; ?>&page=<?php echo $total_pages; ?>"
-                       style="display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:6px; font-size:0.85rem; font-weight:700; text-decoration:none; background:#f7f7f7; color:#555; border:1px solid #e5e7eb;">
-                        <?php echo $total_pages; ?>
-                    </a>
-                    <?php endif; ?>
+                    <?php endforeach; ?>
                 </div>
             </div>
             <?php endif; ?>

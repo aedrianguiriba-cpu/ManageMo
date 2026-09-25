@@ -13,11 +13,15 @@ $user_dept_name = !empty($current_user['college_id']) ? ($user_departments[$curr
 
 // Inventory is a single global list — no more campus scoping.
 $all_inventory = getInventory();
-$campus_inventory = $all_inventory;
+// Condemned/disposed items are out of service, so they don't count as inventory.
+$campus_inventory = array_values(array_filter($all_inventory, fn($i) => !in_array($i['status'], ['condemned', 'disposed'])));
 
-// Calculate inventory stats
+// Calculate inventory stats. Total Items also counts user-owned items (their
+// own table), matching the admin dashboard; 'inventory' stays inventory-only
+// for the status bars below.
 $inventory_result = [
-    'total' => count($campus_inventory),
+    'total' => count($campus_inventory) + count(getUserOwnedItems()),
+    'inventory' => count($campus_inventory),
     'available' => count(filterByColumn($campus_inventory, 'status', 'available')),
     'borrowed' => count(filterByColumn($campus_inventory, 'status', 'borrowed')),
 ];
@@ -40,7 +44,8 @@ $requests_result = [
 
 // Get active borrow records
 $all_borrow = getBorrowRecords();
-$user_borrows = filterByColumns($all_borrow, ['user_id' => $user_id, 'status' => 'active']);
+// Overdue borrows are still in the user's hands, so they count as active too.
+$user_borrows = array_filter($all_borrow, fn($b) => (int)$b['user_id'] === (int)$user_id && in_array($b['status'], ['active', 'overdue']));
 
 $borrow_result = [
     'active' => count($user_borrows),
@@ -330,10 +335,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
                 <div class="ud-card-body">
                     <?php
-                    // Count items with requests
-                    $requested_inv_ids = array_unique(array_column($all_requests, 'inventory_id'));
-                    $inv_requested = count(array_filter($campus_inventory, fn($i) => in_array($i['id'], $requested_inv_ids)));
-                    
+                    $inv_requested   = count(filterByColumn($campus_inventory, 'status', 'requested'));
+
                     $inv_borrowed    = count(filterByColumn($campus_inventory, 'status', 'borrowed'));
                     $inv_maintenance = count(filterByColumn($campus_inventory, 'status', 'maintenance'));
                     $status_rows = [
@@ -347,7 +350,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                         <span class="ud-inv-icon" style="color:<?php echo $row['color']; ?>;"><i class="fas <?php echo $row['icon']; ?>"></i></span>
                         <span class="ud-inv-label"><?php echo $row['label']; ?></span>
                         <div class="ud-inv-bar-wrap">
-                            <div class="ud-inv-bar" style="width:<?php echo ($inventory_result['total'] > 0 ? round($row['count']/$inventory_result['total']*100) : 0); ?>%;background:<?php echo $row['color']; ?>;"></div>
+                            <div class="ud-inv-bar" style="width:<?php echo ($inventory_result['inventory'] > 0 ? round($row['count']/$inventory_result['inventory']*100) : 0); ?>%;background:<?php echo $row['color']; ?>;"></div>
                         </div>
                         <span class="ud-inv-count"><?php echo $row['count']; ?></span>
                     </div>
