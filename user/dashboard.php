@@ -165,13 +165,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     <!-- Stat Cards -->
     <div class="row g-3 mb-4 align-items-stretch">
         <div class="col min-width-0">
-            <div class="ud-stat-card ud-stat-blue h-100">
-                <div class="ud-stat-icon"><i class="fas fa-boxes"></i></div>
-                <div class="ud-stat-value"><?php echo $inventory_result['total']; ?></div>
-                <div class="ud-stat-label">Total Items</div>
-            </div>
-        </div>
-        <div class="col min-width-0">
             <div class="ud-stat-card ud-stat-green h-100">
                 <div class="ud-stat-icon"><i class="fas fa-check-circle"></i></div>
                 <div class="ud-stat-value"><?php echo $inventory_result['available']; ?></div>
