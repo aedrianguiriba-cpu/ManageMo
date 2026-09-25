@@ -320,7 +320,7 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
         <div class="adash-kpi" style="--kpi-color:#b91c1c;">
             <div class="adash-kpi-icon"><i class="fas fa-warehouse"></i></div>
             <div class="adash-kpi-body">
-                <div class="adash-kpi-val"><?php echo $total_items; ?></div>
+                <div class="adash-kpi-val"><?php echo $total_items + $total_owned_items; ?></div>
                 <div class="adash-kpi-label">Total Items</div>
             </div>
         </div>
