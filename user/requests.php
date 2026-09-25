@@ -93,11 +93,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($candidate_ids as $cid) {
                 if (count($usable) >= $qty) break;
                 $cid = (int)$cid;
+                // Claim immediately (not after the loop) — candidate_ids can contain
+                // the same id more than once (a batch row's id repeated to stand in
+                // for several of its units, or a tampered/duplicated list), and
+                // checking against a list only updated at the end would let a
+                // repeated id be counted as a different available unit each time.
                 if (in_array($cid, $claimed_unit_ids, true)) continue;
                 $row = findById($all_inv, $cid);
-                if ($row && $row['status'] === 'available') $usable[] = $cid;
+                if (!$row || $row['status'] !== 'available') continue;
+                $usable[] = $cid;
+                $claimed_unit_ids[] = $cid;
             }
-            foreach ($usable as $cid) $claimed_unit_ids[] = $cid;
             return $usable;
         };
 
@@ -1258,7 +1264,7 @@ if (!empty($submit_error)): ?>
                                     <i class="fas fa-hashtag rq-input-icon"></i>
                                     <input type="number" class="form-control" id="borrow_quantity"
                                            name="borrow_quantity" value="1" min="1" required
-                                           oninput="updateSummary()">
+                                           oninput="clampQtyInput(this); updateSummary()">
                                 </div>
                             </div>
                         </div>
@@ -1394,7 +1400,7 @@ if (!empty($submit_error)): ?>
                             <div class="rq-input-wrap">
                                 <i class="fas fa-hashtag rq-input-icon"></i>
                                 <input type="number" class="form-control" id="quantity" name="quantity"
-                                       value="1" min="1" oninput="updateSummary()">
+                                       value="1" min="1" oninput="clampQtyInput(this); updateSummary()">
                             </div>
                         </div>
 
@@ -1697,6 +1703,20 @@ function filterShopItems(btn) {
     });
     var emptyEl = document.getElementById('bshop-empty');
     if (emptyEl) emptyEl.style.display = visible === 0 ? 'flex' : 'none';
+}
+
+// Re-clamps a quantity input to its own max attribute on every keystroke —
+// handleCatalogChange()/selectItemReqCard() only clamp at the moment an item
+// is selected, so typing a bigger number into the field afterwards (instead
+// of using the spinner arrows) slipped straight through with no client-side
+// check at all. The server still caps the actual request to real stock
+// either way, but the cart/summary should never show more than what could
+// ever be requested.
+function clampQtyInput(input) {
+    var max = parseInt(input.getAttribute('max'));
+    if (!isNaN(max) && parseInt(input.value) > max) input.value = max;
+    var min = parseInt(input.getAttribute('min')) || 1;
+    if (input.value !== '' && parseInt(input.value) < min) input.value = min;
 }
 
 function handleCatalogChange(select) {
