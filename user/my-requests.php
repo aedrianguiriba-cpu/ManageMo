@@ -57,7 +57,11 @@ usort($my_groups, fn($a, $b) => strcmp($b['first']['created_at'], $a['first']['c
 // Build display-ready $my_requests (one entry per group)
 $my_requests = [];
 foreach ($my_groups as $grp) {
-    $req  = $grp['first'];
+    // See pickRepresentativeRequestUnit()'s docblock — a group can have mixed
+    // unit statuses (e.g. some units already scanned as delivered, others
+    // still out for delivery), so the card's status must not just default to
+    // whichever row happened to be added to the group first.
+    $req  = pickRepresentativeRequestUnit($grp['rows']) ?? $grp['first'];
     $rows = $grp['rows'];
     // Collect item names
     $names = [];
@@ -439,6 +443,15 @@ displayMessage();
                     <?php echo htmlspecialchars($req['request_number']); ?>
                     <?php if ($req['unit_count'] > 1): ?>
                     <span style="font-size:.70rem;background:rgba(139,0,0,.15);color:#8B0000;border-radius:3px;padding:0 6px;margin-left:4px;"><?php echo $req['unit_count']; ?> units</span>
+                    <?php
+                    // Each unit is confirmed delivered individually by its own QR
+                    // scan, so a multi-unit request can be partway through delivery —
+                    // show that progress rather than leaving it looking stuck.
+                    $__delivered_so_far = count(array_filter($rows, fn($r) => ($r['status'] ?? null) === 'delivered'));
+                    if ($__delivered_so_far > 0 && $__delivered_so_far < $req['unit_count']):
+                    ?>
+                    <span style="font-size:.70rem;background:rgba(29,78,216,.12);color:#1d4ed8;border-radius:3px;padding:0 6px;margin-left:4px;"><?php echo $__delivered_so_far; ?>/<?php echo $req['unit_count']; ?> delivered</span>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
                 <div class="mrt-item-name"><?php echo htmlspecialchars($item_display); ?></div>

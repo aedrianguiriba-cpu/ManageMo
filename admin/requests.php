@@ -14,6 +14,12 @@ $request_sort = $_GET['sort'] ?? 'newest';
 if (!in_array($request_sort, ['newest', 'oldest'])) $request_sort = 'newest';
 $request_sort_dir = $request_sort === 'oldest' ? 1 : -1;
 
+// See pickRepresentativeRequestUnit() in config/functions.php.
+function arGroupOverallStatus(array $rows): array {
+    $rep = pickRepresentativeRequestUnit($rows) ?? ($rows[0] ?? []);
+    return ['status' => $rep['status'] ?? null, 'delivery_status' => $rep['delivery_status'] ?? null];
+}
+
 // Shared step computation for the progress tracker — used for both the
 // request-level stepper and each unit's own mini tracker.
 function arComputeTrackerSteps(bool $isService, ?string $status, ?string $deliveryStatus): array {
@@ -475,7 +481,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
     $grp_names     = array_values(array_unique($grp_names));
     $grp_name_str  = !empty($grp_names) ? implode(', ', array_slice($grp_names, 0, 3)) . (count($grp_names) > 3 ? '…' : '') : 'N/A';
 
-    $requests[] = array_merge($req, [
+    $requests[] = array_merge($req, arGroupOverallStatus($rows), [
         'full_name'   => $user['full_name']  ?? 'Unknown',
         'email'       => $user['email']      ?? 'N/A',
         'campus_id'   => $user['campus_id']  ?? null,
@@ -833,19 +839,9 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         $all_reqs_for_view = getRequests();
         if ($view_group_id) {
             $group_view_reqs = array_values(array_filter($all_reqs_for_view, fn($r) => ($r['group_id'] ?? '') === $view_group_id));
-            // A group can now have mixed unit statuses (e.g. some approved, one
-            // auto-disapproved for being unchecked at approval time). Picking the
-            // group's first row as "the" representative status broke down here —
-            // if that particular unit happened to be the disapproved one, every
-            // status-gated action button (out for delivery, delivered, etc.) for
-            // the WHOLE group would vanish even though other units were still
-            // progressing normally. Prefer a still-live unit as the representative;
-            // only fall back to the first row if every unit was disapproved.
-            $request = null;
-            foreach ($group_view_reqs as $__gvr) {
-                if ($__gvr['status'] !== 'disapproved') { $request = $__gvr; break; }
-            }
-            if (!$request) $request = $group_view_reqs[0] ?? null;
+            // See pickRepresentativeRequestUnit()'s docblock — picking the group's
+            // first row outright broke down once units could have mixed statuses.
+            $request = pickRepresentativeRequestUnit($group_view_reqs);
         } elseif ($view_single_id) {
             $request = findById($all_reqs_for_view, $view_single_id);
             $group_view_reqs = $request && !empty($request['group_id'])
@@ -1490,7 +1486,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 if ($n && $n !== 'Unknown Item') $grp_names[] = $n;
             }
             $grp_names = array_values(array_unique($grp_names));
-            $requests[] = array_merge($rr, [
+            $requests[] = array_merge($rr, arGroupOverallStatus($rows), [
                 'full_name'  => $u['full_name']  ?? 'Unknown',
                 'email'      => $u['email']      ?? 'N/A',
                 'campus_id'  => $u['campus_id']  ?? null,

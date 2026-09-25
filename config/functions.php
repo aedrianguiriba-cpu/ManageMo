@@ -796,6 +796,29 @@ function dbUpdateUserOwnedItem(int $id, array $data): bool {
     return !empty($rows);
 }
 
+// A request group's displayed status must reflect EVERY row in it, not just
+// whichever one happens to be first. A group can have mixed unit statuses:
+// some rows auto-disapproved at approval time while others were approved, or
+// (now that delivery is confirmed one physical unit at a time via QR scan —
+// see api/confirm_delivery.php) some rows already delivered while others are
+// still out for delivery. Picking row #1 at random would make the group's
+// status/action buttons depend on which unit happened to be first — e.g.
+// flashing "Delivered" the moment just one unit was scanned, or hiding every
+// action button because the one disapproved unit came first. Prefer a unit
+// that's still "live" (not disapproved) and not yet fully done (not
+// delivered while siblings aren't), only falling back further once every
+// unit has reached that stage. Shared by admin/requests.php and
+// user/my-requests.php so both sides of the app agree on a group's status.
+function pickRepresentativeRequestUnit(array $rows): ?array {
+    if (empty($rows)) return null;
+    $live = array_values(array_filter($rows, fn($r) => ($r['status'] ?? null) !== 'disapproved'));
+    if (empty($live)) return $rows[0];
+    foreach ($live as $r) {
+        if (($r['status'] ?? null) !== 'delivered') return $r;
+    }
+    return $live[0];
+}
+
 // Runs the per-unit "delivered" side effects for one request row: for a borrow
 // request, flips the inventory unit to 'borrowed' and opens a borrow_records
 // row; for an item (acquire) request, transfers ownership — flips the unit to

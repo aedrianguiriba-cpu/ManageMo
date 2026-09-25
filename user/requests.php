@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $submit_error = 'No items in your request. Please add at least one item.';
     } else {
         $errors   = [];
+        $availability_notices = []; // "only 2 of 5 were still available" style — not a save failure
         $all_inv  = getInventory();
         $group_id = generateGroupId(); // shared across all units in this submission
 
@@ -75,17 +76,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Collect all units to create as individual request rows
         $units_to_save = []; // each: ['inventory_id', 'qr_code_id', 'item_name']
 
+        // Units already assigned to a request row in this submission — a cart can
+        // reference the same physical unit more than once (two entries for the
+        // same item, or a stale unit_ids list), so this is shared across every
+        // cart entry below, not reset per entry.
+        $claimed_unit_ids = [];
+
+        // Resolves a cart entry's requested quantity down to the units that are
+        // actually still available right now — $all_inv was fetched fresh above,
+        // so this catches a request that's stale (page loaded before someone else
+        // took the item) or tampered (qty raised past what the client ever offered).
+        // Returns the list of unit ids to actually save (never more than $qty,
+        // never a unit already claimed, never one that isn't status=available).
+        $claimAvailableUnits = function(array $candidate_ids, int $qty) use ($all_inv, &$claimed_unit_ids) {
+            $usable = [];
+            foreach ($candidate_ids as $cid) {
+                if (count($usable) >= $qty) break;
+                $cid = (int)$cid;
+                if (in_array($cid, $claimed_unit_ids, true)) continue;
+                $row = findById($all_inv, $cid);
+                if ($row && $row['status'] === 'available') $usable[] = $cid;
+            }
+            foreach ($usable as $cid) $claimed_unit_ids[] = $cid;
+            return $usable;
+        };
+
         foreach ($cart_items as $entry) {
             if ($safe_type === 'borrow') {
-                $unit_ids    = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
-                $inv_id      = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
-                $qty         = max(1, (int)($entry['qty'] ?? 1));
-                $fallback    = ($inv_id ? findById($all_inv, $inv_id) : null)
-                            ?? (!empty($unit_ids) ? findById($all_inv, (int)$unit_ids[0]) : null);
+                $unit_ids      = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                $inv_id        = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                $qty_requested = max(1, (int)($entry['qty'] ?? 1));
+                $candidate_ids = !empty($unit_ids) ? $unit_ids : ($inv_id ? [$inv_id] : []);
+                $usable_ids    = $claimAvailableUnits($candidate_ids, $qty_requested);
 
-                for ($q = 0; $q < $qty; $q++) {
-                    $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
-                    $unit_item = ($uid ? findById($all_inv, $uid) : null) ?? $fallback;
+                if (count($usable_ids) < $qty_requested) {
+                    $label = htmlspecialchars($entry['name'] ?? 'item');
+                    $availability_notices[] = count($usable_ids) > 0
+                        ? "Only " . count($usable_ids) . " of $qty_requested unit(s) of '$label' were still available — the rest were not requested."
+                        : "'$label' is no longer available.";
+                }
+
+                foreach ($usable_ids as $uid) {
+                    $unit_item = findById($all_inv, $uid);
                     // Always use the inventory item's own QR; generate only when no inventory row exists
                     $unit_qr   = ($unit_item && !empty($unit_item['qr_code_id']))
                                  ? $unit_item['qr_code_id']
@@ -97,23 +129,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ];
                 }
             } elseif ($safe_type === 'item') {
-                $name     = sanitizeInput($entry['name'] ?? '');
-                $qty      = max(1, (int)($entry['qty'] ?? 1));
-                $unit_ids = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
-                $inv_id   = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
-                for ($q = 0; $q < $qty; $q++) {
-                    $uid       = isset($unit_ids[$q]) ? (int)$unit_ids[$q] : ($inv_id ?? null);
-                    $unit_item = $uid ? findById($all_inv, $uid) : null;
-                    // Custom item with no catalog match — don't create an inventory record yet;
+                $name          = sanitizeInput($entry['name'] ?? '');
+                $qty_requested = max(1, (int)($entry['qty'] ?? 1));
+                $unit_ids      = isset($entry['unit_ids']) && is_array($entry['unit_ids']) ? $entry['unit_ids'] : [];
+                $inv_id        = !empty($entry['inventory_id']) ? (int)$entry['inventory_id'] : null;
+                $candidate_ids = !empty($unit_ids) ? $unit_ids : ($inv_id ? [$inv_id] : []);
+
+                if (empty($candidate_ids)) {
+                    // Custom item with no catalog match — not tied to existing stock, so
+                    // there's nothing to run out of. Don't create an inventory record yet;
                     // it only gets counted in inventory once admin approves the request.
-                    $unit_qr   = ($unit_item && !empty($unit_item['qr_code_id']))
-                                 ? $unit_item['qr_code_id']
-                                 : generateQRCodeId();
-                    $units_to_save[] = [
-                        'inventory_id' => $uid,
-                        'qr_code_id'   => $unit_qr,
-                        'item_name'    => $unit_item['item_name'] ?? $name,
-                    ];
+                    for ($q = 0; $q < $qty_requested; $q++) {
+                        $units_to_save[] = ['inventory_id' => null, 'qr_code_id' => generateQRCodeId(), 'item_name' => $name];
+                    }
+                } else {
+                    $usable_ids = $claimAvailableUnits($candidate_ids, $qty_requested);
+                    if (count($usable_ids) < $qty_requested) {
+                        $label = htmlspecialchars($name);
+                        $availability_notices[] = count($usable_ids) > 0
+                            ? "Only " . count($usable_ids) . " of $qty_requested unit(s) of '$label' were still available — the rest were not requested."
+                            : "'$label' is no longer available.";
+                    }
+                    foreach ($usable_ids as $uid) {
+                        $unit_item = findById($all_inv, $uid);
+                        $unit_qr   = ($unit_item && !empty($unit_item['qr_code_id']))
+                                     ? $unit_item['qr_code_id']
+                                     : generateQRCodeId();
+                        $units_to_save[] = [
+                            'inventory_id' => $uid,
+                            'qr_code_id'   => $unit_qr,
+                            'item_name'    => $unit_item['item_name'] ?? $name,
+                        ];
+                    }
                 }
             } elseif ($safe_type === 'service') {
                 // Pure free-text now — no item dropdown/inventory link, just what the user typed.
@@ -154,20 +201,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $total_qty = count($units_to_save);
-        logActivity($current_user['id'], 'CREATE', "Submitted $safe_type group $group_id ($total_qty unit(s))", 'requests', 0);
 
-        if (empty($errors)) {
-            $__type_labels = ['borrow' => 'Borrow', 'item' => 'Item', 'service' => 'Service'];
-            $__names = array_values(array_unique(array_column($units_to_save, 'item_name')));
-            notifyAdmins(
-                'New ' . ($__type_labels[$safe_type] ?? ucfirst($safe_type)) . ' request',
-                $current_user['full_name'] . ' submitted ' . $total_qty . ' item(s): ' . implode(', ', array_slice($__names, 0, 3)) . (count($__names) > 3 ? '…' : ''),
-                'info',
-                'admin/requests.php?action=view&group_id=' . urlencode($group_id)
-            );
-            redirectWithMessage('my-requests.php', count($units_to_save) . ' item(s) submitted successfully (Group: ' . $group_id . ')!', 'success');
+        if (empty($errors) && $total_qty === 0) {
+            // Nothing could actually be created — every requested item's availability
+            // ran out between page load and submit (see $availability_notices above).
+            $submit_error = !empty($availability_notices)
+                ? implode(' ', $availability_notices)
+                : 'None of the requested items could be submitted.';
         } else {
-            $submit_error = 'Some requests failed to save: ' . implode('; ', $errors);
+            logActivity($current_user['id'], 'CREATE', "Submitted $safe_type group $group_id ($total_qty unit(s))", 'requests', 0);
+
+            if (empty($errors)) {
+                $__type_labels = ['borrow' => 'Borrow', 'item' => 'Item', 'service' => 'Service'];
+                $__names = array_values(array_unique(array_column($units_to_save, 'item_name')));
+                notifyAdmins(
+                    'New ' . ($__type_labels[$safe_type] ?? ucfirst($safe_type)) . ' request',
+                    $current_user['full_name'] . ' submitted ' . $total_qty . ' item(s): ' . implode(', ', array_slice($__names, 0, 3)) . (count($__names) > 3 ? '…' : ''),
+                    'info',
+                    'admin/requests.php?action=view&group_id=' . urlencode($group_id)
+                );
+                $success_msg = $total_qty . ' item(s) submitted successfully (Group: ' . $group_id . ')!';
+                if (!empty($availability_notices)) $success_msg .= ' ' . implode(' ', $availability_notices);
+                redirectWithMessage('my-requests.php', $success_msg, empty($availability_notices) ? 'success' : 'warning');
+            } else {
+                $submit_error = 'Some requests failed to save: ' . implode('; ', $errors);
+            }
         }
     }
 }
