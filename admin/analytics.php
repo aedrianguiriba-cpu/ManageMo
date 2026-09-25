@@ -154,6 +154,9 @@ $filtered_requests = array_filter($all_requests, function($r) use ($date_from,$d
 });
 
 $inv_total       = count($filtered_inventory);
+// User-owned items live in their own table; scoped by the same department filter.
+$all_owned_items = getUserOwnedItems();
+$owned_total     = count($owner_code ? filterByColumn($all_owned_items, 'college_id', $owner_code) : $all_owned_items);
 $inv_available   = count(filterByColumn($filtered_inventory,'status','available'));
 $inv_borrowed    = count(filterByColumn($filtered_inventory,'status','borrowed'));
 $inv_requested   = count(filterByColumn($filtered_inventory,'status','requested'));
@@ -228,7 +231,7 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
         <div class="an-stat-icon" style="color:#8B0000;">
             <i class="fas fa-warehouse"></i>
         </div>
-        <div><div class="an-stat-value"><?php echo $inv_total; ?></div><div class="an-stat-label">Total Items</div></div>
+        <div><div class="an-stat-value"><?php echo $inv_total + $owned_total; ?></div><div class="an-stat-label">Total Items</div></div>
     </div>
     <div class="an-stat-card">
         <div class="an-stat-icon" style="color:#15803d;">
