@@ -374,9 +374,50 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
     margin-bottom: 16px;
 }
 .cd-modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+/* ── Print report (same formal template as Inventory reports) ── */
+.ai-print-only { display: none; }
+.cd-print-btn {
+    background:#fff !important; border:1px solid #e5e7eb !important;
+    border-radius:6px !important; font-weight:700 !important; color:#374151 !important;
+    padding:9px 16px !important; font-size:0.87rem !important;
+    display:inline-flex; align-items:center; gap:7px;
+}
+.cd-print-btn:hover { background:#f7f7f7 !important; }
+
+@media print {
+    .cd-no-print, .cd-modal-overlay, .alert, .sidebar, .sidebar-toggle-btn, .topbar, nav { display: none !important; }
+    .main-wrapper { padding: 0 !important; margin: 0 !important; }
+    body { background: #fff !important; font-family: 'Times New Roman', Times, Georgia, serif !important; }
+
+    .ai-print-only { display: block !important; }
+
+    .ai-print-header { text-align: center; padding-bottom: 6px; }
+    .ai-print-header .republic { font-size: 12pt; font-style: italic; color: #000; margin: 0; }
+    .ai-print-header h2 { font-size: 17pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; color: #000; margin: 2px 0 0; }
+    .ai-print-header p { font-size: 11pt; color: #000; margin: 2px 0 0; }
+    .ai-print-rule { border-top: 3px solid #000; border-bottom: 1px solid #000; height: 5px; line-height: 5px; font-size: 0; margin: 6px 0 16px; }
+    .ai-print-title { text-align: center; font-size: 14pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; text-decoration: underline; color: #000; margin-bottom: 12px; }
+    .ai-print-meta { font-size: 10.5pt; color: #000; margin-bottom: 16px; }
+    .ai-print-meta div { margin-bottom: 2px; }
+    .ai-print-meta strong { display: inline-block; min-width: 140px; }
+
+    .ai-print-table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 10px; }
+    .ai-print-table th, .ai-print-table td { border: 0.75pt solid #000 !important; padding: 5px 8px !important; font-size: 9pt !important; color: #000 !important; }
+    .ai-print-table th { background: #e5e5e5 !important; text-transform: uppercase; font-size: 8pt !important; text-align: left; }
+
+    .ai-print-signatures { display: flex !important; justify-content: space-between; gap: 20px; margin-top: 50px; page-break-inside: avoid; }
+    .ai-print-sig { flex: 1; text-align: center; font-size: 10pt; }
+    .ai-print-sig-line { border-top: 0.75pt solid #000; margin-bottom: 4px; padding-top: 4px; font-weight: bold; text-transform: uppercase; }
+    .ai-print-sig-role { color: #333; }
+
+    .ai-print-footer { margin-top: 18px; padding-top: 8px; border-top: 0.5pt solid #999; font-size: 8pt; color: #555; text-align: center; }
+
+    @page { size: landscape; margin: 15mm; }
+}
 </style>
 
-<div class="container-fluid mt-4 pb-4">
+<div class="container-fluid mt-4 pb-4 cd-no-print">
 
     <!-- Page Header -->
     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
@@ -387,6 +428,10 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
             <div style="font-size:0.81rem;color:rgba(0,0,0,0.42);">
                 Review damaged and under-maintenance items for condemnation or disposal
             </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button type="button" class="btn cd-print-btn" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+            <button type="button" class="btn cd-print-btn" onclick="downloadCondemnationReport()"><i class="fas fa-file-pdf"></i> Download PDF</button>
         </div>
     </div>
 
@@ -689,6 +734,102 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
     </div>
 
 </div><!-- /.container-fluid -->
+
+<?php
+// Print-only report for the active tab — same letterhead / ruled table /
+// signature template as the Inventory reports. Covers every filtered row,
+// not just the current page.
+$__cd_report_titles = [
+    'evaluate'  => 'Items for Condemnation Evaluation Report',
+    'condemned' => 'Condemned Items Report',
+    'disposed'  => 'Disposed Items Report',
+];
+$__cd_headers = ['Item Name', 'Unit No.', 'QR Code', 'Category', 'College/Office', 'Qty', 'Condition', 'Purchase Date', 'Cost', 'Status'];
+if ($active_tab === 'condemned') array_push($__cd_headers, 'Date Condemned', 'Reason', 'Condemned By');
+if ($active_tab === 'disposed')  array_push($__cd_headers, 'Date Disposed', 'Disposal Notes', 'Disposed By');
+$__cd_rows = [];
+$__cd_total_cost = 0;
+foreach ($display_items as $row) {
+    $__cd_total_cost += (float)($row['cost'] ?? 0);
+    $__cd_unit_no = inventoryUnitNumber((int)$row['id']);
+    $__r = [
+        htmlspecialchars($row['item_name']),
+        $__cd_unit_no ? '#' . $__cd_unit_no : '—',
+        htmlspecialchars($row['qr_code_id'] ?? '—'),
+        htmlspecialchars($row['category'] ?? '—'),
+        htmlspecialchars(!empty($row['college_id']) ? ($all_department_names[$row['college_id']] ?? $row['college_id']) : '—'),
+        (string)(int)($row['quantity'] ?? 1),
+        htmlspecialchars(ucfirst($row['condition'] ?? 'N/A')),
+        !empty($row['purchase_date']) ? htmlspecialchars(formatDate($row['purchase_date'], 'M d, Y')) : '—',
+        '&#8369;' . number_format((float)($row['cost'] ?? 0), 2),
+        htmlspecialchars(ucfirst($row['status'] ?? '')),
+    ];
+    if ($active_tab === 'condemned') {
+        $__by = !empty($row['condemned_by']) ? findById($all_users, (int)$row['condemned_by']) : null;
+        array_push($__r,
+            !empty($row['condemned_at']) ? htmlspecialchars(formatDate($row['condemned_at'], 'M d, Y')) : '—',
+            htmlspecialchars(($row['condemnation_reason'] ?? '') ?: '—'),
+            htmlspecialchars($__by['full_name'] ?? '—'));
+    } elseif ($active_tab === 'disposed') {
+        $__by = !empty($row['disposed_by']) ? findById($all_users, (int)$row['disposed_by']) : null;
+        array_push($__r,
+            !empty($row['disposed_at']) ? htmlspecialchars(formatDate($row['disposed_at'], 'M d, Y')) : '—',
+            htmlspecialchars(($row['disposal_notes'] ?? '') ?: '—'),
+            htmlspecialchars($__by['full_name'] ?? '—'));
+    }
+    $__cd_rows[] = $__r;
+}
+?>
+<div class="ai-print-only" id="cdPrintReport">
+    <div class="ai-print-header">
+        <img src="<?php echo BASE_URL; ?>assets/pics/logo.png" style="width:60px;height:60px;" alt="PSU Logo">
+        <p class="republic">Republic of the Philippines</p>
+        <h2>Pampanga State University</h2>
+        <p>ManageMo &mdash; Inventory &amp; Asset Management System</p>
+    </div>
+    <div class="ai-print-rule"></div>
+    <div class="ai-print-title"><?php echo $__cd_report_titles[$active_tab]; ?></div>
+    <div class="ai-print-meta">
+        <div><strong>Campus / College / Office:</strong> <?php echo $filter_college !== '' ? htmlspecialchars($all_department_names[$filter_college] ?? $filter_college) : 'All'; ?></div>
+        <?php if ($filter_category !== ''): ?>
+        <div><strong>Category:</strong> <?php echo htmlspecialchars($filter_category); ?></div>
+        <?php endif; ?>
+        <?php if ($filter_search !== ''): ?>
+        <div><strong>Search:</strong> <?php echo htmlspecialchars($filter_search); ?></div>
+        <?php endif; ?>
+        <div><strong>Total Records:</strong> <?php echo count($display_items); ?></div>
+        <div><strong>Total Cost:</strong> &#8369;<?php echo number_format($__cd_total_cost, 2); ?></div>
+        <div><strong>Date Generated:</strong> <?php echo date('F d, Y'); ?></div>
+    </div>
+    <table class="ai-print-table">
+        <thead><tr><?php foreach ($__cd_headers as $h): ?><th><?php echo htmlspecialchars($h); ?></th><?php endforeach; ?></tr></thead>
+        <tbody>
+        <?php if (empty($__cd_rows)): ?>
+            <tr><td colspan="<?php echo count($__cd_headers); ?>" style="text-align:center;">No records found.</td></tr>
+        <?php else: foreach ($__cd_rows as $__r): ?>
+            <tr><?php foreach ($__r as $cell): ?><td><?php echo $cell; ?></td><?php endforeach; ?></tr>
+        <?php endforeach; endif; ?>
+        </tbody>
+    </table>
+    <div class="ai-print-signatures">
+        <div class="ai-print-sig">
+            <div class="ai-print-sig-line"><?php echo htmlspecialchars($current_user['full_name']); ?></div>
+            <div class="ai-print-sig-role">Prepared by</div>
+        </div>
+        <div class="ai-print-sig">
+            <div class="ai-print-sig-line">&nbsp;</div>
+            <div class="ai-print-sig-role">Certified Correct</div>
+        </div>
+        <div class="ai-print-sig">
+            <div class="ai-print-sig-line">&nbsp;</div>
+            <div class="ai-print-sig-role">Noted by</div>
+        </div>
+    </div>
+    <div class="ai-print-footer">
+        ManageMo &mdash; Pampanga State University &mdash; Report printed on <?php echo date('F d, Y h:i A'); ?>
+        &nbsp;|&nbsp; Generated by <?php echo htmlspecialchars($current_user['full_name']); ?>
+    </div>
+</div>
 </div><!-- /.main-wrapper -->
 
 <!-- ===== CONDEMN MODAL ===== -->
@@ -785,6 +926,44 @@ $display_items_page = array_slice($display_items, ($cd_current_page - 1) * $cd_i
 </div>
 
 <script>
+// Opens a clean, standalone copy of the report — no app chrome — and triggers
+// the browser's print dialog, where "Save as PDF" downloads it.
+function downloadCondemnationReport() {
+    var reportEl = document.getElementById('cdPrintReport');
+    if (!reportEl) return;
+    var title = reportEl.querySelector('.ai-print-title').textContent;
+    var win = window.open('', '_blank', 'width=1000,height=750,scrollbars=yes');
+    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+        + '<title>' + _cdEsc(title) + '</title>'
+        + '<style>'
+        + 'body{font-family:"Times New Roman",Times,Georgia,serif;background:#fff;margin:0;padding:24px;color:#000;}'
+        + '.ai-print-header{text-align:center;padding-bottom:6px;}'
+        + '.ai-print-header .republic{font-size:12pt;font-style:italic;margin:0;}'
+        + '.ai-print-header h2{font-size:17pt;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;margin:2px 0 0;}'
+        + '.ai-print-header p{font-size:11pt;margin:2px 0 0;}'
+        + '.ai-print-rule{border-top:3px solid #000;border-bottom:1px solid #000;height:5px;line-height:5px;font-size:0;margin:6px 0 16px;}'
+        + '.ai-print-title{text-align:center;font-size:14pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;text-decoration:underline;margin-bottom:12px;}'
+        + '.ai-print-meta{font-size:10.5pt;margin-bottom:16px;}'
+        + '.ai-print-meta div{margin-bottom:2px;}'
+        + '.ai-print-meta strong{display:inline-block;min-width:140px;}'
+        + '.ai-print-table{width:100%;border-collapse:collapse;margin-bottom:10px;}'
+        + '.ai-print-table th,.ai-print-table td{border:.75pt solid #000;padding:5px 8px;font-size:9pt;}'
+        + '.ai-print-table th{background:#e5e5e5;text-transform:uppercase;font-size:8pt;text-align:left;}'
+        + '.ai-print-signatures{display:flex;justify-content:space-between;gap:20px;margin-top:50px;}'
+        + '.ai-print-sig{flex:1;text-align:center;font-size:10pt;}'
+        + '.ai-print-sig-line{border-top:.75pt solid #000;margin-bottom:4px;padding-top:4px;font-weight:bold;text-transform:uppercase;}'
+        + '.ai-print-sig-role{color:#333;}'
+        + '.ai-print-footer{margin-top:18px;padding-top:8px;border-top:.5pt solid #999;font-size:8pt;color:#555;text-align:center;}'
+        + '.ai-download-toolbar{text-align:center;margin-bottom:20px;font-family:Arial,sans-serif;}'
+        + '.ai-download-toolbar button{background:#8B0000;color:#fff;border:none;border-radius:6px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;}'
+        + '.ai-download-toolbar button:hover{background:#6B0000;}'
+        + '@media print{.ai-download-toolbar{display:none !important;}@page{size:landscape;margin:15mm;}}'
+        + '</style></head><body>'
+        + '<div class="ai-download-toolbar"><button onclick="window.print()">Save as PDF / Print</button></div>'
+        + reportEl.innerHTML
+        + '</body></html>');
+    win.document.close();
+}
 function _cdEsc(str) {
     var d = document.createElement('div');
     d.textContent = str == null ? '' : String(str);
