@@ -1291,6 +1291,7 @@ if (!empty($submit_error)): ?>
                         <!-- Hidden select (drives handleItemCatalogChange) -->
                         <select id="item_description" name="item_description" style="display:none;">
                             <option value="">— Select an item —</option>
+                            <option value="__custom__">Other (custom)</option>
                             <?php foreach ($catalog_by_category as $category => $groups): ?>
                             <optgroup label="<?php echo htmlspecialchars($category); ?>">
                                 <?php foreach ($groups as $ci): ?>
@@ -1301,7 +1302,6 @@ if (!empty($submit_error)): ?>
                                 <?php endforeach; ?>
                             </optgroup>
                             <?php endforeach; ?>
-                            <option value="__custom__">Other (custom)</option>
                         </select>
 
                         <!-- Shop grid -->
@@ -1319,6 +1319,17 @@ if (!empty($submit_error)): ?>
                                 <?php endforeach; ?>
                             </div>
                             <div class="bshop-grid" id="ishop-grid">
+                                <!-- Custom card — placed first so it's always easy to find,
+                                     instead of buried after however many catalog items there are. -->
+                                <div class="bshop-card bshop-card-custom"
+                                     data-value="__custom__" data-category="" data-desc=""
+                                     onclick="selectItemReqCard(this)">
+                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
+                                    <div class="bshop-icon bshop-icon-custom"><i class="fas fa-pen"></i></div>
+                                    <div class="bshop-name">Other / Custom</div>
+                                    <div class="bshop-desc">Specify an item not in the list</div>
+                                    <div class="bshop-foot"><div class="bshop-status-pill bshop-pill-custom">Custom</div></div>
+                                </div>
                                 <?php foreach ($catalog_by_category as $category => $groups):
                                     foreach ($groups as $ci):
                                         $meta      = $catMeta[$category] ?? $defaultMeta;
@@ -1357,16 +1368,6 @@ if (!empty($submit_error)): ?>
                                     </div>
                                 </div>
                                 <?php endforeach; endforeach; ?>
-                                <!-- Custom card -->
-                                <div class="bshop-card bshop-card-custom"
-                                     data-value="__custom__" data-category="" data-desc=""
-                                     onclick="selectItemReqCard(this)">
-                                    <div class="bshop-check"><i class="fas fa-check"></i></div>
-                                    <div class="bshop-icon bshop-icon-custom"><i class="fas fa-pen"></i></div>
-                                    <div class="bshop-name">Other / Custom</div>
-                                    <div class="bshop-desc">Specify an item not in the list</div>
-                                    <div class="bshop-foot"><div class="bshop-status-pill bshop-pill-custom">Custom</div></div>
-                                </div>
                                 <div id="ishop-empty" class="bshop-empty" style="display:none;">
                                     <i class="fas fa-search"></i><span>No items match</span>
                                 </div>

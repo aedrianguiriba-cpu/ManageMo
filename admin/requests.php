@@ -1320,13 +1320,27 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
             btn.classList.add('active');
         }
 
+        <?php
+        $__sticker_depts = getAllDepartmentNames();
+        $__sticker_dept_name = !empty($request['college_id']) ? ($__sticker_depts[$request['college_id']] ?? $request['college_id']) : '';
+        ?>
         var _sd = {
             institution: 'Pampanga State University',
             short: 'PSU',
             item:      <?php echo json_encode($request['item_name']); ?>,
             category:  <?php echo json_encode($request['item_category']); ?>,
             reqno:     <?php echo json_encode($request['request_number']); ?>,
-            requester: <?php echo json_encode($request['full_name']); ?>
+            requester: <?php echo json_encode($request['full_name']); ?>,
+            // 'borrow' stickers are meant to stay on the item permanently across
+            // however many different people borrow it over time, so they don't
+            // print a specific transaction's borrower/date — those change every
+            // cycle and would make the physical label wrong the very next loan.
+            // 'item' (acquire) units are permanently issued once, so those still
+            // show when they were acquired — but to the requester's college/office
+            // rather than their personal name, matching how the item is actually
+            // tracked afterward (as departmental property, not a personal loan).
+            type: <?php echo json_encode($request['request_type']); ?>,
+            dept: <?php echo json_encode($__sticker_dept_name); ?>
         };
         var _unitQRs = <?php echo json_encode(array_values($sticker_units)); ?>;
 
@@ -1358,8 +1372,13 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 +   '<div class="ar-sticker-row"><strong>Condition:</strong><span>' + _esc(cond) + '</span></div>'
                 +   (model ? '<div class="ar-sticker-row"><strong>Model:</strong><span>' + _esc(model) + '</span></div>' : '')
                 +   (serial ? '<div class="ar-sticker-row"><strong>Serial No.:</strong><span>' + _esc(serial) + '</span></div>' : '')
-                +   (acquired ? '<div class="ar-sticker-row"><strong>Acquired:</strong><span>' + _esc(acquired) + '</span></div>' : '')
-                +   '<div class="ar-sticker-row"><strong>Issued To:</strong><span>' + _esc(_sd.requester) + '</span></div>'
+                // Borrow stickers stay on the item across however many different
+                // borrowers it sees over its life, so no single acquired date/issued-to
+                // is printed — only 'item' (acquire — permanently issued) units show
+                // these, and "Issued To" there is the requester's college/office, not
+                // their personal name (matching how the item is tracked afterward).
+                +   (_sd.type !== 'borrow' && acquired ? '<div class="ar-sticker-row"><strong>Acquired:</strong><span>' + _esc(acquired) + '</span></div>' : '')
+                +   (_sd.type !== 'borrow' ? '<div class="ar-sticker-row"><strong>Issued To:</strong><span>' + _esc(_sd.dept || _sd.requester) + '</span></div>' : '')
                 +   '<div class="ar-sticker-code">' + _esc(qr) + '</div>'
                 + '</div>'
                 + '<div class="ar-sticker-foot">Req: ' + _esc(_sd.reqno) + ' &bull; ManageMo</div>'
