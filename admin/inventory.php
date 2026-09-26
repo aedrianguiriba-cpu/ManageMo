@@ -1174,8 +1174,32 @@ displayMessage();
                     // those units — the Condemnation page then lets the admin tick
                     // exactly which of them to condemn instead of the whole group.
                     $__all_condemnable_ids = [];
-                    foreach ($group['units'] as $__u) {
+                    // Tag each borrowed unit with who has it — otherwise "Borrowed" is
+                    // just a status with no way to tell who to follow up with, unlike
+                    // the dedicated Borrowed tab which already shows this per unit.
+                    $__all_borrower_names = [];
+                    // A borrowed unit's own college_id is null (borrowing doesn't tag the
+                    // item to a department — see "Available = no owner"), so College/Office
+                    // shows blank for it. Fall back to the borrower's own college/office,
+                    // which is the far more useful "where is this right now" answer.
+                    $__all_borrower_depts = [];
+                    foreach ($group['units'] as &$__u) {
                         if (!in_array($__u['status'], ['requested', 'borrowed'])) $__all_condemnable_ids[] = (int)$__u['id'];
+                        if ($__u['status'] === 'borrowed') {
+                            $__u_br = $__active_borrows_by_unit[(int)$__u['id']] ?? null;
+                            $__u_borrower = $__u_br ? ($all_users_by_id[$__u_br['user_id']] ?? null) : null;
+                            $__u['borrower_name'] = $__u_borrower['full_name'] ?? ($__u_br ? 'Unknown user' : null);
+                            if ($__u['borrower_name']) $__all_borrower_names[] = $__u['borrower_name'];
+                            if (!empty($__u_borrower['college_id']) && isset($__all_grp_depts[$__u_borrower['college_id']])) {
+                                $__all_borrower_depts[] = $__all_grp_depts[$__u_borrower['college_id']];
+                            }
+                        }
+                    }
+                    unset($__u);
+                    $__all_borrower_names = array_values(array_unique($__all_borrower_names));
+                    $__all_borrower_depts = array_values(array_unique($__all_borrower_depts));
+                    if (!$__all_grp_dept_name && !empty($__all_borrower_depts)) {
+                        $__all_grp_dept_name = count($__all_borrower_depts) === 1 ? $__all_borrower_depts[0] : 'Mixed (borrowers)';
                     }
         ?>
         <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
@@ -1204,6 +1228,12 @@ displayMessage();
                         <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Units</div>
                         <div style="font-weight:600;color:#1a1d23;"><?php echo $unit_count; ?> (<?php echo $cond_label; ?>)</div>
                     </div>
+                    <?php if (!empty($__all_borrower_names)): ?>
+                    <div style="grid-column:1/-1;">
+                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Borrowed By</div>
+                        <div style="font-weight:600;color:#1a1d23;"><i class="fas fa-user me-1" style="color:rgba(0,0,0,0.35);"></i><?php echo htmlspecialchars(implode(', ', $__all_borrower_names)); ?></div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
             <div style="display:flex;gap:8px;margin-top:auto;">
@@ -1497,6 +1527,24 @@ displayMessage();
                             $__grp_depts = getAllDepartmentNames();
                             $__grp_dept_name = ($group['college_id'] ?? null) && isset($__grp_depts[$group['college_id']])
                                 ? $__grp_depts[$group['college_id']] : null;
+                            // A borrowed unit's own college_id is null (borrowing doesn't tag
+                            // the item to a department — see "Available = no owner"), so this
+                            // would otherwise show blank — fall back to the borrower's own
+                            // college/office instead, which is the more useful answer here.
+                            if (!$__grp_dept_name) {
+                                $__grp_borrower_depts = [];
+                                foreach ($group['units'] as $__gu) {
+                                    $__gu_br = $__active_borrows_by_unit[(int)$__gu['id']] ?? null;
+                                    $__gu_borrower = $__gu_br ? ($all_users_by_id[$__gu_br['user_id']] ?? null) : null;
+                                    if (!empty($__gu_borrower['college_id']) && isset($__grp_depts[$__gu_borrower['college_id']])) {
+                                        $__grp_borrower_depts[] = $__grp_depts[$__gu_borrower['college_id']];
+                                    }
+                                }
+                                $__grp_borrower_depts = array_values(array_unique($__grp_borrower_depts));
+                                if (!empty($__grp_borrower_depts)) {
+                                    $__grp_dept_name = count($__grp_borrower_depts) === 1 ? $__grp_borrower_depts[0] : 'Mixed (borrowers)';
+                                }
+                            }
                         ?>
                         <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">College/Office</div>
                         <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($__grp_dept_name ?? '—'); ?></div>
@@ -2099,6 +2147,9 @@ function openGroupModal(group) {
             + '<div style="font-family:monospace;font-size:0.67rem;word-break:break-all;margin-bottom:6px;color:rgba(0,0,0,0.55);background:rgba(0,0,0,0.03);padding:4px;border-radius:4px;">' + unit.qr_code_id + '</div>'
             + '<div style="font-size:0.78rem;font-weight:700;color:#1a1d23;margin-bottom:4px;">' + baseName + ' #' + (unit.unit_no || idx + 1) + '</div>'
             + '<span class="ai-badge ai-badge-' + sc + '" style="font-size:0.7rem;margin-bottom:8px;">' + unit.status + '</span>'
+            + (unit.status === 'borrowed' && unit.borrower_name
+                ? '<div style="font-size:0.72rem;color:rgba(0,0,0,0.55);margin-bottom:4px;"><i class="fas fa-user me-1"></i>' + unit.borrower_name + '</div>'
+                : '')
             + '<div style="display:flex;gap:4px;justify-content:center;margin-top:6px;">'
             + '<a href="inventory.php?action=edit&id=' + unit.id + '" class="ai-btn-sm ai-btn-edit" title="Edit"><i class="fas fa-edit"></i></a>'
             + (['condemned', 'disposed', 'requested', 'borrowed', 'owned'].indexOf(unit.status) === -1
