@@ -185,31 +185,6 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
     border: 1px solid rgba(0,0,0,0.08);
 }
 
-/* Stats strip */
-.inv-stats-strip {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-}
-.inv-stat-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 0.82rem;
-    font-weight: 700;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    color: #111;
-}
-.inv-stat-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
 /* Filter card */
 .inv-filter-card {
     background: #fff;
@@ -469,30 +444,6 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
 </style>
 
 <div class="container-fluid mt-4 pb-4">
-
-    <!-- Stats Strip -->
-    <div class="inv-stats-strip">
-        <div class="inv-stat-pill">
-            <span class="inv-stat-dot" style="background:#6b7280;"></span>
-            <?php echo $inv_total; ?> Total
-        </div>
-        <div class="inv-stat-pill">
-            <span class="inv-stat-dot" style="background:#f59e0b;"></span>
-            <?php echo $inv_borrowed; ?> Borrowed
-        </div>
-        <div class="inv-stat-pill">
-            <span class="inv-stat-dot" style="background:#22c55e;"></span>
-            <?php echo $inv_requested; ?> Requested
-        </div>
-        <div class="inv-stat-pill">
-            <span class="inv-stat-dot" style="background:#3b82f6;"></span>
-            <?php echo $inv_maint; ?> Maintenance
-        </div>
-        <div class="inv-stat-pill">
-            <span class="inv-stat-dot" style="background:#8b5cf6;"></span>
-            <?php echo $owned_items_count; ?> Owned
-        </div>
-    </div>
 
     <!-- TAB NAVIGATION -->
     <!-- Plain links (no preventDefault) — each tab needs its own status filter recomputed
