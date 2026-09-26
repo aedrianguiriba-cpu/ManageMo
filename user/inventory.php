@@ -14,6 +14,9 @@ $status_filter = $_GET['status'] ?? '';
 // Acquisition-mode sub-tabs (All Items tab): '', 'borrow', or 'request'.
 $acq_filter = $_GET['facq'] ?? '';
 if (!in_array($acq_filter, ['', 'borrow', 'request'])) $acq_filter = '';
+// Borrowed tab sub-tab: 'not_returned' (default, currently out) or 'returned' (history).
+$filter_borrow = $_GET['fborrow'] ?? 'not_returned';
+if (!in_array($filter_borrow, ['not_returned', 'returned'], true)) $filter_borrow = 'not_returned';
 
 require_once dirname(__DIR__) . '/includes/header.php';
 require_once dirname(__DIR__) . '/includes/navbar.php';
@@ -117,6 +120,31 @@ foreach ($all_borrows as $br) {
         $user_borrowed_item_ids[] = (int)$br['inventory_id'];
     }
 }
+
+// Borrowed tab, "Returned" sub-tab: once a unit is returned its inventory status
+// flips back to 'available' and it leaves the "Not Returned" list entirely — so
+// this history has to come from borrow_records directly (getInventory(), not
+// $all_campus_inventory, since a returned unit may since have been condemned/
+// disposed and would otherwise disappear from here too).
+$all_inventory_full = getInventory();
+$returned_borrows = array_values(array_filter($all_borrows, function($br) use ($all_inventory_full, $search, $category_filter) {
+    if ($br['status'] !== 'returned') return false;
+    $inv = findById($all_inventory_full, (int)$br['inventory_id']);
+    if ($category_filter !== '' && ($inv['category'] ?? '') !== $category_filter) return false;
+    if ($search !== '') {
+        $hay = strtolower(($inv['item_name'] ?? '') . ' ' . ($inv['category'] ?? ''));
+        if (strpos($hay, strtolower($search)) === false) return false;
+    }
+    return true;
+}));
+usort($returned_borrows, fn($a, $b) => strcmp($b['actual_return_date'] ?? '', $a['actual_return_date'] ?? ''));
+
+$page_returned         = max(1, (int)($_GET['page_returned'] ?? 1));
+$total_returned        = count($returned_borrows);
+$total_pages_returned  = max(1, (int)ceil($total_returned / ITEMS_PER_PAGE));
+$page_returned         = min($page_returned, $total_pages_returned);
+$returned_offset       = ($page_returned - 1) * ITEMS_PER_PAGE;
+$returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_PER_PAGE);
 ?>
 
 <style>
@@ -505,6 +533,7 @@ foreach ($all_borrows as $br) {
         <form method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
             <input type="hidden" name="facq" value="<?php echo htmlspecialchars($acq_filter); ?>">
+            <input type="hidden" name="fborrow" value="<?php echo htmlspecialchars($filter_borrow); ?>">
             <div class="<?php echo $current_tab === 'all' ? 'col-md-4' : 'col-md-6'; ?>">
                 <label class="inv-filter-label"><i class="fas fa-search me-1"></i>Search</label>
                 <input type="text" class="form-control" name="search"
@@ -546,7 +575,7 @@ foreach ($all_borrows as $br) {
                 <button type="submit" class="btn inv-search-btn flex-fill">
                     <i class="fas fa-search me-1"></i> Search
                 </button>
-                <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?>" class="btn inv-reset-btn px-3">
+                <a href="inventory.php?tab=<?php echo htmlspecialchars($current_tab); ?><?php echo $current_tab === 'borrowed' ? '&fborrow=' . urlencode($filter_borrow) : ''; ?>" class="btn inv-reset-btn px-3">
                     <i class="fas fa-times"></i>
                 </a>
             </div>
@@ -567,7 +596,32 @@ foreach ($all_borrows as $br) {
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
-        <?php if ($total > 0): ?>
+        <?php if ($current_tab === 'borrowed'):
+            $__fborrow_base_qs = 'tab=borrowed&search=' . urlencode($search) . '&category=' . urlencode($category_filter);
+            $__fborrow_tabs = ['not_returned' => 'Not Returned', 'returned' => 'Returned'];
+        ?>
+        <div style="display:flex;gap:6px;margin:14px 0;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:300px;">
+            <?php foreach ($__fborrow_tabs as $__fb_val => $__fb_label): ?>
+            <a href="inventory.php?<?php echo $__fborrow_base_qs; ?>&fborrow=<?php echo $__fb_val; ?>"
+               style="flex:1;text-align:center;padding:7px 0;border-radius:6px;font-size:.82rem;font-weight:700;text-decoration:none;
+                      background:<?php echo $filter_borrow === $__fb_val ? '#fff' : 'transparent'; ?>;
+                      color:<?php echo $filter_borrow === $__fb_val ? '#8B0000' : '#555'; ?>;
+                      box-shadow:<?php echo $filter_borrow === $__fb_val ? '0 1px 4px rgba(0,0,0,.10)' : 'none'; ?>;">
+                <?php echo $__fb_label; ?>
+            </a>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <?php if ($current_tab === 'borrowed' && $filter_borrow === 'returned'): ?>
+        <?php if ($total_returned > 0): ?>
+        <div class="inv-results-count">
+            Showing <?php echo count($returned_borrows_page); ?> of <?php echo $total_returned; ?> returned item<?php echo $total_returned !== 1 ? 's' : ''; ?>
+            <?php if ($search || $category_filter): ?>
+                — filtered results
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+        <?php elseif ($total > 0): ?>
         <div class="inv-results-count">
             Showing <?php echo count($items); ?> of <?php echo $total; ?> group<?php echo $total !== 1 ? 's' : ''; ?>
             <?php if ($search || $category_filter || $status_filter || $acq_filter): ?>
@@ -578,7 +632,7 @@ foreach ($all_borrows as $br) {
     </div>
 
     <!-- AVAILABLE/BORROWED ITEMS TAB -->
-    <div id="tab-campus-inventory" style="display: <?php echo in_array($current_tab, ['all', 'available', 'borrowed']) ? 'block' : 'none'; ?>;">
+    <div id="tab-campus-inventory" style="display: <?php echo (in_array($current_tab, ['all', 'available', 'borrowed']) && !($current_tab === 'borrowed' && $filter_borrow === 'returned')) ? 'block' : 'none'; ?>;">
     <!-- Inventory Grid (grouped) -->
     <?php if (count($items) > 0): ?>
     <div class="row g-3">
@@ -712,6 +766,83 @@ foreach ($all_borrows as $br) {
                         echo $category_filter ? '&category=' . urlencode($category_filter) : '';
                         echo $status_filter   ? '&status='   . urlencode($status_filter)   : '';
                         echo $acq_filter      ? '&facq='     . urlencode($acq_filter)      : '';
+                    ?>"><?php echo $i; ?></a>
+                </li>
+            <?php endfor; ?>
+        </ul>
+    </nav>
+    <?php endif; ?>
+    </div>
+
+    <!-- BORROWED TAB — "Returned" sub-tab: history from borrow_records, since a
+         returned unit's inventory status flips back to 'available' and it leaves
+         the "Not Returned" list (built from live inventory) entirely. -->
+    <div id="tab-borrowed-returned" style="display: <?php echo ($current_tab === 'borrowed' && $filter_borrow === 'returned') ? 'block' : 'none'; ?>;">
+    <?php if (count($returned_borrows_page) > 0): ?>
+    <div class="row g-3">
+        <?php foreach ($returned_borrows_page as $__rb):
+            $__rb_inv = findById($all_inventory_full, (int)$__rb['inventory_id']);
+        ?>
+        <div class="col-md-6 col-lg-4">
+            <div class="inv-card" style="height:100%;">
+                <div class="inv-card-body" style="padding:18px;">
+                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:10px;">
+                        <div>
+                            <div style="font-weight:800;font-size:1rem;color:#1a1d23;margin-bottom:2px;">
+                                <?php echo htmlspecialchars($__rb_inv['item_name'] ?? 'Unknown item'); ?>
+                            </div>
+                            <div style="font-size:0.75rem;color:rgba(0,0,0,0.50);text-transform:uppercase;letter-spacing:0.5px;">
+                                <?php echo htmlspecialchars($__rb_inv['category'] ?? ''); ?>
+                            </div>
+                        </div>
+                        <span style="background:rgba(34,197,94,0.12);color:#15803d;font-weight:700;font-size:0.72rem;padding:3px 10px;border-radius:10px;white-space:nowrap;">
+                            <i class="fas fa-check"></i> Returned
+                        </span>
+                    </div>
+                    <div class="inv-info-row">
+                        <span class="inv-info-icon"><i class="fas fa-calendar-check"></i></span>
+                        <span class="inv-info-label">Returned</span>
+                        <span class="inv-info-val" style="font-weight:600;">
+                            <?php echo !empty($__rb['actual_return_date']) ? formatDate($__rb['actual_return_date'], 'M d, Y') : '—'; ?>
+                        </span>
+                    </div>
+                    <div class="inv-info-row">
+                        <span class="inv-info-icon"><i class="fas fa-calendar-day"></i></span>
+                        <span class="inv-info-label">Borrowed On</span>
+                        <span class="inv-info-val"><?php echo !empty($__rb['borrow_date']) ? formatDate($__rb['borrow_date'], 'M d, Y') : '—'; ?></span>
+                    </div>
+                    <?php if (!empty($__rb_inv['qr_code_id'])): ?>
+                    <div style="font-size:0.72rem;font-family:monospace;color:rgba(139,0,0,0.55);margin-top:8px;">
+                        <?php echo htmlspecialchars($__rb_inv['qr_code_id']); ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php else: ?>
+    <div class="inv-empty">
+        <div class="inv-empty-icon"><i class="fas fa-undo"></i></div>
+        <h5>No returned items yet</h5>
+        <p>Items you've borrowed and returned will show up here.</p>
+        <?php if ($search || $category_filter): ?>
+            <a href="inventory.php?tab=borrowed&fborrow=returned" class="btn inv-reset-btn mt-3" style="display:inline-flex;align-items:center;gap:6px;">
+                <i class="fas fa-times"></i> Clear Filters
+            </a>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- Pagination -->
+    <?php if ($total_pages_returned > 1): ?>
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            <?php for ($i = 1; $i <= $total_pages_returned; $i++): ?>
+                <li class="page-item <?php echo $i === $page_returned ? 'active' : ''; ?>">
+                    <a class="page-link" href="inventory.php?tab=borrowed&fborrow=returned&page_returned=<?php echo $i;
+                        echo $search          ? '&search='   . urlencode($search)          : '';
+                        echo $category_filter ? '&category=' . urlencode($category_filter) : '';
                     ?>"><?php echo $i; ?></a>
                 </li>
             <?php endfor; ?>
