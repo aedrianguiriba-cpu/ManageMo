@@ -858,6 +858,14 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 
         $user = findById(getUsers(), $request['user_id']);
 
+        // Self-heal any unit in this group whose delivery side effect (ownership
+        // transfer for 'item', borrow record for 'borrow') never ran — see
+        // ensureDeliverySideEffects()'s docblock. Safe/no-op once already done.
+        $__all_users_for_heal = getUsers();
+        foreach ($group_view_reqs as $__gvr) {
+            ensureDeliverySideEffects($__gvr, $__all_users_for_heal);
+        }
+
         // Resolve item info: for grouped requests, build from each request row directly
         $sticker_units = [];
         foreach ($group_view_reqs as $_gr) {

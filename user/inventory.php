@@ -23,6 +23,18 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
 <div class="main-wrapper">
 <?php
+// Self-heal any delivery whose ownership transfer never ran — the mobile app
+// confirms delivery by writing straight to Supabase and only notifies the
+// server as a best-effort call, which can silently fail to land; without
+// this, a delivered custom/acquired item stays stuck showing as "requested"
+// forever instead of ever reaching Owned Items. See ensureDeliverySideEffects().
+$__all_users_for_heal = getUsers();
+foreach (getRequests() as $__r) {
+    if ((int)$__r['user_id'] === (int)$current_user['id']) {
+        ensureDeliverySideEffects($__r, $__all_users_for_heal);
+    }
+}
+
 // Inventory is a single global list — no more campus scoping. Condemned/disposed
 // units are retired stock and never shown to users, in any tab.
 $all_campus_inventory = array_values(array_filter(getInventory(), fn($i) => !in_array($i['status'], ['condemned', 'disposed', 'owned'])));

@@ -23,6 +23,10 @@ $admin_user     = null;
 $raw_requests = [];
 foreach ($all_requests as $req) {
     if ($req['user_id'] != $user_id) continue;
+    // Self-heal a delivery whose ownership transfer (item) or borrow record
+    // (borrow) never ran — see ensureDeliverySideEffects()'s docblock. Cheap
+    // and safe to call on every view; it no-ops once already done.
+    ensureDeliverySideEffects($req, $all_users);
     $item     = !empty($req['inventory_id']) ? findById($all_inventory, (int)$req['inventory_id']) : null;
     $approver = $req['approved_by'] ? findById($all_users, $req['approved_by']) : null;
     $req['item_name']     = $item['item_name']     ?? null;

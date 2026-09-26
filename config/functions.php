@@ -881,6 +881,24 @@ function processDeliveredRequestUnit(array $gr, ?array $req_user = null): void {
     }
 }
 
+// Self-heals a missed delivery side effect (see processDeliveredRequestUnit
+// above). The mobile app confirms delivery by writing straight to Supabase
+// and only tells the server as a best-effort, fire-and-forget call — if that
+// call never lands (app closed too soon, no signal, timeout), the side
+// effect silently never runs, and nothing else was ever set up to retry it:
+// the unit stays stuck at its pre-delivery inventory status ('requested')
+// forever, and never actually reaches the user's Owned Items. Calling this
+// wherever a delivered/completed request is actually looked at re-runs it —
+// safe even when it already succeeded, since processDeliveredRequestUnit
+// itself checks for that before doing anything.
+function ensureDeliverySideEffects(array $request, array $all_users): void {
+    if (!in_array($request['request_type'] ?? '', ['borrow', 'item'], true)) return;
+    if (!in_array($request['status'] ?? '', ['delivered', 'completed'], true)) return;
+    if (empty($request['inventory_id'])) return;
+    $req_user = findById($all_users, (int)$request['user_id']);
+    processDeliveredRequestUnit($request, $req_user);
+}
+
 function dbAddCustomDepartment(string $type, array $data): bool {
     if ($type === 'campus') {
         // Campuses now live in the departments table alongside colleges/offices
