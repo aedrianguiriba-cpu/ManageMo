@@ -29,6 +29,15 @@ class _ScannerScreenState extends State<ScannerScreen> {
   String? _resultTitle;
   String? _resultDetail;
   final List<String> _confirmedThisSession = [];
+  // Raw QR values this screen has itself already confirmed. The camera can
+  // re-fire a detection for the code still in frame right after restarting
+  // (a leftover/stale frame from before the previous scan, before the live
+  // feed catches up to wherever the phone is now pointed) — without this,
+  // that shows up as "This item has already been confirmed", which reads as
+  // a rejection of a scan the user hasn't actually made yet. If we ourselves
+  // already confirmed this exact code this session, it's a stale re-detection,
+  // not a new conflict — ignore it silently and keep scanning.
+  final Set<String> _confirmedCodes = {};
   late int _remaining = widget.expectedItem.unitCount;
 
   @override
@@ -41,6 +50,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (_busy || _phase != _Phase.scanning) return;
     final code = capture.barcodes.firstOrNull?.rawValue;
     if (code == null || code.isEmpty) return;
+    if (_confirmedCodes.contains(code)) return;
 
     setState(() => _busy = true);
     await _controller.stop();
@@ -51,6 +61,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
         code,
         expectedGroupKey: widget.expectedItem.groupKey,
       );
+      _confirmedCodes.add(code);
       _confirmedThisSession.add('${result.itemName} (${result.requestNumber})');
       setState(() {
         _remaining = result.remainingInGroup;
