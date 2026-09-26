@@ -688,6 +688,21 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
 
                 <!-- Info Rows -->
                 <div class="inv-card-body">
+                    <?php if ($current_tab === 'borrowed'): ?>
+                    <!-- On this tab, $group['units'] is already filtered down to just the
+                         currently-borrowed units of this item (see $status_filter above) —
+                         so "available of total" would always read "0 of N" no matter what,
+                         since none of the units in this set could ever be available. That's
+                         not "0 available", it's a meaningless fraction; show the borrowed
+                         count plainly instead. -->
+                    <div class="inv-info-row">
+                        <span class="inv-info-icon"><i class="fas fa-hand-holding"></i></span>
+                        <span class="inv-info-label">Currently Borrowed</span>
+                        <span class="inv-info-val" style="color:#b45309;font-weight:700;">
+                            <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
+                        </span>
+                    </div>
+                    <?php else: ?>
                     <div class="inv-info-row">
                         <span class="inv-info-icon"><i class="fas fa-check-circle"></i></span>
                         <span class="inv-info-label">Available</span>
@@ -695,6 +710,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
                             <?php echo $available_count; ?> of <?php echo $unit_count; ?>
                         </span>
                     </div>
+                    <?php endif; ?>
                     <div class="inv-info-row">
                         <span class="inv-info-icon"><i class="fas fa-star"></i></span>
                         <span class="inv-info-label">Condition</span>
