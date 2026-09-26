@@ -1490,10 +1490,20 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         usort($filtered_requests, function($a, $b) use ($request_sort_dir) {
             return $request_sort_dir * strcmp($a['created_at'], $b['created_at']);
         });
-        // Group then paginate
+        // Group then paginate — by submission AND item, not submission alone, so
+        // a single "Add to List" batch that bundled different items together
+        // (a chair AND a projector, one group_id) shows as separate rows/cards
+        // instead of one lumped together under "Chair, Projector…". Units of
+        // the SAME item within a submission still stay grouped as one row.
+        $__reqItemKey = function($r) use ($inventory_data, $_req_items_map) {
+            $inv = !empty($r['inventory_id']) ? findById($inventory_data, (int)$r['inventory_id']) : null;
+            $n = $inv['item_name'] ?? _reqFirstItemName($_req_items_map, (int)$r['id'], $inventory_data);
+            if ((!$n || $n === 'Unknown Item') && !empty($r['service_description'])) $n = $r['service_description'];
+            return $n ?: ('row:' . $r['id']);
+        };
         $tab_grouped = [];
         foreach ($filtered_requests as $rr) {
-            $gk = !empty($rr['group_id']) ? 'gid:'.$rr['group_id'] : 'id:'.$rr['id'];
+            $gk = (!empty($rr['group_id']) ? 'gid:'.$rr['group_id'] : 'id:'.$rr['id']) . '||' . $__reqItemKey($rr);
             if (!isset($tab_grouped[$gk])) $tab_grouped[$gk] = ['rows'=>[],'first'=>$rr];
             $tab_grouped[$gk]['rows'][] = $rr;
         }

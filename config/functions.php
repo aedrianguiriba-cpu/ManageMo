@@ -104,9 +104,16 @@ function getItemUnitQRCodes($item) {
 function groupOwnedItems(array $items): array {
     $groups = [];
     foreach ($items as $item) {
+        // A single acquire submission can bundle several different items
+        // together (1 Conference Chair + 2 Conference Phones all share one
+        // group_id) — grouping by group_id alone merged all of them into one
+        // "group" and labeled the whole thing with whichever item happened to
+        // be first, mislabeling the rest. Item identity must always be part
+        // of the key, group_id or not.
+        $item_ident = strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? ''));
         $key = !empty($item['group_id'])
-            ? 'gid:' . $item['group_id']
-            : strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? ''));
+            ? 'gid:' . $item['group_id'] . '||' . $item_ident
+            : $item_ident;
         if (!isset($groups[$key])) {
             $groups[$key] = [
                 'group_id'    => $item['group_id'] ?? null,
