@@ -1648,12 +1648,15 @@ displayMessage();
              unit itself is back in 'available' status by now, so it can't be found
              by filtering live inventory the way the Not Returned list is. -->
         <div class="ai-no-print" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
-            <?php if (count($returned_borrows_page) > 0): foreach ($returned_borrows_page as $__rb):
+            <?php
+            $__rb_depts = getAllDepartmentNames();
+            if (count($returned_borrows_page) > 0): foreach ($returned_borrows_page as $__rb):
                 $__rb_inv = findById($all_items, (int)$__rb['inventory_id']);
                 $__rb_user = $all_users_by_id[$__rb['user_id']] ?? null;
-                $__rb_depts = getAllDepartmentNames();
-                $__rb_dept_name = ($__rb_inv['college_id'] ?? null) && isset($__rb_depts[$__rb_inv['college_id']])
-                    ? $__rb_depts[$__rb_inv['college_id']] : null;
+                // The unit's own college_id is null (borrowing/returning doesn't tag the
+                // item to a department), so use the borrower's college/office instead.
+                $__rb_dept_name = (!empty($__rb_user['college_id']) && isset($__rb_depts[$__rb_user['college_id']]))
+                    ? $__rb_depts[$__rb_user['college_id']] : null;
             ?>
             <div class="ai-item-card" style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;flex-direction:column;height:100%;">
                 <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
@@ -1670,10 +1673,14 @@ displayMessage();
                 <div style="border-top:1px solid rgba(0,0,0,0.07);border-bottom:1px solid rgba(0,0,0,0.07);padding:12px 0;margin:12px 0;">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                         <div>
+                            <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Last Borrowed By</div>
+                            <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($__rb_user['full_name'] ?? 'Unknown user'); ?></div>
+                        </div>
+                        <div>
                             <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">College/Office</div>
                             <div style="font-weight:600;color:#1a1d23;"><?php echo htmlspecialchars($__rb_dept_name ?? '—'); ?></div>
                         </div>
-                        <div>
+                        <div style="grid-column:1/-1;">
                             <div style="font-size:0.7rem;color:rgba(0,0,0,0.50);text-transform:uppercase;">Returned</div>
                             <div style="font-weight:600;color:#1a1d23;"><?php echo !empty($__rb['actual_return_date']) ? formatDate($__rb['actual_return_date'], 'M d, Y') : '—'; ?></div>
                         </div>
@@ -1682,7 +1689,6 @@ displayMessage();
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;padding:7px 10px;margin-top:auto;">
                     <div style="min-width:0;">
                         <div style="font-size:0.72rem;font-weight:700;color:#15803d;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo htmlspecialchars($__rb_inv['qr_code_id'] ?? ''); ?></div>
-                        <div style="font-size:0.7rem;color:rgba(0,0,0,0.55);"><i class="fas fa-user me-1"></i><?php echo htmlspecialchars($__rb_user['full_name'] ?? 'Unknown user'); ?></div>
                     </div>
                 </div>
             </div>
@@ -1709,16 +1715,16 @@ displayMessage();
             foreach ($returned_borrows as $__rb) {
                 $__rb_inv = findById($all_items, (int)$__rb['inventory_id']);
                 $__rb_user = $all_users_by_id[$__rb['user_id']] ?? null;
-                $__rb_dept_name = ($__rb_inv['college_id'] ?? null) && isset($__pd[$__rb_inv['college_id']]) ? $__pd[$__rb_inv['college_id']] : '—';
+                $__rb_dept_name = (!empty($__rb_user['college_id']) && isset($__pd[$__rb_user['college_id']])) ? $__pd[$__rb_user['college_id']] : '—';
                 $__rows[] = [
                     htmlspecialchars($__rb_inv['item_name'] ?? 'Unknown item'),
                     htmlspecialchars($__rb_inv['qr_code_id'] ?? ''),
-                    htmlspecialchars($__rb_dept_name),
                     htmlspecialchars($__rb_user['full_name'] ?? 'Unknown user'),
+                    htmlspecialchars($__rb_dept_name),
                     !empty($__rb['actual_return_date']) ? htmlspecialchars(formatDate($__rb['actual_return_date'], 'M d, Y')) : '—',
                 ];
             }
-            aiPrintTable(['Item Name', 'QR Code', 'College/Office', 'Borrower', 'Date Returned'], $__rows);
+            aiPrintTable(['Item Name', 'QR Code', 'Last Borrowed By', 'College/Office', 'Date Returned'], $__rows);
             ?>
         </div>
         <?php endif; ?>
