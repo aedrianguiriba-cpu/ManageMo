@@ -44,14 +44,23 @@ if ($type_filter) {
     $filtered_mine = array_values(array_filter($filtered_mine, fn($r) => $r['request_type'] === $type_filter));
 }
 
-// Group by group_id; each group → one card
+// Group by group_id, then by item within that group — one card per distinct
+// item, not one card for the whole submission. A single "Add to List" pass
+// can bundle several different items together (a chair AND a projector),
+// which all share one group_id since they were submitted at once; grouping
+// by group_id alone lumped every one of them into a single card labeled
+// "Chair, Projector…", which read as one confusing box instead of separate
+// requests. Units of the SAME item still stay together as before (e.g. 3
+// borrowed chairs still show as one card with "3 units").
 $my_groups = [];
 foreach ($filtered_mine as $req) {
     $gkey = !empty($req['group_id']) ? 'gid:' . $req['group_id'] : 'id:' . $req['id'];
-    if (!isset($my_groups[$gkey])) {
-        $my_groups[$gkey] = ['rows' => [], 'first' => $req];
+    $item_key = $req['item_name'] ?? $req['service_description'] ?? ('row:' . $req['id']);
+    $key = $gkey . '||' . $item_key;
+    if (!isset($my_groups[$key])) {
+        $my_groups[$key] = ['rows' => [], 'first' => $req];
     }
-    $my_groups[$gkey]['rows'][] = $req;
+    $my_groups[$key]['rows'][] = $req;
 }
 $my_groups = array_values($my_groups);
 
@@ -80,12 +89,14 @@ foreach ($my_groups as $grp) {
     $my_requests[] = $req;
 }
 
-// Stats (unfiltered, counted by group)
-$all_mine_raw = array_filter($all_requests, fn($r) => $r['user_id'] == $user_id);
+// Stats (unfiltered, counted the same per-item way as the card list above, so
+// the numbers here actually match how many cards are shown)
 $all_mine_groups = [];
-foreach ($all_mine_raw as $r) {
-    $k = !empty($r['group_id']) ? 'gid:'.$r['group_id'] : 'id:'.$r['id'];
-    $all_mine_groups[$k] = $r; // last row per group; status should be uniform
+foreach ($raw_requests as $r) {
+    $gkey = !empty($r['group_id']) ? 'gid:'.$r['group_id'] : 'id:'.$r['id'];
+    $item_key = $r['item_name'] ?? $r['service_description'] ?? ('row:' . $r['id']);
+    $k = $gkey . '||' . $item_key;
+    $all_mine_groups[$k] = $r; // last row per group/item; status should be uniform
 }
 $stat_total       = count($all_mine_groups);
 $stat_pending     = count(array_filter($all_mine_groups, fn($r) => $r['status'] === 'pending'));
