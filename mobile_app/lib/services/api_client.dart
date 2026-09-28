@@ -177,22 +177,42 @@ class ApiClient {
     return user;
   }
 
-  /// Requests still waiting to be scanned (out for delivery, not yet confirmed).
+  /// Accounts in the same college/office/campus share one data pool — mirrors
+  /// getDepartmentMateIds() in config/functions.php on the web side. A user
+  /// with no college_id set shares with nobody but themselves; grouping every
+  /// "unassigned" account together would silently pool together people who
+  /// simply haven't been assigned a department yet, which is a privacy
+  /// problem, not a convenience.
+  Future<List<int>> _departmentMateIds(AppUser user) async {
+    final collegeId = user.collegeId;
+    if (collegeId == null || collegeId.isEmpty) return [user.id];
+    final rows = await SupabaseRest.select('users', 'college_id=eq.${Uri.encodeComponent(collegeId)}');
+    final ids = rows.map((r) => (r['id'] as num).toInt()).toList();
+    return ids.isEmpty ? [user.id] : ids;
+  }
+
+  /// PostgREST "IN" filter fragment, e.g. `in.(3,7,12)`.
+  String _idsFilter(List<int> ids) => 'in.(${ids.join(',')})';
+
+  /// Requests still waiting to be scanned (out for delivery, not yet confirmed)
+  /// for [user]'s whole department, not just their own account.
   /// Note: with per-unit confirmation, a group only disappears from this list
   /// once every unit in it has been scanned individually.
   Future<List<DeliveryItem>> pendingDeliveries(AppUser user) async {
+    final deptIds = await _departmentMateIds(user);
     final requests = await SupabaseRest.select(
       'requests',
-      'user_id=eq.${user.id}&delivery_status=eq.out_for_delivery',
+      'user_id=${_idsFilter(deptIds)}&delivery_status=eq.out_for_delivery',
     );
     return _groupRequests(requests);
   }
 
-  /// Requests whose delivery has already been confirmed.
+  /// Requests whose delivery has already been confirmed, for [user]'s whole department.
   Future<List<DeliveryItem>> completedDeliveries(AppUser user) async {
+    final deptIds = await _departmentMateIds(user);
     final requests = await SupabaseRest.select(
       'requests',
-      'user_id=eq.${user.id}&delivery_status=eq.delivered&order=updated_at.desc',
+      'user_id=${_idsFilter(deptIds)}&delivery_status=eq.delivered&order=updated_at.desc',
     );
     return _groupRequests(requests);
   }
@@ -255,6 +275,11 @@ class ApiClient {
     String qrCodeId, {
     String? expectedGroupKey,
   }) async {
+    // Accounts in the same college/office/campus share one data pool — any of
+    // them can confirm a delivery for the department, not just whoever
+    // originally submitted the request. See _departmentMateIds()'s docblock.
+    final deptIds = await _departmentMateIds(user);
+
     // A QR sticker is tied to the physical inventory unit, not to one request —
     // the same unit gets the exact same code again the next time it's
     // borrowed. A plain "qr_code_id=eq.X" lookup with no ordering can match
@@ -283,8 +308,8 @@ class ApiClient {
         throw ApiException('This QR code does not match any request.');
       }
       final latest = anyMatches.first;
-      if ((latest['user_id'] as num).toInt() != user.id) {
-        throw ApiException('This item was not requested by you.');
+      if (!deptIds.contains((latest['user_id'] as num).toInt())) {
+        throw ApiException('This item was not requested by your department.');
       }
       if (latest['delivery_status'] == 'delivered') {
         throw ApiException('This item has already been confirmed.');
@@ -292,8 +317,8 @@ class ApiClient {
       throw ApiException('This item is not out for delivery yet.');
     }
 
-    if ((match['user_id'] as num).toInt() != user.id) {
-      throw ApiException('This item was not requested by you.');
+    if (!deptIds.contains((match['user_id'] as num).toInt())) {
+      throw ApiException('This item was not requested by your department.');
     }
 
     if (expectedGroupKey != null) {
@@ -315,12 +340,16 @@ class ApiClient {
     });
 
     // Bell notification — same table/shape the web app writes to directly.
+    // Goes to whoever actually REQUESTED it, not whoever scanned it — with
+    // department-wide sharing, a teammate can confirm a delivery on someone
+    // else's behalf, but the notification is still about that person's request.
+    final requesterId = (match['user_id'] as num).toInt();
     final reqNumberForNotif = (match['group_id'] as String?)?.isNotEmpty == true
         ? match['group_id'] as String
         : match['request_number'] as String;
     try {
       await SupabaseRest.insert('notifications', {
-        'user_id': user.id,
+        'user_id': requesterId,
         'title': 'Item delivered',
         'message': 'Request ($reqNumberForNotif) has been marked as delivered.',
         'type': 'success',
@@ -343,7 +372,10 @@ class ApiClient {
       if (match['request_type'] == 'borrow') {
         await SupabaseRest.updateById('inventory', invIdInt, {'status': 'borrowed'});
         await SupabaseRest.insert('borrow_records', {
-          'user_id': user.id,
+          // The original requester is the borrower of record, not whoever
+          // happened to scan the QR to confirm it — see the notification
+          // comment above for why.
+          'user_id': requesterId,
           'inventory_id': invIdInt,
           'request_id': id,
           'borrow_date': DateTime.now().toUtc().toIso8601String().split('T').first,
@@ -394,30 +426,34 @@ class ApiClient {
   /// lookup ("what is this, and what's its status") for the item scanner's
   /// check-details mode, never a delivery confirmation and never a write.
   ///
-  /// Scoped to things actually belonging to [user]: an item they permanently
-  /// own, a unit they currently have borrowed, or (failing those) an active
-  /// request of theirs still moving through approval/delivery for it. A QR
-  /// that isn't tied to this user in any of those ways is refused outright —
-  /// otherwise anyone could scan a sticker lying around and see whichever
-  /// other user's borrow/ownership details it carries.
+  /// Scoped to things actually belonging to [user]'s department (see
+  /// _departmentMateIds()'s docblock): an item someone in the department
+  /// permanently owns, a unit someone there currently has borrowed, or
+  /// (failing those) an active request of theirs still moving through
+  /// approval/delivery. A QR that isn't tied to the department in any of
+  /// those ways is refused outright — otherwise anyone could scan a sticker
+  /// lying around and see an unrelated department's borrow/ownership details.
   Future<ItemLookupResult> lookupItemDetails(AppUser user, String qrCodeId) async {
     final qr = qrCodeId.trim();
     if (qr.isEmpty) throw ApiException('That QR code could not be read.');
+    final deptIds = await _departmentMateIds(user);
+    final isSharedDept = deptIds.length > 1;
 
-    // 1) Permanently owned by this user (acquired/custom items).
+    // 1) Permanently owned by someone in this department (acquired/custom items).
     final ownedRows = await SupabaseRest.select(
       'user_owned_items',
-      'qr_code_id=eq.${Uri.encodeComponent(qr)}&user_id=eq.${user.id}',
+      'qr_code_id=eq.${Uri.encodeComponent(qr)}&user_id=${_idsFilter(deptIds)}',
     );
     final owned = ownedRows.firstOrNull;
     if (owned != null) {
+      final ownerName = isSharedDept ? await _userName(owned['user_id']) : null;
       return ItemLookupResult(
         qrCodeId: qr,
         itemName: owned['item_name'] as String? ?? 'Item',
         category: owned['category'] as String?,
         condition: owned['condition'] as String?,
         description: owned['description'] as String?,
-        ownershipLabel: 'Owned by you',
+        ownershipLabel: ownerName != null ? 'Owned by $ownerName' : 'Owned by you',
         statusLabel: 'Owned',
         statusColorKey: 'owned',
         details: {
@@ -435,21 +471,22 @@ class ApiClient {
     }
     final invId = (inv['id'] as num).toInt();
 
-    // 2) A unit currently borrowed by this user.
+    // 2) A unit currently borrowed by someone in this department.
     final borrowRows = await SupabaseRest.select(
       'borrow_records',
-      'inventory_id=eq.$invId&user_id=eq.${user.id}&order=id.desc&limit=1',
+      'inventory_id=eq.$invId&user_id=${_idsFilter(deptIds)}&order=id.desc&limit=1',
     );
     final borrow = borrowRows.firstOrNull;
     if (borrow != null && (borrow['status'] == 'active' || borrow['status'] == 'overdue')) {
       final overdue = borrow['status'] == 'overdue';
+      final borrowerName = isSharedDept ? await _userName(borrow['user_id']) : null;
       return ItemLookupResult(
         qrCodeId: qr,
         itemName: inv['item_name'] as String? ?? 'Item',
         category: inv['category'] as String?,
         condition: inv['condition'] as String?,
         description: inv['description'] as String?,
-        ownershipLabel: 'Borrowed by you',
+        ownershipLabel: borrowerName != null ? 'Borrowed by $borrowerName' : 'Borrowed by you',
         statusLabel: overdue ? 'Overdue' : 'Borrowed',
         statusColorKey: overdue ? 'overdue' : 'borrowed',
         details: {
@@ -462,21 +499,22 @@ class ApiClient {
       );
     }
 
-    // 3) Not currently borrowed by this user, but maybe they have a request
-    // for it still working its way through approval/delivery.
+    // 3) Not currently borrowed by anyone in this department, but maybe
+    // someone there has a request for it still moving through approval/delivery.
     final reqRows = await SupabaseRest.select(
       'requests',
-      'inventory_id=eq.$invId&user_id=eq.${user.id}&order=id.desc&limit=1',
+      'inventory_id=eq.$invId&user_id=${_idsFilter(deptIds)}&order=id.desc&limit=1',
     );
     final req = reqRows.firstOrNull;
     if (req != null && !['disapproved', 'completed'].contains(req['status'])) {
+      final requesterName = isSharedDept ? await _userName(req['user_id']) : null;
       return ItemLookupResult(
         qrCodeId: qr,
         itemName: inv['item_name'] as String? ?? 'Item',
         category: inv['category'] as String?,
         condition: inv['condition'] as String?,
         description: inv['description'] as String?,
-        ownershipLabel: 'Your request',
+        ownershipLabel: requesterName != null ? "$requesterName's request" : 'Your request',
         statusLabel: _requestStatusLabel(req['status'] as String?, req['delivery_status'] as String?),
         statusColorKey: 'pending',
         details: {
@@ -490,6 +528,18 @@ class ApiClient {
   }
 
   bool _notBlank(dynamic v) => v is String && v.trim().isNotEmpty;
+
+  /// Looks up a user's display name by id — used to label a department-mate's
+  /// item ("Owned by Jane Dela Cruz") once sharing means it isn't always the
+  /// viewer's own.
+  Future<String> _userName(dynamic userId) async {
+    try {
+      final rows = await SupabaseRest.select('users', 'id=eq.$userId');
+      return rows.firstOrNull?['full_name'] as String? ?? 'a department member';
+    } catch (_) {
+      return 'a department member';
+    }
+  }
 
   String _requestStatusLabel(String? status, String? deliveryStatus) {
     if (status == 'pending') return 'Pending Approval';

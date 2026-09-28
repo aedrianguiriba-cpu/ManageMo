@@ -1293,7 +1293,7 @@ displayMessage();
         <?php
         // Acquisition-mode sub-tabs: keep every other active filter, just swap facq.
         $__acq_base_qs = 'tab=available&search=' . urlencode($filter_search) . '&fdept=' . urlencode($filter_dept) . '&fcategory=' . urlencode($filter_category);
-        $__acq_tabs = ['' => 'All', 'borrow' => 'Borrowable', 'request' => 'Acquire Only'];
+        $__acq_tabs = ['' => 'All', 'borrow' => termLabel('Borrowable'), 'request' => termLabel('Acquire Only')];
         ?>
         <div style="display:flex;gap:6px;margin-bottom:16px;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:360px;">
             <?php foreach ($__acq_tabs as $__acq_val => $__acq_label): ?>

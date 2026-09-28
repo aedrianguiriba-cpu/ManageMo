@@ -13,6 +13,7 @@ $current_tab = $_GET['tab'] ?? 'all';
 $page = $_GET['page'] ?? 1;
 $search = $_GET['search'] ?? '';
 $category_filter = $_GET['category'] ?? '';
+$owner_filter = $_GET['owner'] ?? '';
 $status_filter = $_GET['status'] ?? '';
 // Acquisition-mode sub-tabs (All Items tab): '', 'borrow', or 'request'.
 $acq_filter = $_GET['facq'] ?? '';
@@ -58,6 +59,36 @@ $all_owned_items = getUserOwnedItems();
 $user_owned_items = array_values(array_filter($all_owned_items, fn($i) => in_array((int)$i['user_id'], $dept_user_ids, true)));
 $owned_items_count = count($user_owned_items);
 $owned_items_total = array_reduce($user_owned_items, fn($sum, $item) => $sum + ($item['quantity'] ?? 1), 0);
+
+// Needed ahead of the owned-items filtering below to resolve an "Owner" filter/column.
+$dept_users_by_id = array_column(getUsers(), null, 'id');
+$show_owner_col   = count($dept_user_ids) > 1;
+
+// Categories present among owned items (separate from the inventory categories list,
+// since owned items can include custom/acquired items not present in current stock).
+$owned_categories = [];
+foreach ($user_owned_items as $__oi) {
+    if (!empty($__oi['category']) && !in_array($__oi['category'], $owned_categories)) {
+        $owned_categories[] = $__oi['category'];
+    }
+}
+sort($owned_categories);
+
+// Apply search/category/owner filters to the owned-items pool before grouping.
+$filtered_owned_items = $user_owned_items;
+if (!empty($search)) {
+    $s = strtolower($search);
+    $filtered_owned_items = array_values(array_filter($filtered_owned_items, function($item) use ($s) {
+        return strpos(strtolower($item['item_name']), $s) !== false ||
+               strpos(strtolower($item['category'] ?? ''), $s) !== false;
+    }));
+}
+if (!empty($category_filter)) {
+    $filtered_owned_items = array_values(array_filter($filtered_owned_items, fn($item) => ($item['category'] ?? '') === $category_filter));
+}
+if ($show_owner_col && $owner_filter !== '') {
+    $filtered_owned_items = array_values(array_filter($filtered_owned_items, fn($item) => (string)$item['user_id'] === (string)$owner_filter));
+}
 
 
 // Get categories from the inventory
@@ -110,13 +141,11 @@ usort($filtered_items, function($a, $b) {
 
 // Group into display groups, then paginate over groups
 $grouped_inventory = groupInventoryItems($filtered_items);
-$grouped_owned     = groupOwnedItems($user_owned_items);
+$grouped_owned     = groupOwnedItems($filtered_owned_items);
 // Owned items from multiple department-mates are now mixed together — each
-// group is guaranteed single-owner (see groupOwnedItems()'s docblock), so
-// resolve that owner's name for display whenever there's more than one
-// account in the department to distinguish.
-$dept_users_by_id = array_column(getUsers(), null, 'id');
-$show_owner_col   = count($dept_user_ids) > 1;
+// group is guaranteed single-owner (see groupOwnedItems()'s docblock); owner
+// name resolution ($dept_users_by_id/$show_owner_col) is computed earlier,
+// ahead of the owned-items filtering above.
 
 $total       = count($grouped_inventory);
 $total_pages = ceil($total / ITEMS_PER_PAGE);
@@ -502,13 +531,13 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
         }
     </style>
 
-    <!-- Filter Card (Available & Borrowed Tabs Only) -->
-    <div class="inv-filter-card" id="inv-filter-section" style="display: <?php echo in_array($current_tab, ['all', 'available', 'borrowed']) ? 'block' : 'none'; ?>;">
+    <!-- Filter Card (Available, Borrowed & Owned Tabs) -->
+    <div class="inv-filter-card" id="inv-filter-section" style="display: <?php echo in_array($current_tab, ['all', 'available', 'borrowed', 'owned']) ? 'block' : 'none'; ?>;">
         <form method="GET" class="row g-3 align-items-end">
             <input type="hidden" name="tab" value="<?php echo htmlspecialchars($current_tab); ?>">
             <input type="hidden" name="facq" value="<?php echo htmlspecialchars($acq_filter); ?>">
             <input type="hidden" name="fborrow" value="<?php echo htmlspecialchars($filter_borrow); ?>">
-            <div class="<?php echo $current_tab === 'all' ? 'col-md-4' : 'col-md-6'; ?>">
+            <div class="<?php echo $current_tab === 'all' ? 'col-md-4' : ($current_tab === 'owned' && $show_owner_col ? 'col-md-4' : 'col-md-6'); ?>">
                 <label class="inv-filter-label"><i class="fas fa-search me-1"></i>Search</label>
                 <input type="text" class="form-control" name="search"
                        placeholder="Item name, category..."
@@ -518,13 +547,28 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
                 <label class="inv-filter-label"><i class="fas fa-tag me-1"></i>Category</label>
                 <select class="form-select" name="category">
                     <option value="">All Categories</option>
-                    <?php foreach ($categories as $cat): ?>
+                    <?php foreach (($current_tab === 'owned' ? $owned_categories : $categories) as $cat): ?>
                         <option value="<?php echo htmlspecialchars($cat); ?>" <?php echo $category_filter === $cat ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($cat); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php if ($current_tab === 'owned' && $show_owner_col): ?>
+            <div class="col-md-2">
+                <label class="inv-filter-label"><i class="fas fa-user me-1"></i>Owner</label>
+                <select class="form-select" name="owner">
+                    <option value="">Everyone</option>
+                    <?php foreach ($dept_user_ids as $__duid):
+                        $__duname = $dept_users_by_id[$__duid]['full_name'] ?? 'Unknown';
+                    ?>
+                        <option value="<?php echo $__duid; ?>" <?php echo (string)$owner_filter === (string)$__duid ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($__duname); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
             <?php if ($current_tab === 'all'): ?>
             <!-- Status only makes sense on "All Items" — the Available/Borrowed tabs
                  already imply their own status, and letting it be overridden there
@@ -556,7 +600,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
         </form>
         <?php if ($current_tab === 'available'):
             $__acq_base_qs = 'tab=available&search=' . urlencode($search) . '&category=' . urlencode($category_filter);
-            $__acq_tabs = ['' => 'All', 'borrow' => 'Borrowable', 'request' => 'Acquire Only'];
+            $__acq_tabs = ['' => 'All', 'borrow' => termLabel('Borrowable'), 'request' => termLabel('Acquire Only')];
         ?>
         <div style="display:flex;gap:6px;margin:14px 0;background:rgba(0,0,0,0.04);border-radius:8px;padding:5px;max-width:360px;">
             <?php foreach ($__acq_tabs as $__acq_val => $__acq_label): ?>
@@ -591,6 +635,15 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
         <div class="inv-results-count">
             Showing <?php echo count($returned_borrows_page); ?> of <?php echo $total_returned; ?> returned item<?php echo $total_returned !== 1 ? 's' : ''; ?>
             <?php if ($search || $category_filter): ?>
+                — filtered results
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+        <?php elseif ($current_tab === 'owned'): ?>
+        <?php if ($owned_total > 0): ?>
+        <div class="inv-results-count">
+            Showing <?php echo count($grouped_owned_page); ?> of <?php echo $owned_total; ?> group<?php echo $owned_total !== 1 ? 's' : ''; ?>
+            <?php if ($search || $category_filter || $owner_filter): ?>
                 — filtered results
             <?php endif; ?>
         </div>
@@ -909,7 +962,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
             <ul class="pagination justify-content-center">
                 <?php for ($i = 1; $i <= $owned_total_pages; $i++): ?>
                     <li class="page-item <?php echo $i === $page_owned ? 'active' : ''; ?>">
-                        <a class="page-link" href="inventory.php?tab=owned&page_owned=<?php echo $i; ?>"><?php echo $i; ?></a>
+                        <a class="page-link" href="inventory.php?tab=owned&page_owned=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&category=<?php echo urlencode($category_filter); ?>&owner=<?php echo urlencode($owner_filter); ?>"><?php echo $i; ?></a>
                     </li>
                 <?php endfor; ?>
             </ul>
@@ -919,9 +972,14 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
         <?php else: ?>
         <div class="inv-empty">
             <div class="inv-empty-icon"><i class="fas fa-user-circle"></i></div>
+            <?php if ($search || $category_filter || $owner_filter): ?>
+            <h5>No matching owned items</h5>
+            <p>Try adjusting or clearing your search/filters.</p>
+            <?php else: ?>
             <h5>No owned items recorded</h5>
             <p>You don't have any items recorded in your ownership history.</p>
             <p style="font-size: 0.85rem; color: rgba(0,0,0,0.35);">Contact your admin to add items you own or have owned.</p>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
     </div>

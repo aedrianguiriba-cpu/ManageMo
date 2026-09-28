@@ -225,7 +225,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             logActivity($current_user['id'], 'CREATE', "Submitted $safe_type group $group_id ($total_qty unit(s))", 'requests', 0);
 
             if (empty($errors)) {
-                $__type_labels = ['borrow' => 'Borrow', 'item' => 'Item', 'service' => 'Service'];
+                $__type_labels = ['borrow' => termLabel('Borrow'), 'item' => 'Item', 'service' => 'Service'];
                 $__names = array_values(array_unique(array_column($units_to_save, 'item_name')));
                 notifyAdmins(
                     'New ' . ($__type_labels[$safe_type] ?? ucfirst($safe_type)) . ' request',
@@ -1104,8 +1104,8 @@ if (!empty($submit_error)): ?>
                     <i class="fas fa-hand-holding"></i>
                 </div>
                 <div>
-                    <div class="rq-form-head-title" id="formHeadTitle">Borrow Item</div>
-                    <div class="rq-form-head-sub"  id="formHeadSub">Fill in the details for your borrow request</div>
+                    <div class="rq-form-head-title" id="formHeadTitle"><?php echo termLabel("Borrow"); ?> Item</div>
+                    <div class="rq-form-head-sub"  id="formHeadSub">Fill in the details for your <?php echo strtolower(termLabel("Borrow")); ?> request</div>
                 </div>
             </div>
 
@@ -1155,7 +1155,7 @@ if (!empty($submit_error)): ?>
                     ?>
 
                     <div class="rq-field">
-                        <label>Item to Borrow <span class="rq-req">*</span><?php if ($auto_fill_item): ?> <span style="font-size:0.65rem;font-weight:700;background:rgba(34,197,94,0.12);color:#15803d;padding:2px 8px;border-radius:12px;border:1px solid rgba(34,197,94,0.22);margin-left:6px;"><i class="fas fa-check-circle me-1"></i>Pre-selected</span><?php endif; ?></label>
+                        <label>Item to <?php echo termLabel("Borrow"); ?> <span class="rq-req">*</span><?php if ($auto_fill_item): ?> <span style="font-size:0.65rem;font-weight:700;background:rgba(34,197,94,0.12);color:#15803d;padding:2px 8px;border-radius:12px;border:1px solid rgba(34,197,94,0.22);margin-left:6px;"><i class="fas fa-check-circle me-1"></i>Pre-selected</span><?php endif; ?></label>
 
                         <!-- Hidden select (drives existing JS logic unchanged) -->
                         <select id="borrow_catalog_select" name="borrow_item_name" style="display:none;" required>
@@ -1222,7 +1222,7 @@ if (!empty($submit_error)): ?>
                                      onclick="selectBorrowCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
                                     <div class="bshop-avail-badge <?php echo $availableQty > 0 ? 'bshop-avail-ok' : 'bshop-avail-none'; ?>">
-                                        <?php echo $availableQty > 0 ? $availableQty . ' avail.' : 'Fully borrowed'; ?>
+                                        <?php echo $availableQty > 0 ? $availableQty . ' avail.' : 'Fully ' . strtolower(termLabel('Borrowed')); ?>
                                     </div>
                                     <div class="bshop-icon" style="background:<?php echo $meta['bg']; ?>;color:<?php echo $meta['color']; ?>;">
                                         <i class="fas <?php echo $meta['icon']; ?>"></i>
@@ -1241,7 +1241,7 @@ if (!empty($submit_error)): ?>
                                             <?php if ($availableQty === 0 && count($retDates) > 0): ?>
                                                 Returns <?php echo $retDates[0]; ?>
                                             <?php elseif ($availableQty === 0): ?>
-                                                Borrowed
+                                                <?php echo termLabel("Borrowed"); ?>
                                             <?php else: ?>
                                                 <?php echo $totalUnits; ?> unit<?php echo $totalUnits > 1 ? 's' : ''; ?>
                                             <?php endif; ?>
@@ -1292,7 +1292,7 @@ if (!empty($submit_error)): ?>
                     </div>
 
                     <div class="rq-field mt-3">
-                        <label>Reason for Borrowing</label>
+                        <label>Reason for <?php echo termLabel("Borrowing"); ?></label>
                         <div class="rq-input-wrap">
                             <i class="fas fa-comment rq-input-icon rq-input-icon-ta"></i>
                             <textarea class="form-control" id="reason" name="reason" rows="3"
@@ -1436,7 +1436,7 @@ if (!empty($submit_error)): ?>
                     </div>
 
                     <div class="rq-field">
-                        <label>Reason for Request <span class="rq-req">*</span></label>
+                        <label>Reason for <?php echo termLabel("Request"); ?> <span class="rq-req">*</span></label>
                         <div class="rq-input-wrap">
                             <i class="fas fa-comment rq-input-icon rq-input-icon-ta"></i>
                             <textarea class="form-control" id="item_reason" name="reason" rows="3"
@@ -1573,7 +1573,7 @@ if (!empty($submit_error)): ?>
                     <div class="rq-summary-icon"><i class="fas fa-tag"></i></div>
                     <div>
                         <div class="rq-summary-label">Type</div>
-                        <div class="rq-summary-val" id="sum_type">Borrow Item</div>
+                        <div class="rq-summary-val" id="sum_type"><?php echo termLabel("Borrow"); ?> Item</div>
                     </div>
                 </div>
                 <div class="rq-summary-row">
@@ -1626,9 +1626,13 @@ if (!empty($submit_error)): ?>
 
 <script>
 /* ── Type selection ── */
+// Borrow/Request wording here follows the same site-wide terminology switch
+// as everything server-rendered — this object is pure JS otherwise, so
+// without echoing termLabel() into it, the form header/summary stayed stuck
+// in the default wording no matter what the switch was set to.
 const typeConfig = {
-    borrow:  { title:'Borrow Item',      sub:'Fill in the details for your borrow request',       icon:'fa-hand-holding', bg:'rgba(59,130,246,0.12)',  color:'#1d4ed8', label:'Borrow Item'      },
-    item:    { title:'Request Item',     sub:'Specify the item you need procured',                 icon:'fa-shopping-cart',bg:'rgba(34,197,94,0.12)',   color:'#15803d', label:'Request Item'     },
+    borrow:  { title:'<?php echo termLabel("Borrow"); ?> Item', sub:'Fill in the details for your <?php echo strtolower(termLabel("Borrow")); ?> request', icon:'fa-hand-holding', bg:'rgba(59,130,246,0.12)',  color:'#1d4ed8', label:'<?php echo termLabel("Borrow"); ?> Item' },
+    item:    { title:'<?php echo termLabel("Request Item"); ?>', sub:'Specify the item you need procured', icon:'fa-shopping-cart',bg:'rgba(34,197,94,0.12)',   color:'#15803d', label:'<?php echo termLabel("Request Item"); ?>' },
     service: { title:'Request Service',  sub:'Describe the maintenance or repair needed',          icon:'fa-tools',        bg:'rgba(245,158,11,0.12)',  color:'#b45309', label:'Request Service'  },
 };
 
@@ -2063,7 +2067,7 @@ function addToCart() {
     if (type === 'borrow') {
         var sel = document.getElementById('borrow_catalog_select');
         var name = sel.value;
-        if (!name) { showCartError('Please select an item to borrow.'); return; }
+        if (!name) { showCartError('Please select an item to <?php echo strtolower(termLabel("Borrow")); ?>.'); return; }
         var rd = document.getElementById('expected_return_date').value;
         if (!rd) { showCartError('Please enter the expected return date.'); return; }
         var qty = parseInt(document.getElementById('borrow_quantity').value) || 1;
