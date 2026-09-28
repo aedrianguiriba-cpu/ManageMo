@@ -470,6 +470,20 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     $items_by_category[$cat][] = $item;
                 }
                 ksort($items_by_category);
+                // Flatten back into one ordered list (category order preserved)
+                // so pagination has a single, stable sequence to slice — same
+                // page-size setting as the user-facing Borrow catalog, since
+                // this is a catalog view of the exact same list.
+                $catalog_flat = [];
+                foreach ($items_by_category as $category => $items) {
+                    foreach ($items as $item) { $item['_category'] = $category; $catalog_flat[] = $item; }
+                }
+                $catalog_page_size  = max(4, min(60, (int)getAppSetting('borrow_catalog_page_size', '12')));
+                $catalog_page       = max(1, (int)($_GET['catalog_page'] ?? 1));
+                $catalog_total_pages = max(1, (int)ceil(count($catalog_flat) / $catalog_page_size));
+                $catalog_page       = min($catalog_page, $catalog_total_pages);
+                $catalog_offset     = ($catalog_page - 1) * $catalog_page_size;
+                $catalog_page_items = array_slice($catalog_flat, $catalog_offset, $catalog_page_size);
                 ?>
                 <?php if (empty($available_items)): ?>
                 <div style="background:rgba(139,0,0,0.05); border:1.5px dashed rgba(139,0,0,0.20); border-radius:12px; padding:24px; text-align:center; color:rgba(0,0,0,0.45); font-size:0.85rem;">
@@ -477,9 +491,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     No available items in inventory at this time.
                 </div>
                 <?php else: ?>
-                <?php foreach ($items_by_category as $category => $items): ?>
-                <div class="as-cat-label"><i class="fas fa-tag me-1"></i><?php echo htmlspecialchars($category); ?></div>
-                <?php foreach ($items as $item): ?>
+                <?php $__last_cat = null; foreach ($catalog_page_items as $item):
+                    if ($item['_category'] !== $__last_cat): $__last_cat = $item['_category']; ?>
+                <div class="as-cat-label"><i class="fas fa-tag me-1"></i><?php echo htmlspecialchars($__last_cat); ?></div>
+                <?php endif; ?>
                 <div class="as-catalog-item">
                     <span class="as-catalog-item-id">#<?php echo $item['id']; ?></span>
                     <div style="flex:1;">
@@ -496,7 +511,30 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     </div>
                 </div>
                 <?php endforeach; ?>
-                <?php endforeach; ?>
+                <?php if ($catalog_total_pages > 1): ?>
+                <div style="display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:6px;margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;">
+                    <?php
+                    // Sliding window (current ± 2, plus first/last) — with up to
+                    // ~60+ pages possible at the smallest page size, listing
+                    // every page number would be unusable.
+                    $__pages = array_unique(array_merge([1], range(max(1,$catalog_page-2), min($catalog_total_pages,$catalog_page+2)), [$catalog_total_pages]));
+                    sort($__pages); $__prev = 0;
+                    foreach ($__pages as $p):
+                        if ($p - $__prev > 1): ?>
+                    <span style="padding:0 4px;color:rgba(0,0,0,.35);">…</span>
+                    <?php endif; $__prev = $p; ?>
+                    <a href="settings.php?catalog_page=<?php echo $p; ?>#catalog-tab"
+                       style="min-width:30px;text-align:center;border-radius:6px;padding:5px 8px;font-size:0.82rem;font-weight:700;text-decoration:none;
+                              background:<?php echo $p === $catalog_page ? '#8B0000' : '#f7f7f7'; ?>;
+                              color:<?php echo $p === $catalog_page ? '#fff' : '#555'; ?>;
+                              border:1px solid <?php echo $p === $catalog_page ? '#8B0000' : '#e5e7eb'; ?>;"><?php echo $p; ?></a>
+                    <?php endforeach; ?>
+                </div>
+                <div style="text-align:center;font-size:0.74rem;color:rgba(0,0,0,0.38);margin-top:8px;">
+                    Showing <?php echo $catalog_offset + 1; ?>–<?php echo min($catalog_offset + $catalog_page_size, count($catalog_flat)); ?> of <?php echo count($catalog_flat); ?> items
+                    &middot; <?php echo $catalog_page_size; ?> per page (<a href="settings.php#system-tab" style="color:#8B0000;">change</a>)
+                </div>
+                <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
