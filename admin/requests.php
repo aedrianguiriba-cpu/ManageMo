@@ -941,7 +941,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 
         $status_colors = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'secondary'];
         $urgency_colors = ['low'=>'info','medium'=>'warning','high'=>'danger','critical'=>'danger'];
-        $type_labels = ['item'=>'Item Request','borrow'=>'Borrow Request','service'=>'Service Request'];
+        $type_labels = ['item'=>termLabel('Item Request'),'borrow'=>termLabel('Borrow Request'),'service'=>'Service Request'];
         ?>
 
         <!-- Header row -->
@@ -1459,10 +1459,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 <i class="fas fa-list"></i> All Requests <span class="ar-tab-count"><?php echo $count_all; ?></span>
             </a>
             <a class="ar-type-tab <?php echo $active_tab==='item'?'active':''; ?>" href="requests.php?tab=item<?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>">
-                <i class="fas fa-box"></i> Item Requests <span class="ar-tab-count"><?php echo $count_item; ?></span>
+                <i class="fas fa-box"></i> <?php echo termLabel("Item Requests"); ?> <span class="ar-tab-count"><?php echo $count_item; ?></span>
             </a>
             <a class="ar-type-tab <?php echo $active_tab==='borrow'?'active':''; ?>" href="requests.php?tab=borrow<?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>">
-                <i class="fas fa-hand-holding"></i> Borrow Requests <span class="ar-tab-count"><?php echo $count_borrow; ?></span>
+                <i class="fas fa-hand-holding"></i> <?php echo termLabel("Borrow Requests"); ?> <span class="ar-tab-count"><?php echo $count_borrow; ?></span>
             </a>
             <a class="ar-type-tab <?php echo $active_tab==='service'?'active':''; ?>" href="requests.php?tab=service<?php echo $status_filter?'&status='.$status_filter:''; ?>&sort=<?php echo urlencode($request_sort); ?>">
                 <i class="fas fa-tools"></i> Service Requests <span class="ar-tab-count"><?php echo $count_service; ?></span>
@@ -1578,7 +1578,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         <?php
         $status_colors  = ['pending'=>'warning','approved'=>'success','disapproved'=>'danger','delivered'=>'info','returned'=>'primary','completed'=>'success'];
         $urgency_colors = ['low'=>'info','medium'=>'warning','high'=>'danger','critical'=>'danger'];
-        $type_labels    = ['item'=>'Item Request','borrow'=>'Borrow Request','service'=>'Service Request'];
+        $type_labels    = ['item'=>termLabel('Item Request'),'borrow'=>termLabel('Borrow Request'),'service'=>'Service Request'];
         ?>
         <?php if ($active_tab === 'item'): ?>
         <!-- Item Requests dedicated table -->

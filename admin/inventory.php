@@ -1,15 +1,15 @@
 <?php
+require_once dirname(__DIR__) . '/config/functions.php';
 $__inv_tab_titles = [
     'all'         => 'All Items',
     'available'   => 'Available Items',
-    'requested'   => 'Requested Items',
-    'borrowed'    => 'Borrowed Items',
+    'requested'   => termLabel('Requested Items'),
+    'borrowed'    => termLabel('Borrowed Items'),
     'maintenance' => 'Maintenance Tickets',
     'owned'       => 'User-Owned Items',
 ];
 $__inv_tab = $_GET['tab'] ?? 'all';
 $page_title = isset($__inv_tab_titles[$__inv_tab]) ? $__inv_tab_titles[$__inv_tab] . ' - Inventory' : 'Inventory Management';
-require_once dirname(__DIR__) . '/config/functions.php';
 
 requireAdmin();
 
@@ -1083,7 +1083,7 @@ displayMessage();
     }
     $__tab_titles = [
         'all' => 'All Items Report', 'available' => 'Available Items Report',
-        'requested' => 'Requested Items Report', 'borrowed' => 'Borrowed Items Report',
+        'requested' => termLabel('Requested Items Report'), 'borrowed' => termLabel('Borrowed Items Report'),
         'maintenance' => 'Maintenance Tickets Report', 'owned' => 'User-Owned Items Report',
     ];
     ?>
@@ -1129,12 +1129,12 @@ displayMessage();
             </a>
             <a href="inventory.php?tab=requested" class="ai-tab <?php echo $current_tab === 'requested' ? 'ai-tab-active' : ''; ?>" onclick="setTab('requested'); return false;">
                 <span class="ai-tab-icon"><i class="fas fa-clipboard-list"></i></span>
-                <span class="ai-tab-label">Requested</span>
+                <span class="ai-tab-label"><?php echo termLabel("Requested"); ?></span>
                 <span class="ai-tab-badge"><?php echo $total_requested; ?></span>
             </a>
             <a href="inventory.php?tab=borrowed" class="ai-tab <?php echo $current_tab === 'borrowed' ? 'ai-tab-active' : ''; ?>" onclick="setTab('borrowed'); return false;">
                 <span class="ai-tab-icon"><i class="fas fa-handshake"></i></span>
-                <span class="ai-tab-label">Borrowed</span>
+                <span class="ai-tab-label"><?php echo termLabel("Borrowed"); ?></span>
                 <span class="ai-tab-badge"><?php echo $total_borrowed; ?></span>
             </a>
             <a href="inventory.php?tab=maintenance" class="ai-tab <?php echo $current_tab === 'maintenance' ? 'ai-tab-active' : ''; ?>" onclick="setTab('maintenance'); return false;">
@@ -1163,7 +1163,7 @@ displayMessage();
                     $conditions = array_unique(array_column($group['units'], 'condition'));
                     $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
                     $statuses = array_unique(array_column($group['units'], 'status'));
-                    $status_label = count($statuses) === 1 ? ucfirst($statuses[0]) : 'Mixed';
+                    $status_label = count($statuses) === 1 ? termLabel(ucfirst($statuses[0])) : 'Mixed';
                     $status_color = count($statuses) === 1 ? ($status_colors[$statuses[0]] ?? 'secondary') : 'secondary';
                     $__all_grp_depts = getAllDepartmentNames();
                     $__all_grp_dept_name = ($group['college_id'] ?? null) && isset($__all_grp_depts[$group['college_id']])
@@ -1272,7 +1272,7 @@ displayMessage();
                 $conditions = array_unique(array_column($group['units'], 'condition'));
                 $cond_label = count($conditions) === 1 ? ucfirst($conditions[0]) : 'Mixed';
                 $statuses = array_unique(array_column($group['units'], 'status'));
-                $status_label = count($statuses) === 1 ? ucfirst($statuses[0]) : 'Mixed';
+                $status_label = count($statuses) === 1 ? termLabel(ucfirst($statuses[0])) : 'Mixed';
                 $dept_name = ($group['college_id'] ?? null) && isset($__pd[$group['college_id']]) ? $__pd[$group['college_id']] : '—';
                 $__rows[] = [
                     htmlspecialchars($group['item_name']),
@@ -2172,8 +2172,8 @@ function openGroupModal(group) {
 // Shared with downloadInventoryReport() below and setTab() — kept as a single
 // source of truth so the popup title and the browser tab title never drift.
 var invPrintTitles = {
-    all: 'All Items Report', available: 'Available Items Report', requested: 'Requested Items Report',
-    borrowed: 'Borrowed Items Report', maintenance: 'Maintenance Tickets Report', owned: 'User-Owned Items Report'
+    all: 'All Items Report', available: 'Available Items Report', requested: <?php echo json_encode(termLabel('Requested Items Report')); ?>,
+    borrowed: <?php echo json_encode(termLabel('Borrowed Items Report')); ?>, maintenance: 'Maintenance Tickets Report', owned: 'User-Owned Items Report'
 };
 var currentInvTab = '<?php echo htmlspecialchars($current_tab); ?>';
 // The Borrowed sub-tab (Not Returned / Returned) always reloads the page (plain
@@ -2272,8 +2272,8 @@ function setTab(tabName) {
     // mirrors the server-side title so it doesn't go stale after a client-side
     // switch (no page reload happens here).
     var invTabTitles = {
-        all: 'All Items', available: 'Available Items', requested: 'Requested Items',
-        borrowed: 'Borrowed Items', maintenance: 'Maintenance Tickets', owned: 'User-Owned Items'
+        all: 'All Items', available: 'Available Items', requested: <?php echo json_encode(termLabel('Requested Items')); ?>,
+        borrowed: <?php echo json_encode(termLabel('Borrowed Items')); ?>, maintenance: 'Maintenance Tickets', owned: 'User-Owned Items'
     };
     currentInvTab = tabName;
     if (invTabTitles[tabName]) {

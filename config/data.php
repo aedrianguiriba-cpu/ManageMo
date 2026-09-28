@@ -197,6 +197,39 @@ function getUserOwnedItems(): array {
     });
 }
 
+// ── App Settings ──────────────────────────────────────────────────────────────
+// Small global key/value store — currently just the terminology switch (see
+// termLabel() in config/functions.php). Cached the same way every other list
+// here is; setAppSetting() clears it immediately so the change is instant.
+
+function getAppSettings(): array {
+    return _dbCache('app_settings', function () {
+        $rows = supabase()->select('app_settings');
+        $out = [];
+        foreach ($rows as $r) $out[$r['key']] = $r['value'];
+        return $out;
+    });
+}
+
+function getAppSetting(string $key, string $default = ''): string {
+    return getAppSettings()[$key] ?? $default;
+}
+
+function setAppSetting(string $key, string $value): bool {
+    // Upsert — PostgREST has no native "insert or update" without a unique
+    // constraint conflict clause, and this table intentionally isn't exposed
+    // through a Prefer:resolution=merge-duplicates insert, so just check
+    // first; this is an infrequent, admin-only write, not a hot path.
+    $existing = supabase()->select('app_settings', 'key=eq.' . urlencode($key));
+    if (!empty($existing)) {
+        supabase()->update('app_settings', 'key=eq.' . urlencode($key), ['value' => $value, 'updated_at' => date('Y-m-d H:i:s')]);
+    } else {
+        supabase()->insert('app_settings', ['key' => $key, 'value' => $value]);
+    }
+    clearDataCache('app_settings');
+    return true;
+}
+
 // ── Notifications ──────────────────────────────────────────────────────────────
 // Not run through _dbCache: unread counts need to stay fresh per-user, and the
 // dataset per user is small, so a direct query is simplest and correct.

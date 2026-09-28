@@ -319,7 +319,7 @@ function anPageUrl(string $get_key, int $page): string {
         <div class="an-stat-icon" style="color:#b45309;">
             <i class="fas fa-share-alt"></i>
         </div>
-        <div><div class="an-stat-value"><?php echo $inv_borrowed; ?></div><div class="an-stat-label">Borrowed</div></div>
+        <div><div class="an-stat-value"><?php echo $inv_borrowed; ?></div><div class="an-stat-label"><?php echo termLabel("Borrowed"); ?></div></div>
     </div>
     <div class="an-stat-card">
         <div class="an-stat-icon" style="color:#dc2626;">
@@ -340,8 +340,8 @@ function anPageUrl(string $get_key, int $page): string {
             <?php
             $status_dist = [
                 ['label'=>'Available',   'val'=>$inv_available,   'color'=>'#15803d', 'bg'=>'rgba(34,197,94,0.7)'],
-                ['label'=>'Borrowed',    'val'=>$inv_borrowed,    'color'=>'#b45309', 'bg'=>'rgba(245,158,11,0.7)'],
-                ['label'=>'Requested',   'val'=>$inv_requested,   'color'=>'#7c3aed', 'bg'=>'rgba(168,85,247,0.7)'],
+                ['label'=>termLabel('Borrowed'), 'val'=>$inv_borrowed,    'color'=>'#b45309', 'bg'=>'rgba(245,158,11,0.7)'],
+                ['label'=>termLabel('Requested'), 'val'=>$inv_requested,   'color'=>'#7c3aed', 'bg'=>'rgba(168,85,247,0.7)'],
                 ['label'=>'Maintenance', 'val'=>$inv_maintenance, 'color'=>'#1d4ed8', 'bg'=>'rgba(59,130,246,0.7)'],
             ];
             foreach ($status_dist as $s):

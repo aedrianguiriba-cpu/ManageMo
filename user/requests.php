@@ -1055,7 +1055,7 @@ if (!empty($submit_error)): ?>
                 <div class="rq-type-icon" style="color:#1d4ed8;">
                     <i class="fas fa-hand-holding"></i>
                 </div>
-                <h6>Borrow Item</h6>
+                <h6><?php echo termLabel("Borrow"); ?> Item</h6>
                 <p>Temporarily borrow an item from inventory</p>
             </label>
             <label class="rq-type-card" id="typeCardItem" onclick="selectType(this,'item')">
@@ -1064,7 +1064,7 @@ if (!empty($submit_error)): ?>
                 <div class="rq-type-icon" style="color:#15803d;">
                     <i class="fas fa-shopping-cart"></i>
                 </div>
-                <h6>Request Item</h6>
+                <h6><?php echo termLabel("Request Item"); ?></h6>
                 <p>Request a new item to be procured or purchased</p>
             </label>
             <label class="rq-type-card" onclick="selectType(this,'service')">
@@ -1125,7 +1125,7 @@ if (!empty($submit_error)): ?>
 
                 <!-- BORROW FIELDS -->
                 <div id="borrow_fields">
-                    <div class="rq-section-title"><i class="fas fa-hand-holding"></i> Borrow Details</div>
+                    <div class="rq-section-title"><i class="fas fa-hand-holding"></i> <?php echo termLabel("Borrow"); ?> Details</div>
 
                     <?php
                     // Category icon + color map
@@ -1290,7 +1290,7 @@ if (!empty($submit_error)): ?>
 
                 <!-- ITEM REQUEST FIELDS -->
                 <div id="item_fields" style="display:none;">
-                    <div class="rq-section-title"><i class="fas fa-shopping-cart"></i> Item Request Details</div>
+                    <div class="rq-section-title"><i class="fas fa-shopping-cart"></i> Item <?php echo termLabel("Request"); ?> Details</div>
 
                     <div class="rq-field">
                         <label>Item Name <span class="rq-req">*</span></label>

@@ -262,6 +262,17 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Small global key/value store for site-wide settings that aren't tied to any
+-- one user — currently just the Borrow/Request terminology switch (see
+-- getAppSetting()/setAppSetting() in config/data.php).
+CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Run in Supabase SQL Editor if the table already exists without this row:
+-- INSERT INTO app_settings (key, value) VALUES ('terminology', 'default') ON CONFLICT DO NOTHING;
+
 -- ─────────────────────────────────────────────
 -- 2. DISABLE ROW LEVEL SECURITY
 --    (auth is handled by PHP session; anon key needs full access)
@@ -274,6 +285,7 @@ ALTER TABLE borrow_records DISABLE ROW LEVEL SECURITY;
 ALTER TABLE user_owned_items DISABLE ROW LEVEL SECURITY;
 ALTER TABLE departments    DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications  DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_settings   DISABLE ROW LEVEL SECURITY;
 
 -- ─────────────────────────────────────────────
 -- 3. SEED DATA
@@ -428,3 +440,8 @@ ON CONFLICT DO NOTHING;
 -- (No campus_id remap needed anymore — the column has been dropped from
 -- inventory/users/user_owned_items entirely; college_id is the single
 -- ownership field for colleges, offices, AND campuses alike.)
+
+-- Default terminology mode — 'default' (Borrow/Request) or 'alt' (the fixed
+-- Transferrable/Procurement wording), toggled from Admin Settings.
+INSERT INTO app_settings (key, value) VALUES ('terminology', 'default')
+ON CONFLICT DO NOTHING;

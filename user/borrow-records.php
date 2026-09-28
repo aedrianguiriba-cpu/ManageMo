@@ -242,7 +242,7 @@ displayMessage();
 
     <!-- Print-only header (hidden on screen, shown via @media print) -->
     <div class="br-print-header">
-        <div style="font-size:1.2rem;font-weight:800;">My Records — <?php echo ucfirst($active_tab === 'item' ? 'Item Requests' : ($active_tab === 'service' ? 'Service Requests' : 'Borrow Records')); ?></div>
+        <div style="font-size:1.2rem;font-weight:800;">My Records — <?php echo $active_tab === 'item' ? termLabel('Item Requests') : ($active_tab === 'service' ? 'Service Requests' : termLabel('Borrow') . ' Records'); ?></div>
         <div style="font-size:0.85rem;color:#555;margin-top:2px;">
             <?php echo htmlspecialchars($current_user['full_name']); ?> &bull; Generated <?php echo date('F j, Y g:i A'); ?>
             <?php if ($status_filter): ?> &bull; Filtered by status: <?php echo ucfirst($status_filter); ?><?php endif; ?>
@@ -252,11 +252,11 @@ displayMessage();
     <!-- Tabs -->
     <div class="br-tabs mb-4">
         <a href="borrow-records.php?tab=borrow" class="br-tab <?php echo $active_tab === 'borrow' ? 'active' : ''; ?>">
-            <i class="fas fa-hand-holding"></i> Borrow Records
+            <i class="fas fa-hand-holding"></i> <?php echo termLabel("Borrow"); ?> Records
             <span class="br-tab-count"><?php echo count($user_borrows) + $stat_borrow_pending; ?></span>
         </a>
         <a href="borrow-records.php?tab=item" class="br-tab <?php echo $active_tab === 'item' ? 'active' : ''; ?>">
-            <i class="fas fa-shopping-cart"></i> Item Requests
+            <i class="fas fa-shopping-cart"></i> <?php echo termLabel("Item Requests"); ?>
             <span class="br-tab-count"><?php echo count($all_mine_item); ?></span>
         </a>
         <a href="borrow-records.php?tab=service" class="br-tab <?php echo $active_tab === 'service' ? 'active' : ''; ?>">

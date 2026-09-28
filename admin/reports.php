@@ -422,9 +422,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                             <?php if ($report_type === 'inventory'): ?>
                             <option value="owned"       <?php echo $status_f==='owned'      ?'selected':''; ?>>User-Owned</option>
                             <option value="available"   <?php echo $status_f==='available'  ?'selected':''; ?>>Available</option>
-                            <option value="borrowed"    <?php echo $status_f==='borrowed'   ?'selected':''; ?>>Borrowed</option>
+                            <option value="borrowed"    <?php echo $status_f==='borrowed'   ?'selected':''; ?>><?php echo termLabel("Borrowed"); ?></option>
                             <option value="maintenance" <?php echo $status_f==='maintenance'?'selected':''; ?>>Maintenance</option>
-                            <option value="requested"   <?php echo $status_f==='requested'  ?'selected':''; ?>>Requested</option>
+                            <option value="requested"   <?php echo $status_f==='requested'  ?'selected':''; ?>><?php echo termLabel("Requested"); ?></option>
                             <?php elseif($report_type === 'requests'): ?>
                             <option value="pending"     <?php echo $status_f==='pending'    ?'selected':''; ?>>Pending</option>
                             <option value="approved"    <?php echo $status_f==='approved'   ?'selected':''; ?>>Approved</option>
@@ -491,11 +491,11 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 </div>
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#b45309;"><?php echo $inv_bor; ?></div>
-                    <div class="rp-summary-lbl">Borrowed</div>
+                    <div class="rp-summary-lbl"><?php echo termLabel("Borrowed"); ?></div>
                 </div>
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#22c55e;"><?php echo $inv_requested; ?></div>
-                    <div class="rp-summary-lbl">Requested</div>
+                    <div class="rp-summary-lbl"><?php echo termLabel("Requested"); ?></div>
                 </div>
                 <div class="rp-summary-item">
                     <div class="rp-summary-val" style="color:#1d4ed8;"><?php echo $inv_maint; ?></div>

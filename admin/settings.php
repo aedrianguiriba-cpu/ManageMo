@@ -35,6 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             dbUpdateUser($current_user['id'], ['password' => hashPassword($new_password)]);
             redirectWithMessage('settings.php', 'Password changed successfully!', 'success');
         }
+
+    } elseif ($action === 'update_terminology') {
+        $terminology = ($_POST['terminology'] ?? '') === 'alt' ? 'alt' : 'default';
+        setAppSetting('terminology', $terminology);
+        logActivity($current_user['id'], 'UPDATE', 'Changed site terminology to ' . ($terminology === 'alt' ? 'Transferrable/Procurement' : 'Borrow/Request (default)'), 'app_settings', 0);
+        redirectWithMessage('settings.php#system-tab', 'Terminology updated site-wide.', 'success');
     }
 }
 
@@ -496,6 +502,33 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             $sys_requests  = getRequests();
             $institution_name = 'Pampanga State University';
             ?>
+            <div class="as-card">
+                <div class="as-card-title"><i class="fas fa-language me-2" style="opacity:0.8;"></i>Terminology</div>
+                <div class="as-card-sub">Site-wide wording for Borrow and Request features — applies immediately for every admin and user.</div>
+                <?php $current_terminology = getAppSetting('terminology', 'default'); ?>
+                <form method="POST" action="settings.php#system-tab" style="margin-top:8px;">
+                    <input type="hidden" name="action" value="update_terminology">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:520px;">
+                        <label style="display:flex;flex-direction:column;gap:4px;border:2px solid <?php echo $current_terminology === 'default' ? '#8B0000' : '#e5e7eb'; ?>;border-radius:8px;padding:14px 16px;cursor:pointer;background:<?php echo $current_terminology === 'default' ? 'rgba(139,0,0,0.04)' : '#fff'; ?>;">
+                            <span style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.9rem;color:#1a1d23;">
+                                <input type="radio" name="terminology" value="default" <?php echo $current_terminology === 'default' ? 'checked' : ''; ?> onchange="this.form.submit()">
+                                Default
+                            </span>
+                            <span style="font-size:0.78rem;color:rgba(0,0,0,0.50);padding-left:24px;">Borrow / Borrowable / Borrowing<br>Request / Requesting / Requested</span>
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;border:2px solid <?php echo $current_terminology === 'alt' ? '#8B0000' : '#e5e7eb'; ?>;border-radius:8px;padding:14px 16px;cursor:pointer;background:<?php echo $current_terminology === 'alt' ? 'rgba(139,0,0,0.04)' : '#fff'; ?>;">
+                            <span style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:0.9rem;color:#1a1d23;">
+                                <input type="radio" name="terminology" value="alt" <?php echo $current_terminology === 'alt' ? 'checked' : ''; ?> onchange="this.form.submit()">
+                                Alternate
+                            </span>
+                            <span style="font-size:0.78rem;color:rgba(0,0,0,0.50);padding-left:24px;">Transferrable<br>Procurement</span>
+                        </label>
+                    </div>
+                    <div style="font-size:0.76rem;color:rgba(0,0,0,0.40);margin-top:10px;">
+                        <i class="fas fa-info-circle me-1"></i>Changes only the wording shown on screen — statuses, URLs, and how requests work behind the scenes are unaffected.
+                    </div>
+                </form>
+            </div>
             <div class="as-card">
                 <div class="as-card-title"><i class="fas fa-server me-2" style="opacity:0.8;"></i>System Information</div>
                 <div class="as-card-sub"><?php echo htmlspecialchars($institution_name); ?> — Asset Management</div>

@@ -345,7 +345,7 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
             <div class="adash-kpi-icon"><i class="fas fa-share-alt"></i></div>
             <div class="adash-kpi-body">
                 <div class="adash-kpi-val"><?php echo $borrowed_items; ?></div>
-                <div class="adash-kpi-label">Borrowed</div>
+                <div class="adash-kpi-label"><?php echo termLabel("Borrowed"); ?></div>
             </div>
         </div>
         <div class="adash-kpi" style="--kpi-color:#2563eb;">
@@ -384,7 +384,7 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
                 </div>
                 <div class="chart-legend justify-content-center">
                     <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#15803d;"></div>Available</div>
-                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#d97706;"></div>Borrowed</div>
+                    <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#d97706;"></div><?php echo termLabel("Borrowed"); ?></div>
                     <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#2563eb;"></div>Maintenance</div>
                 </div>
             </div>
@@ -491,8 +491,8 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
                     <th>Department / Campus</th>
                     <th>Type</th>
                     <th>Total</th>
-                    <th>Borrowed</th>
-                    <th>Requested</th>
+                    <th><?php echo termLabel("Borrowed"); ?></th>
+                    <th><?php echo termLabel("Requested"); ?></th>
                     <th>Maintenance</th>
                     <th>Owned</th>
                     <th></th>
@@ -931,7 +931,7 @@ function openDeptModal(deptCode) {
                     <div class="campus-item-name">${item.item_name}</div>
                     <div class="campus-item-detail">Qty: ${item.quantity} • ${item.category}</div>
                 </div>
-                <div class="campus-item-badge" style="background:rgba(245,158,11,.12);color:#b45309;">Borrowed</div>
+                <div class="campus-item-badge" style="background:rgba(245,158,11,.12);color:#b45309;"><?php echo termLabel("Borrowed"); ?></div>
             </div>
         `).join('')
         : '<div class="campus-empty">No borrowed items</div>';
@@ -1029,7 +1029,7 @@ document.addEventListener('DOMContentLoaded', function () {
     new Chart(document.getElementById('statusDonut'), {
         type: 'doughnut',
         data: {
-            labels: ['Available', 'Borrowed', 'Maintenance'],
+            labels: ['Available', <?php echo json_encode(termLabel('Borrowed')); ?>, 'Maintenance'],
             datasets: [{
                 data: [<?php echo $computed_available; ?>, <?php echo $borrowed_items; ?>, <?php echo $maintenance_total; ?>],
                 backgroundColor: ['#15803d', '#d97706', '#2563eb'],
@@ -1078,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     borderRadius: 4
                 },
                 {
-                    label: 'Borrowed',
+                    label: <?php echo json_encode(termLabel('Borrowed')); ?>,
                     data: <?php echo json_encode($dept_borrowed_js); ?>,
                     backgroundColor: 'rgba(217,119,6,0.15)',
                     borderColor: '#d97706',

@@ -338,8 +338,8 @@ displayMessage();
                 <?php
                 $types = [
                     ''        => ['label' => 'All Types',       'icon' => 'fa-layer-group'],
-                    'borrow'  => ['label' => 'Borrow',          'icon' => 'fa-hand-holding'],
-                    'item'    => ['label' => 'Item Request',     'icon' => 'fa-shopping-cart'],
+                    'borrow'  => ['label' => termLabel('Borrow'), 'icon' => 'fa-hand-holding'],
+                    'item'    => ['label' => termLabel('Item Request'), 'icon' => 'fa-shopping-cart'],
                     'service' => ['label' => 'Service Request',  'icon' => 'fa-tools'],
                 ];
                 foreach ($types as $val => $t):
@@ -382,8 +382,8 @@ displayMessage();
 
         // Type config
         $type_map = [
-            'borrow'  => ['label' => 'Borrow Item',      'icon' => 'fa-hand-holding',  'class' => 'mrt-type-borrow'],
-            'item'    => ['label' => 'Item Request',      'icon' => 'fa-shopping-cart', 'class' => 'mrt-type-item'],
+            'borrow'  => ['label' => termLabel('Borrow') . ' Item', 'icon' => 'fa-hand-holding',  'class' => 'mrt-type-borrow'],
+            'item'    => ['label' => termLabel('Item Request'), 'icon' => 'fa-shopping-cart', 'class' => 'mrt-type-item'],
             'service' => ['label' => 'Service Request',   'icon' => 'fa-tools',         'class' => 'mrt-type-service'],
         ];
         $tc = $type_map[$rtype] ?? ['label' => ucfirst($rtype), 'icon' => 'fa-file', 'class' => 'mrt-type-borrow'];

@@ -181,14 +181,37 @@ function groupInventoryItems(array $items): array {
     return array_values($groups);
 }
 
+// Global Borrow/Request terminology switch, toggled from Admin Settings
+// (Settings > System). In "alt" mode every borrow-family word (Borrow,
+// Borrowed, Borrowable, Borrowing) collapses to the single fixed word
+// "Transferrable", and every request-family word (Request, Requesting,
+// Requested) collapses to "Procurement" — a deliberate word-swap, not a
+// grammatical re-wording per call site, so e.g. "Item Borrowed" becomes
+// "Item Transferrable" rather than "Item Transferred". $default_text is
+// exactly what's shown today (unchanged) when the switch is off.
+function termLabel(string $default_text): string {
+    static $mode = null;
+    if ($mode === null) $mode = getAppSetting('terminology', 'default');
+    if ($mode !== 'alt') return $default_text;
+    if (preg_match('/borrow/i', $default_text)) return 'Transferrable';
+    // "Acquire"/"Acquisition" is this app's own synonym for a request that
+    // permanently transfers ownership (as opposed to a temporary borrow) —
+    // same concept as "Request", so it maps to "Procurement" too.
+    if (preg_match('/request|acquir/i', $default_text)) return 'Procurement';
+    return $default_text;
+}
+
 // Shared label/color for an inventory item's acquisition_mode ('borrow','request','both'),
 // used to render a consistent badge wherever items are listed (admin inventory cards,
 // user request catalogs).
 function acquisitionModeBadge(?string $mode): array {
     switch ($mode) {
-        case 'request': return ['label' => 'Acquire Only',  'bg' => 'rgba(34,197,94,0.12)',  'fg' => '#15803d'];
-        case 'both':    return ['label' => 'Borrow & Acquire', 'bg' => 'rgba(139,92,246,0.12)', 'fg' => '#6d28d9'];
-        default:        return ['label' => 'Borrowable',    'bg' => 'rgba(59,130,246,0.12)', 'fg' => '#1d4ed8'];
+        case 'request': return ['label' => termLabel('Acquire Only'),  'bg' => 'rgba(34,197,94,0.12)',  'fg' => '#15803d'];
+        // A combined label needs both halves spelled out, not just whichever
+        // family termLabel() matches first in one string — otherwise an item
+        // that's both borrowable AND acquirable would silently lose one half.
+        case 'both':    return ['label' => termLabel('Borrow') . ' & ' . termLabel('Acquire'), 'bg' => 'rgba(139,92,246,0.12)', 'fg' => '#6d28d9'];
+        default:        return ['label' => termLabel('Borrowable'),    'bg' => 'rgba(59,130,246,0.12)', 'fg' => '#1d4ed8'];
     }
 }
 

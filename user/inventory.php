@@ -470,7 +470,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
             <i class="fas fa-boxes-stacked"></i> Available
         </a>
         <a href="inventory.php?tab=borrowed" class="inv-tab-link <?php echo $current_tab === 'borrowed' ? 'inv-tab-active' : ''; ?>" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
-            <i class="fas fa-hand-holding"></i> Borrowed
+            <i class="fas fa-hand-holding"></i> <?php echo termLabel("Borrowed"); ?>
         </a>
         <a href="inventory.php?tab=owned" class="inv-tab-link <?php echo $current_tab === 'owned' ? 'inv-tab-active' : ''; ?>" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
             <i class="fas fa-user-check"></i> My Owned Items
@@ -528,8 +528,8 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
                 <select class="form-select" name="status">
                     <option value="">All Status</option>
                     <option value="available"   <?php echo $status_filter === 'available'    ? 'selected' : ''; ?>>Available</option>
-                    <option value="borrowed"    <?php echo $status_filter === 'borrowed'     ? 'selected' : ''; ?>>Borrowed</option>
-                    <option value="requested"   <?php echo $status_filter === 'requested'    ? 'selected' : ''; ?>>Requested</option>
+                    <option value="borrowed"    <?php echo $status_filter === 'borrowed'     ? 'selected' : ''; ?>><?php echo termLabel("Borrowed"); ?></option>
+                    <option value="requested"   <?php echo $status_filter === 'requested'    ? 'selected' : ''; ?>><?php echo termLabel("Requested"); ?></option>
                     <option value="maintenance" <?php echo $status_filter === 'maintenance'  ? 'selected' : ''; ?>>Maintenance</option>
                 </select>
             </div>
@@ -660,7 +660,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
                          count plainly instead. -->
                     <div class="inv-info-row">
                         <span class="inv-info-icon"><i class="fas fa-hand-holding"></i></span>
-                        <span class="inv-info-label">Currently Borrowed</span>
+                        <span class="inv-info-label">Currently <?php echo termLabel("Borrowed"); ?></span>
                         <span class="inv-info-val" style="color:#b45309;font-weight:700;">
                             <?php echo $unit_count; ?> unit<?php echo $unit_count > 1 ? 's' : ''; ?>
                         </span>
@@ -695,20 +695,20 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
                 <div class="inv-card-footer">
                     <?php if ($user_has_borrow): ?>
                         <div class="inv-already-badge">
-                            <i class="fas fa-info-circle"></i> You have a unit of this item borrowed
+                            <i class="fas fa-info-circle"></i> You have a unit of this item <?php echo strtolower(termLabel("Borrowed")); ?>
                         </div>
                         <div class="inv-disabled-btn">
-                            <i class="fas fa-check"></i> Already Borrowed
+                            <i class="fas fa-check"></i> Already <?php echo termLabel("Borrowed"); ?>
                         </div>
                     <?php elseif ($acq_mode === 'request' && $first_available): ?>
                         <!-- Request/Acquire-only items aren't lent out — send the user to the
                              Request Item flow instead of a Borrow link that would 404 the catalog. -->
                         <a href="requests.php?item_id=<?php echo $first_available['id']; ?>&type=item" class="inv-borrow-btn" style="background:#15803d !important;">
-                            <i class="fas fa-hand-holding"></i> Request to Acquire
+                            <i class="fas fa-hand-holding"></i> <?php echo termLabel("Request to Acquire"); ?>
                         </a>
                     <?php elseif ($first_available): ?>
                         <a href="requests.php?item_id=<?php echo $first_available['id']; ?>&type=borrow" class="inv-borrow-btn">
-                            <i class="fas fa-hand-paper"></i> Borrow Item
+                            <i class="fas fa-hand-paper"></i> <?php echo termLabel("Borrow"); ?> Item
                         </a>
                     <?php else: ?>
                         <div class="inv-disabled-btn">
