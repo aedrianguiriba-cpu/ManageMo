@@ -879,7 +879,7 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
         <div class="campus-modal-body">
             <!-- Borrowed Items Section -->
             <div class="campus-section">
-                <div class="campus-section-title">Borrowed Items</div>
+                <div class="campus-section-title"><?php echo termLabel("Borrowed Items"); ?></div>
                 <div id="modalBorrowedItems" class="campus-items-list"></div>
             </div>
 
@@ -891,7 +891,7 @@ for ($i = $trend_days - 1; $i >= 0; $i--) {
 
             <!-- Requested Items Section -->
             <div class="campus-section">
-                <div class="campus-section-title">Requested Items</div>
+                <div class="campus-section-title"><?php echo termLabel("Requested Items"); ?></div>
                 <div id="modalRequestedItems" class="campus-items-list"></div>
             </div>
 
@@ -934,7 +934,7 @@ function openDeptModal(deptCode) {
                 <div class="campus-item-badge" style="background:rgba(245,158,11,.12);color:#b45309;"><?php echo termLabel("Borrowed"); ?></div>
             </div>
         `).join('')
-        : '<div class="campus-empty">No borrowed items</div>';
+        : '<div class="campus-empty">No <?php echo strtolower(termLabel("Borrowed")); ?> items</div>';
     document.getElementById('modalBorrowedItems').innerHTML = borrowedHtml;
     
     // Filter maintenance items
@@ -978,7 +978,7 @@ function openDeptModal(deptCode) {
                 </div>
             `;
         }).join('')
-        : '<div class="campus-empty">No requested items</div>';
+        : '<div class="campus-empty">No <?php echo strtolower(termLabel("Requested")); ?> items</div>';
     document.getElementById('modalRequestedItems').innerHTML = requestedHtml;
 
     // Filter owned items for this department (separate table — user_owned_items)

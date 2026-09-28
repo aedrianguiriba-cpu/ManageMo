@@ -334,8 +334,8 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     $inv_maintenance = count(filterByColumn($campus_inventory, 'status', 'maintenance'));
                     $status_rows = [
                         ['label' => 'Available',    'count' => $inventory_result['available'], 'color' => '#34a853', 'bg' => '#d1fae5', 'icon' => 'fa-check-circle'],
-                        ['label' => 'Borrowed',     'count' => $inv_borrowed,                 'color' => '#1a73e8', 'bg' => '#e8f0fe', 'icon' => 'fa-hand-holding'],
-                        ['label' => 'Requested',    'count' => $inv_requested,                'color' => '#ea8c55', 'bg' => '#fef3c7', 'icon' => 'fa-clipboard-list'],
+                        ['label' => termLabel('Borrowed'), 'count' => $inv_borrowed,                 'color' => '#1a73e8', 'bg' => '#e8f0fe', 'icon' => 'fa-hand-holding'],
+                        ['label' => termLabel('Requested'), 'count' => $inv_requested,                'color' => '#ea8c55', 'bg' => '#fef3c7', 'icon' => 'fa-clipboard-list'],
                         ['label' => 'Maintenance',  'count' => $inv_maintenance,              'color' => '#f9ab00', 'bg' => '#fef3c7', 'icon' => 'fa-tools'],
                     ];
                     foreach ($status_rows as $row): ?>
@@ -394,9 +394,9 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     ];
                     $ib_status_cfg = [
                         'available'   => ['bg' => '#d1fae5', 'color' => '#065f46', 'label' => 'Available'],
-                        'borrowed'    => ['bg' => '#dbeafe', 'color' => '#1e40af', 'label' => 'Borrowed'],
+                        'borrowed'    => ['bg' => '#dbeafe', 'color' => '#1e40af', 'label' => termLabel('Borrowed')],
                         'maintenance' => ['bg' => '#fef3c7', 'color' => '#92400e', 'label' => 'Maintenance'],
-                        'requested'   => ['bg' => '#f3e8ff', 'color' => '#6b21a8', 'label' => 'Requested'],
+                        'requested'   => ['bg' => '#f3e8ff', 'color' => '#6b21a8', 'label' => termLabel('Requested')],
                     ];
                     foreach ($campus_inventory as $item):
                         $avail_qty = ($item['status'] === 'available') ? (int)$item['quantity'] : 0;

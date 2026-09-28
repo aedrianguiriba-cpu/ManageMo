@@ -319,7 +319,7 @@ displayMessage();
         <div class="table-responsive">
             <table class="table">
                 <thead><tr>
-                    <th>Item</th><th>Borrowed</th>
+                    <th>Item</th><th><?php echo termLabel("Borrowed"); ?></th>
                     <th>Expected Return</th><th>Returned On</th><th>Status</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
@@ -360,7 +360,7 @@ displayMessage();
                     <td><span class="br-item-name"><?php echo htmlspecialchars($rec['item_name']); ?></span></td>
                     <td>
                         <span class="br-date"><?php echo formatDate($rec['borrow_date'], 'M d, Y'); ?></span>
-                        <?php if ($is_request): ?><br><small style="color:#bbb;font-size:0.68rem;">Requested</small><?php endif; ?>
+                        <?php if ($is_request): ?><br><small style="color:#bbb;font-size:0.68rem;"><?php echo termLabel("Requested"); ?></small><?php endif; ?>
                     </td>
                     <td>
                         <?php if (!empty($rec['expected_return_date'])): ?>

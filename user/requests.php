@@ -1018,6 +1018,19 @@ if (!empty($submit_error)): ?>
     padding: 24px;
     display: flex;
 }
+
+/* Shop grid pagination — client-side, applied on top of whatever search/
+   category filters are active (see filterShopItems()/renderBshopPage()). */
+.bshop-pagination { display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:6px; margin-top:16px; }
+.bshop-pagination button {
+    min-width:32px; height:32px; padding:0 8px; border-radius:6px;
+    font-size:0.82rem; font-weight:700; cursor:pointer;
+    background:#f7f7f7; color:#555; border:1px solid #e5e7eb;
+}
+.bshop-pagination button:hover { background:#eee; }
+.bshop-pagination button.active { background:#8B0000; color:#fff; border-color:#8B0000; }
+.bshop-pagination button:disabled { opacity:0.4; cursor:default; }
+.bshop-pagination button:disabled:hover { background:#f7f7f7; }
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -1240,6 +1253,7 @@ if (!empty($submit_error)): ?>
                                     <i class="fas fa-search"></i><span>No items match</span>
                                 </div>
                             </div>
+                            <div id="bshop-pagination" class="bshop-pagination"></div>
                         </div>
                     </div>
 
@@ -1689,28 +1703,78 @@ function selectBorrowCard(card) {
     updateSummary();
 }
 
+// Borrow catalog: 12 cards per page, applied on top of whatever the search
+// box/category pills currently match. Re-filtering always jumps back to page
+// 1 — otherwise switching category could land you on a now out-of-range page.
+var BSHOP_PAGE_SIZE = 12;
+
 function filterShopItems(btn) {
     if (btn) {
-        document.querySelectorAll('.bshop-cat').forEach(function(b) { b.classList.remove('active'); });
+        // Scoped to #bshop-cats specifically — the Item Request shop below
+        // reuses the same .bshop-cat class for its own, separate pills, and
+        // toggling every .bshop-cat on the page was clearing the OTHER
+        // shop's active pill too.
+        document.querySelectorAll('#bshop-cats .bshop-cat').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
     }
     var activeCat = '';
-    var activeBtn = document.querySelector('.bshop-cat.active');
+    var activeBtn = document.querySelector('#bshop-cats .bshop-cat.active');
     if (activeBtn) activeCat = activeBtn.getAttribute('data-cat') || '';
     var search = (document.getElementById('bshop-search').value || '').toLowerCase().trim();
-    var visible = 0;
-    document.querySelectorAll('.bshop-grid .bshop-card').forEach(function(card) {
+    var matches = [];
+    document.querySelectorAll('#bshop-grid .bshop-card').forEach(function(card) {
         var cat = card.getAttribute('data-category') || '';
         var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
         var desc = (card.querySelector('.bshop-desc') ? card.querySelector('.bshop-desc').textContent : '').toLowerCase();
         var catMatch = !activeCat || cat === activeCat;
         var searchMatch = !search || name.indexOf(search) !== -1 || desc.indexOf(search) !== -1;
-        var show = catMatch && searchMatch;
-        card.style.display = show ? '' : 'none';
-        if (show) visible++;
+        if (catMatch && searchMatch) matches.push(card);
+        else card.style.display = 'none';
     });
+    renderBshopPage(matches, 1);
+}
+
+// Shows just the current page's slice of [matches] (cards that already
+// passed the search/category filter above), hides the rest, and rebuilds the
+// pager underneath the grid.
+function renderBshopPage(matches, page) {
+    var totalPages = Math.max(1, Math.ceil(matches.length / BSHOP_PAGE_SIZE));
+    page = Math.min(Math.max(1, page), totalPages);
+    var start = (page - 1) * BSHOP_PAGE_SIZE;
+    document.querySelectorAll('#bshop-grid .bshop-card').forEach(function(card) { card.style.display = 'none'; });
+    matches.slice(start, start + BSHOP_PAGE_SIZE).forEach(function(card) { card.style.display = ''; });
+
     var emptyEl = document.getElementById('bshop-empty');
-    if (emptyEl) emptyEl.style.display = visible === 0 ? 'flex' : 'none';
+    if (emptyEl) emptyEl.style.display = matches.length === 0 ? 'flex' : 'none';
+
+    var pagerEl = document.getElementById('bshop-pagination');
+    if (!pagerEl) return;
+    if (totalPages <= 1) { pagerEl.innerHTML = ''; return; }
+    var html = '<button type="button" ' + (page === 1 ? 'disabled' : 'onclick="filterShopItemsPage(' + (page - 1) + ')"') + '><i class="fas fa-chevron-left"></i></button>';
+    for (var i = 1; i <= totalPages; i++) {
+        html += '<button type="button" class="' + (i === page ? 'active' : '') + '" onclick="filterShopItemsPage(' + i + ')">' + i + '</button>';
+    }
+    html += '<button type="button" ' + (page === totalPages ? 'disabled' : 'onclick="filterShopItemsPage(' + (page + 1) + ')"') + '><i class="fas fa-chevron-right"></i></button>';
+    pagerEl.innerHTML = html;
+}
+
+// Re-runs the current search/category filter, then jumps straight to [page]
+// instead of resetting to page 1 — used by the pager's own buttons.
+function filterShopItemsPage(page) {
+    var activeBtn = document.querySelector('#bshop-cats .bshop-cat.active');
+    var activeCat = activeBtn ? (activeBtn.getAttribute('data-cat') || '') : '';
+    var search = (document.getElementById('bshop-search').value || '').toLowerCase().trim();
+    var matches = [];
+    document.querySelectorAll('#bshop-grid .bshop-card').forEach(function(card) {
+        var cat = card.getAttribute('data-category') || '';
+        var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
+        var desc = (card.querySelector('.bshop-desc') ? card.querySelector('.bshop-desc').textContent : '').toLowerCase();
+        var catMatch = !activeCat || cat === activeCat;
+        var searchMatch = !search || name.indexOf(search) !== -1 || desc.indexOf(search) !== -1;
+        if (catMatch && searchMatch) matches.push(card);
+    });
+    renderBshopPage(matches, page);
+    document.getElementById('bshop-pagination').scrollIntoView({behavior: 'smooth', block: 'nearest'});
 }
 
 // Re-clamps a quantity input to its own max attribute on every keystroke —
@@ -2175,6 +2239,7 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
 // Init
 renderCart();
 updateSummary();
+filterShopItems(); // also paginates the borrow catalog from page 1 on first load
 
 // Pre-select item from inventory page
 <?php if ($auto_fill_item && $auto_fill_type === 'item'): ?>
@@ -2203,6 +2268,12 @@ updateSummary();
         });
         if (matchCard) {
             matchCard.classList.add('bshop-selected');
+            // The catalog is paginated now — a deep-linked item could land on
+            // any page, so jump straight to whichever one actually has it
+            // (nothing is filtered yet at this point, so DOM order == page order).
+            var allCards = Array.from(document.querySelectorAll('#bshop-grid .bshop-card'));
+            var idx = allCards.indexOf(matchCard);
+            if (idx >= 0) filterShopItemsPage(Math.floor(idx / BSHOP_PAGE_SIZE) + 1);
             // Scroll card into view inside the grid
             setTimeout(function() { matchCard.scrollIntoView({ block: 'nearest' }); }, 100);
         }

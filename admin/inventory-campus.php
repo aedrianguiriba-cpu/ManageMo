@@ -308,7 +308,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </div>
             <div class="ic-status-list">
                 <div class="ic-status-row">
-                    <span class="ic-status-lbl">Borrowed</span>
+                    <span class="ic-status-lbl"><?php echo termLabel("Borrowed"); ?></span>
                     <span class="ic-badge ic-badge-warning"><?php echo $dept_status['borrowed'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
@@ -316,7 +316,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <span class="ic-badge ic-badge-info"><?php echo $dept_status['maintenance'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
-                    <span class="ic-status-lbl">Requested</span>
+                    <span class="ic-status-lbl"><?php echo termLabel("Requested"); ?></span>
                     <span class="ic-badge ic-badge-secondary"><?php echo $dept_status['requested'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
@@ -345,7 +345,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             </div>
             <div class="ic-status-list">
                 <div class="ic-status-row">
-                    <span class="ic-status-lbl">Borrowed</span>
+                    <span class="ic-status-lbl"><?php echo termLabel("Borrowed"); ?></span>
                     <span class="ic-badge ic-badge-warning"><?php echo $dept_status['borrowed'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
@@ -353,7 +353,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <span class="ic-badge ic-badge-info"><?php echo $dept_status['maintenance'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
-                    <span class="ic-status-lbl">Requested</span>
+                    <span class="ic-status-lbl"><?php echo termLabel("Requested"); ?></span>
                     <span class="ic-badge ic-badge-secondary"><?php echo $dept_status['requested'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
@@ -387,7 +387,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <?php endif; ?>
             <div class="ic-status-list">
                 <div class="ic-status-row">
-                    <span class="ic-status-lbl">Borrowed</span>
+                    <span class="ic-status-lbl"><?php echo termLabel("Borrowed"); ?></span>
                     <span class="ic-badge ic-badge-warning"><?php echo $camp_status['borrowed'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
@@ -395,7 +395,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <span class="ic-badge ic-badge-info"><?php echo $camp_status['maintenance'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
-                    <span class="ic-status-lbl">Requested</span>
+                    <span class="ic-status-lbl"><?php echo termLabel("Requested"); ?></span>
                     <span class="ic-badge ic-badge-secondary"><?php echo $camp_status['requested'] ?? 0; ?></span>
                 </div>
                 <div class="ic-status-row">
