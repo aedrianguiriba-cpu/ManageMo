@@ -6,6 +6,10 @@ requireUser();
 
 $current_user = getCurrentUser();
 $user_id = $current_user['id'];
+// Accounts in the same college/office/campus share one data pool — see
+// getDepartmentMateIds()'s docblock.
+$dept_user_ids = getDepartmentMateIds($current_user);
+$is_shared_dept = count($dept_user_ids) > 1;
 
 // Department (college/office) info for the welcome banner, if the user has one set.
 $user_departments = getMainCampusDepartments();
@@ -26,9 +30,9 @@ $inventory_result = [
     'borrowed' => count(filterByColumn($campus_inventory, 'status', 'borrowed')),
 ];
 
-// Get user's requests
+// Get this department's requests
 $all_requests = getRequests();
-$user_requests = filterByColumn($all_requests, 'user_id', $user_id);
+$user_requests = array_values(array_filter($all_requests, fn($r) => in_array((int)$r['user_id'], $dept_user_ids, true)));
 
 // Calculate request stats
 $pending_requests = filterByColumn($user_requests, 'status', 'pending');
@@ -42,10 +46,10 @@ $requests_result = [
     'disapproved' => count($disapproved_requests),
 ];
 
-// Get active borrow records
+// Get this department's active borrow records
 $all_borrow = getBorrowRecords();
-// Overdue borrows are still in the user's hands, so they count as active too.
-$user_borrows = array_filter($all_borrow, fn($b) => (int)$b['user_id'] === (int)$user_id && in_array($b['status'], ['active', 'overdue']));
+// Overdue borrows are still in the borrower's hands, so they count as active too.
+$user_borrows = array_filter($all_borrow, fn($b) => in_array((int)$b['user_id'], $dept_user_ids, true) && in_array($b['status'], ['active', 'overdue']));
 
 $borrow_result = [
     'active' => count($user_borrows),
@@ -79,9 +83,9 @@ usort($recent_inventory, function($a, $b) {
 });
 $recent_inventory = array_slice($recent_inventory, 0, 5);
 
-// Get user's owned items
+// Get this department's owned items
 $all_owned_items = getUserOwnedItems();
-$user_owned_items = filterByColumn($all_owned_items, 'user_id', $user_id);
+$user_owned_items = array_values(array_filter($all_owned_items, fn($i) => in_array((int)$i['user_id'], $dept_user_ids, true)));
 $owned_items_count = count($user_owned_items);
 $owned_items_total = array_reduce($user_owned_items, function($carry, $item) {
     return $carry + $item['quantity'];
@@ -90,16 +94,17 @@ $owned_items_total = array_reduce($user_owned_items, function($carry, $item) {
 // Build item return map from borrow records + pending/approved borrow requests
 $item_return_map = [];
 
-// Source 1: delivered borrow records (active/overdue)
+// Source 1: delivered borrow records (active/overdue) — this department's only.
 foreach ($all_borrow as $br) {
+    if (!in_array((int)$br['user_id'], $dept_user_ids, true)) continue;
     if (in_array($br['status'], ['active', 'overdue']) && empty($br['actual_return_date'])) {
         $iid = (int)$br['inventory_id'];
         if (!isset($item_return_map[$iid])) $item_return_map[$iid] = $br['expected_return_date'];
     }
 }
 
-// Source 2: pending/approved borrow requests (not yet delivered, no borrow record yet)
-foreach (getRequests() as $req) {
+// Source 2: pending/approved borrow requests (not yet delivered, no borrow record yet) — this department's only.
+foreach ($user_requests as $req) {
     if ($req['request_type'] === 'borrow'
         && in_array($req['status'], ['pending', 'approved'])
         && !empty($req['inventory_id'])
@@ -189,7 +194,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <div class="ud-stat-card h-100" style="--ud-kpi-color:#7c3aed;">
                 <div class="ud-stat-icon"><i class="fas fa-user-check"></i></div>
                 <div class="ud-stat-value"><?php echo $owned_items_count; ?></div>
-                <div class="ud-stat-label">My Owned Items</div>
+                <div class="ud-stat-label"><?php echo $is_shared_dept ? "Dept Owned Items" : "My Owned Items"; ?></div>
             </div>
         </div>
     </div>
@@ -562,7 +567,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
             <div class="ud-card">
                 <div class="ud-card-header">
                     <i class="fas fa-user-check ud-card-icon" style="color:#8b5cf6;"></i>
-                    <span>My Owned Items</span>
+                    <span><?php echo $is_shared_dept ? "Department Owned Items" : "My Owned Items"; ?></span>
                     <a href="inventory.php?tab=owned" class="ud-card-link ms-auto">View all <i class="fas fa-arrow-right ms-1"></i></a>
                 </div>
                 <div class="ud-card-body p-0">

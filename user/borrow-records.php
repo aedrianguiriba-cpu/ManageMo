@@ -1,11 +1,14 @@
 <?php
-$page_title = 'My Records';
 require_once dirname(__DIR__) . '/config/functions.php';
 
 requireUser();
 
 $current_user = getCurrentUser();
 $user_id = $current_user['id'];
+// Accounts in the same college/office/campus share one records pool — see
+// getDepartmentMateIds()'s docblock.
+$dept_user_ids = getDepartmentMateIds($current_user);
+$page_title = count($dept_user_ids) > 1 ? 'Department Records' : 'My Records';
 $active_tab    = $_GET['tab']    ?? 'borrow';
 $status_filter = $_GET['status'] ?? '';
 
@@ -15,8 +18,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 <div class="main-wrapper">
 <?php
 $all_borrows    = getBorrowRecords();
-$user_borrows   = filterByColumn($all_borrows, 'user_id', $user_id);
+$user_borrows   = array_values(array_filter($all_borrows, fn($b) => in_array((int)$b['user_id'], $dept_user_ids, true)));
 $all_inventory  = getInventory();
+// Records from department-mates are now mixed in with the viewer's own — a
+// "Requested By"/"Borrowed By" column (shown only when there's actually more
+// than one account to distinguish) is the only way to tell whose is whose.
+$dept_users_by_id = array_column(getUsers(), null, 'id');
+$show_owner_col   = count($dept_user_ids) > 1;
 
 $borrow_records = [];
 foreach ($user_borrows as $borrow) {
@@ -36,7 +44,7 @@ foreach ($user_borrows as $borrow) {
 if (!$status_filter || $active_tab !== 'borrow') {
     $already_request_ids = array_column($user_borrows, 'request_id');
     foreach (getRequests() as $req) {
-        if ($req['user_id'] != $user_id) continue;
+        if (!in_array((int)$req['user_id'], $dept_user_ids, true)) continue;
         if ($req['request_type'] !== 'borrow') continue;
         if (!in_array($req['status'], ['pending', 'approved', 'delivered'])) continue;
         // Skip if a borrow_record already exists for this request (status = delivered with record)
@@ -70,7 +78,7 @@ $all_requests = getRequests();
 $item_requests    = [];
 $service_requests = [];
 foreach ($all_requests as $req) {
-    if ($req['user_id'] != $user_id) continue;
+    if (!in_array((int)$req['user_id'], $dept_user_ids, true)) continue;
     $item = findById($all_inventory, $req['inventory_id']);
     $req['item_name'] = $req['item_name'] ?? ($item['item_name'] ?? null);
     if ($req['request_type'] === 'item') {
@@ -92,8 +100,8 @@ $stat_borrow_returned = count(filterByColumn($user_borrows, 'status', 'returned'
 $stat_borrow_overdue  = count(filterByColumn($user_borrows, 'status', 'overdue'));
 $stat_borrow_pending  = count(array_filter($borrow_records, fn($r) => ($r['_from_table'] ?? '') === 'requests'));
 
-$all_mine_item    = array_filter(getRequests(), fn($r) => $r['user_id'] == $user_id && $r['request_type'] === 'item');
-$all_mine_service = array_filter(getRequests(), fn($r) => $r['user_id'] == $user_id && $r['request_type'] === 'service');
+$all_mine_item    = array_filter(getRequests(), fn($r) => in_array((int)$r['user_id'], $dept_user_ids, true) && $r['request_type'] === 'item');
+$all_mine_service = array_filter(getRequests(), fn($r) => in_array((int)$r['user_id'], $dept_user_ids, true) && $r['request_type'] === 'service');
 
 /* ── Pagination (per tab, so switching tabs doesn't reset the others) ── */
 $br_per_page = 10;
@@ -319,7 +327,7 @@ displayMessage();
         <div class="table-responsive">
             <table class="table">
                 <thead><tr>
-                    <th>Item</th><th><?php echo termLabel("Borrowed"); ?></th>
+                    <th>Item</th><?php if ($show_owner_col): ?><th><?php echo termLabel("Borrowed"); ?> By</th><?php endif; ?><th><?php echo termLabel("Borrowed"); ?></th>
                     <th>Expected Return</th><th>Returned On</th><th>Status</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
@@ -358,6 +366,7 @@ displayMessage();
                 ?>
                 <tr <?php if ($is_request): ?>style="background:rgba(245,158,11,0.03);"<?php endif; ?>>
                     <td><span class="br-item-name"><?php echo htmlspecialchars($rec['item_name']); ?></span></td>
+                    <?php if ($show_owner_col): ?><td><span class="br-notes"><?php echo htmlspecialchars($dept_users_by_id[$rec['user_id']]['full_name'] ?? 'Unknown'); ?></span></td><?php endif; ?>
                     <td>
                         <span class="br-date"><?php echo formatDate($rec['borrow_date'], 'M d, Y'); ?></span>
                         <?php if ($is_request): ?><br><small style="color:#bbb;font-size:0.68rem;"><?php echo termLabel("Requested"); ?></small><?php endif; ?>
@@ -380,7 +389,7 @@ displayMessage();
                     <td><span class="br-notes"><?php echo $rec['notes'] ? htmlspecialchars($rec['notes']) : '—'; ?></span></td>
                 </tr>
                 <?php endforeach; else: ?>
-                <tr><td colspan="6">
+                <tr><td colspan="<?php echo $show_owner_col ? 7 : 6; ?>">
                     <div class="br-empty"><i class="fas fa-box-open"></i><p>No borrow records found.</p></div>
                 </td></tr>
                 <?php endif; ?>
@@ -440,7 +449,7 @@ displayMessage();
         <div class="table-responsive">
             <table class="table">
                 <thead><tr>
-                    <th>Request #</th><th>Item / Description</th><th>Urgency</th>
+                    <th>Request #</th><th>Item / Description</th><?php if ($show_owner_col): ?><th><?php echo termLabel("Requested"); ?> By</th><?php endif; ?><th>Urgency</th>
                     <th>Reason</th><th>Submitted</th><th>Status</th>
                 </tr></thead>
                 <tbody>
@@ -457,6 +466,7 @@ displayMessage();
                 <tr>
                     <td><span class="br-qr-chip"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
                     <td><span class="br-item-name"><?php echo htmlspecialchars($display); ?></span></td>
+                    <?php if ($show_owner_col): ?><td><span class="br-notes"><?php echo htmlspecialchars($dept_users_by_id[$req['user_id']]['full_name'] ?? 'Unknown'); ?></span></td><?php endif; ?>
                     <td>
                         <span class="br-badge" style="background:<?php echo $urg_bg[$urgency] ?? $urg_bg['medium']; ?>;color:<?php echo $urg_color[$urgency] ?? $urg_color['medium']; ?>;border:1px solid <?php echo $urg_color[$urgency] ?? $urg_color['medium']; ?>33;">
                             <?php echo ucfirst($urgency); ?>
@@ -472,7 +482,7 @@ displayMessage();
                     </td>
                 </tr>
                 <?php endforeach; else: ?>
-                <tr><td colspan="7">
+                <tr><td colspan="<?php echo $show_owner_col ? 8 : 7; ?>">
                     <div class="br-empty"><i class="fas fa-shopping-cart"></i><p>No item requests found.</p></div>
                 </td></tr>
                 <?php endif; ?>
@@ -530,7 +540,7 @@ displayMessage();
         <div class="table-responsive">
             <table class="table">
                 <thead><tr>
-                    <th>Request #</th><th>Item</th><th>Service Type</th>
+                    <th>Request #</th><th>Item</th><?php if ($show_owner_col): ?><th>Requested By</th><?php endif; ?><th>Service Type</th>
                     <th>Description</th><th>Urgency</th><th>Submitted</th><th>Status</th>
                 </tr></thead>
                 <tbody>
@@ -551,6 +561,7 @@ displayMessage();
                 <tr>
                     <td><span class="br-qr-chip"><?php echo htmlspecialchars($req['request_number']); ?></span></td>
                     <td><span class="br-item-name"><?php echo htmlspecialchars(($req['item_name'] ?? $svc_subject) ?: '—'); ?></span></td>
+                    <?php if ($show_owner_col): ?><td><span class="br-notes"><?php echo htmlspecialchars($dept_users_by_id[$req['user_id']]['full_name'] ?? 'Unknown'); ?></span></td><?php endif; ?>
                     <td>
                         <?php if ($svc_type): ?>
                         <span class="br-badge" style="background:rgba(245,158,11,0.10);color:#b45309;border:1px solid rgba(245,158,11,0.25);">
@@ -573,7 +584,7 @@ displayMessage();
                     </td>
                 </tr>
                 <?php endforeach; else: ?>
-                <tr><td colspan="7">
+                <tr><td colspan="<?php echo $show_owner_col ? 8 : 7; ?>">
                     <div class="br-empty"><i class="fas fa-tools"></i><p>No service requests found.</p></div>
                 </td></tr>
                 <?php endif; ?>

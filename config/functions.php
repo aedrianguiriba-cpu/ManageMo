@@ -111,9 +111,15 @@ function groupOwnedItems(array $items): array {
         // be first, mislabeling the rest. Item identity must always be part
         // of the key, group_id or not.
         $item_ident = strtolower(trim($item['item_name'])) . '||' . strtolower(trim($item['category'] ?? ''));
+        // Now that owned items from multiple department-mates can be listed
+        // together (see getDepartmentMateIds()), the no-group_id fallback key
+        // must also include the owner — otherwise two different people's
+        // items of the same name/category would merge into one group and
+        // misattribute ownership, the exact bug just fixed above but for owner
+        // instead of item identity.
         $key = !empty($item['group_id'])
             ? 'gid:' . $item['group_id'] . '||' . $item_ident
-            : $item_ident;
+            : ($item['user_id'] ?? '') . '||' . $item_ident;
         if (!isset($groups[$key])) {
             $groups[$key] = [
                 'group_id'    => $item['group_id'] ?? null,
@@ -179,6 +185,28 @@ function groupInventoryItems(array $items): array {
         $groups[$key]['units'][] = $item;
     }
     return array_values($groups);
+}
+
+// Accounts in the same college/office/campus share one pool of data — owned
+// items, active borrows, and request history all show and are actionable
+// across every account tagged with that same college_id, not just the one
+// that originally submitted/acquired it. Returns every user id sharing
+// $user's college_id, including $user's own id.
+//
+// A user with NO college_id set shares with nobody but themselves — grouping
+// every "unassigned" account together would silently pool together people
+// who simply haven't been assigned a department yet, which is a privacy
+// problem, not a convenience. Only a real, shared department groups accounts.
+function getDepartmentMateIds(array $user): array {
+    static $cache = [];
+    $college_id = $user['college_id'] ?? null;
+    if (empty($college_id)) return [(int)$user['id']];
+    if (isset($cache[$college_id])) return $cache[$college_id];
+    $ids = [];
+    foreach (getUsers() as $u) {
+        if (($u['college_id'] ?? null) === $college_id) $ids[] = (int)$u['id'];
+    }
+    return $cache[$college_id] = $ids;
 }
 
 // Global Borrow/Request terminology switch, toggled from Admin Settings

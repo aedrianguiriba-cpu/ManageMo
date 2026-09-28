@@ -49,13 +49,17 @@ $user_id = $current_user['id'];
 $departments = getMainCampusDepartments();
 $dept_name = !empty($current_user['college_id']) ? ($departments[$current_user['college_id']] ?? $current_user['college_id']) : '';
 
+// Accounts in the same college/office/campus share one data pool — see
+// getDepartmentMateIds()'s docblock. These sidebar stats match what the rest
+// of the app now shows for this account.
+$dept_user_ids       = getDepartmentMateIds($current_user);
 $all_requests        = getRequests();
-$user_requests       = filterByColumn($all_requests, 'user_id', $user_id);
+$user_requests       = array_values(array_filter($all_requests, fn($r) => in_array((int)$r['user_id'], $dept_user_ids, true)));
 $total_requests      = count($user_requests);
 $all_borrows         = getBorrowRecords();
-$user_active_borrows = filterByColumns($all_borrows, ['user_id' => $user_id, 'status' => 'active']);
+$user_active_borrows = array_values(array_filter($all_borrows, fn($b) => in_array((int)$b['user_id'], $dept_user_ids, true) && $b['status'] === 'active'));
 $active_borrows      = count($user_active_borrows);
-$user_ret_borrows    = filterByColumns($all_borrows, ['user_id' => $user_id, 'status' => 'returned']);
+$user_ret_borrows    = array_values(array_filter($all_borrows, fn($b) => in_array((int)$b['user_id'], $dept_user_ids, true) && $b['status'] === 'returned'));
 $completed_borrows   = count($user_ret_borrows);
 
 displayMessage();

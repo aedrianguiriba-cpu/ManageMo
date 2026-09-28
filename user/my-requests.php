@@ -1,11 +1,15 @@
 <?php
-$page_title = 'My Requests';
 require_once dirname(__DIR__) . '/config/functions.php';
 
 requireUser();
 
 $current_user = getCurrentUser();
 $user_id      = $current_user['id'];
+// Accounts in the same college/office/campus share one request pool — see
+// getDepartmentMateIds()'s docblock. A user with no department set only
+// ever sees their own requests.
+$dept_user_ids = getDepartmentMateIds($current_user);
+$page_title = count($dept_user_ids) > 1 ? 'Department Requests' : 'My Requests';
 $status_filter = $_GET['status'] ?? '';
 $type_filter   = $_GET['type']   ?? '';
 
@@ -19,10 +23,10 @@ $all_inventory  = getInventory();
 $all_users      = getUsers();
 $admin_user     = null;
 
-// Build enriched request list for this user (one row per DB record)
+// Build enriched request list for this user's department (one row per DB record)
 $raw_requests = [];
 foreach ($all_requests as $req) {
-    if ($req['user_id'] != $user_id) continue;
+    if (!in_array((int)$req['user_id'], $dept_user_ids, true)) continue;
     // Self-heal a delivery whose ownership transfer (item) or borrow record
     // (borrow) never ran — see ensureDeliverySideEffects()'s docblock. Cheap
     // and safe to call on every view; it no-ops once already done.

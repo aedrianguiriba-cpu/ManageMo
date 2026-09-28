@@ -9,7 +9,9 @@ $page_labels = [
     'requests.php'         => 'Requests',
     'analytics.php'        => 'Analytics',
     'settings.php'         => 'Settings',
-    'borrow-records.php'   => 'My Records',
+    // borrow-records.php sets its own $page_title dynamically — "My Records"
+    // or "Department Records" depending on whether accounts in the current
+    // user's department share data (see getDepartmentMateIds()).
 ];
 $label = $page_labels[$current_page] ?? (isset($page_title) ? $page_title : 'ManageMo');
 $settings_url = ($current_user['role'] === 'admin') ? BASE_URL . 'admin/settings.php' : BASE_URL . 'user/settings.php';

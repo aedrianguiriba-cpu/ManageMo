@@ -6,6 +6,9 @@ require_once dirname(__DIR__) . '/lib/qrcode.php';
 requireUser();
 
 $current_user = getCurrentUser();
+// Accounts in the same college/office/campus share one owned-items/borrow
+// pool — see getDepartmentMateIds()'s docblock.
+$dept_user_ids = getDepartmentMateIds($current_user);
 $current_tab = $_GET['tab'] ?? 'all';
 $page = $_GET['page'] ?? 1;
 $search = $_GET['search'] ?? '';
@@ -30,7 +33,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 // forever instead of ever reaching Owned Items. See ensureDeliverySideEffects().
 $__all_users_for_heal = getUsers();
 foreach (getRequests() as $__r) {
-    if ((int)$__r['user_id'] === (int)$current_user['id']) {
+    if (in_array((int)$__r['user_id'], $dept_user_ids, true)) {
         ensureDeliverySideEffects($__r, $__all_users_for_heal);
     }
 }
@@ -50,9 +53,9 @@ $inv_borrowed  = count(filterByColumn($all_campus_inventory, 'status', 'borrowed
 $inv_maint     = count(filterByColumn($all_campus_inventory, 'status', 'maintenance'));
 $inv_requested = count(filterByColumn($all_campus_inventory, 'status', 'requested'));
 
-// Get user's owned items
+// Get owned items for this user's whole department (not just this account)
 $all_owned_items = getUserOwnedItems();
-$user_owned_items = filterByColumn($all_owned_items, 'user_id', $current_user['id']);
+$user_owned_items = array_values(array_filter($all_owned_items, fn($i) => in_array((int)$i['user_id'], $dept_user_ids, true)));
 $owned_items_count = count($user_owned_items);
 $owned_items_total = array_reduce($user_owned_items, fn($sum, $item) => $sum + ($item['quantity'] ?? 1), 0);
 
@@ -108,6 +111,12 @@ usort($filtered_items, function($a, $b) {
 // Group into display groups, then paginate over groups
 $grouped_inventory = groupInventoryItems($filtered_items);
 $grouped_owned     = groupOwnedItems($user_owned_items);
+// Owned items from multiple department-mates are now mixed together — each
+// group is guaranteed single-owner (see groupOwnedItems()'s docblock), so
+// resolve that owner's name for display whenever there's more than one
+// account in the department to distinguish.
+$dept_users_by_id = array_column(getUsers(), null, 'id');
+$show_owner_col   = count($dept_user_ids) > 1;
 
 $total       = count($grouped_inventory);
 $total_pages = ceil($total / ITEMS_PER_PAGE);
@@ -125,10 +134,12 @@ $grouped_owned_page = array_slice($grouped_owned, $owned_offset, ITEMS_PER_PAGE)
 // Pre-load borrow records once
 $all_borrows = getBorrowRecords();
 
-// Current user's active borrow inventory_ids — for quick group-level lookup
+// This department's active borrow inventory_ids — for quick group-level
+// lookup, so "you already have this" (really: your department already has
+// it) can gate borrowing a duplicate unit of the same item.
 $user_borrowed_item_ids = [];
 foreach ($all_borrows as $br) {
-    if ((int)$br['user_id'] === (int)$current_user['id'] && $br['status'] === 'active') {
+    if (in_array((int)$br['user_id'], $dept_user_ids, true) && $br['status'] === 'active') {
         $user_borrowed_item_ids[] = (int)$br['inventory_id'];
     }
 }
@@ -473,7 +484,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
             <i class="fas fa-hand-holding"></i> <?php echo termLabel("Borrowed"); ?>
         </a>
         <a href="inventory.php?tab=owned" class="inv-tab-link <?php echo $current_tab === 'owned' ? 'inv-tab-active' : ''; ?>" style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; font-weight: 600; font-size: 0.9rem; color: rgba(0,0,0,0.50); border-bottom: 3px solid transparent; cursor: pointer; text-decoration: none; transition: all 0.2s;">
-            <i class="fas fa-user-check"></i> My Owned Items
+            <i class="fas fa-user-check"></i> <?php echo $show_owner_col ? "Department" : "My"; ?> Owned Items
         </a>
     </div>
 
@@ -695,7 +706,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
                 <div class="inv-card-footer">
                     <?php if ($user_has_borrow): ?>
                         <div class="inv-already-badge">
-                            <i class="fas fa-info-circle"></i> You have a unit of this item <?php echo strtolower(termLabel("Borrowed")); ?>
+                            <i class="fas fa-info-circle"></i> <?php echo count($dept_user_ids) > 1 ? "Your department" : "You"; ?> already <?php echo strtolower(termLabel("Borrowed")); ?> a unit of this item
                         </div>
                         <div class="inv-disabled-btn">
                             <i class="fas fa-check"></i> Already <?php echo termLabel("Borrowed"); ?>
@@ -858,6 +869,13 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
 
                 <!-- Info Rows -->
                 <div class="inv-card-body">
+                    <?php if ($show_owner_col): ?>
+                    <div class="inv-info-row">
+                        <span class="inv-info-icon"><i class="fas fa-user"></i></span>
+                        <span class="inv-info-label">Owner</span>
+                        <span class="inv-info-val" style="font-weight:600;"><?php echo htmlspecialchars($dept_users_by_id[$group['user_id']]['full_name'] ?? 'Unknown'); ?></span>
+                    </div>
+                    <?php endif; ?>
                     <div class="inv-info-row">
                         <span class="inv-info-icon"><i class="fas fa-calendar"></i></span>
                         <span class="inv-info-label">Year</span>
@@ -877,7 +895,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
                 <div class="inv-card-footer">
                     <button type="button" class="btn" style="width:100%;background:rgba(139,0,0,0.10);color:#8B0000;border:none;border-radius:10px;font-weight:600;font-size:0.85rem;"
                         data-bs-toggle="modal" data-bs-target="#ownedItemDetailModal"
-                        onclick="showOwnedGroup(<?php echo htmlspecialchars(json_encode($group)); ?>)">
+                        onclick="showOwnedGroup(<?php echo htmlspecialchars(json_encode($show_owner_col ? array_merge($group, ['owner_name' => $dept_users_by_id[$group['user_id']]['full_name'] ?? 'Unknown']) : $group)); ?>)">
                         <i class="fas fa-info-circle"></i> View Details
                     </button>
                 </div>
@@ -945,7 +963,7 @@ $returned_borrows_page = array_slice($returned_borrows, $returned_offset, ITEMS_
 
 function showOwnedGroup(group) {
     document.getElementById('ownedModalTitle').textContent = group.item_name;
-    document.getElementById('ownedModalCategory').textContent = group.category + ' · ' + group.units.length + ' unit(s)';
+    document.getElementById('ownedModalCategory').textContent = group.category + ' · ' + group.units.length + ' unit(s)' + (group.owner_name ? ' · Owner: ' + group.owner_name : '');
 
     var descEl = document.getElementById('ownedModalDescSection');
     if (group.description) {
