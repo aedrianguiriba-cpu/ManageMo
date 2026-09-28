@@ -1011,7 +1011,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php if (!empty($request['group_id'])): ?>
                         <p><strong>Group ID:</strong><span style="font-family:monospace;background:rgba(107,114,128,0.10);color:#374151;border-radius:5px;padding:1px 7px;font-size:0.77rem;"><?php echo htmlspecialchars($request['group_id']); ?></span></p>
                         <?php endif; ?>
-                        <?php if (!empty($request['receiving_method'])): ?>
+                        <?php if (!empty($request['receiving_method']) && $request['request_type'] !== 'service'): ?>
                         <?php $rm = $request['receiving_method']; ?>
                         <p style="align-items:flex-start;flex-direction:column;gap:6px;">
                             <strong>Receiving Method:</strong>

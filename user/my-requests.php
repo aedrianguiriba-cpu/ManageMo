@@ -420,7 +420,11 @@ displayMessage();
             $s4_dot = '';         $s4_lbl = '';
             $s5_dot = '';         $s5_lbl = '';
             $line1 = 'done-line'; $line2 = ''; $line3 = ''; $line4 = '';
-        } elseif ($delivery_status === 'delivered') {
+        } elseif ($status === 'completed' || $delivery_status === 'delivered') {
+            // A service ticket reaches 'completed' via its own status field —
+            // it never goes through delivery_status at all (it's never "out for
+            // delivery"), so that check alone left a finished maintenance ticket
+            // permanently stuck looking like it was still in progress.
             $s2_dot = 'done'; $s2_lbl = 'done-lbl';
             $s3_dot = 'done'; $s3_lbl = 'done-lbl';
             $s4_dot = 'done'; $s4_lbl = 'done-lbl';
@@ -439,6 +443,12 @@ displayMessage();
             $s5_dot = '';            $s5_lbl = '';
             $line1 = 'done-line'; $line2 = 'done-line'; $line3 = ''; $line4 = '';
         }
+
+        // A maintenance/service ticket is never "delivered" — it's worked on and
+        // finished, not shipped anywhere. Steps 4–5 relabel for it (In Progress /
+        // Completed instead of Out for Delivery / Delivered), matching the same
+        // distinction admin/requests.php's arComputeTrackerSteps() already makes.
+        $is_service = ($req['request_type'] ?? '') === 'service';
 
         // Item display
         $item_display = $req['item_name'] ?? null;
@@ -533,28 +543,38 @@ displayMessage();
 
                 <div class="mrt-step-line <?php echo $line3; ?>"></div>
 
-                <!-- Step 4: Out for Delivery -->
+                <!-- Step 4: Out for Delivery / In Progress -->
                 <div class="mrt-step">
                     <div class="mrt-step-dot <?php echo $s4_dot; ?>">
-                        <?php if ($s4_dot === 'done'): ?><i class="fas fa-truck" style="font-size:0.72rem;"></i>
+                        <?php if ($is_service): ?><i class="fas fa-wrench" style="font-size:0.72rem;<?php echo in_array($s4_dot, ['done','active','pending-dot'], true) ? '' : 'opacity:0.35;'; ?>"></i>
+                        <?php elseif ($s4_dot === 'done'): ?><i class="fas fa-truck" style="font-size:0.72rem;"></i>
                         <?php elseif ($s4_dot === 'active'): ?><i class="fas fa-truck" style="font-size:0.72rem;"></i>
                         <?php elseif ($s4_dot === 'pending-dot'): ?><i class="fas fa-box-open" style="font-size:0.72rem;"></i>
                         <?php else: ?><i class="fas fa-truck" style="font-size:0.72rem;opacity:0.35;"></i>
                         <?php endif; ?>
                     </div>
-                    <div class="mrt-step-lbl <?php echo $s4_lbl; ?>"><?php echo $s4_dot === 'active' ? 'Out for Delivery' : ($s4_dot === 'done' ? 'Delivered' : 'Preparing'); ?></div>
+                    <div class="mrt-step-lbl <?php echo $s4_lbl; ?>">
+                        <?php
+                        if ($is_service) {
+                            echo 'In Progress';
+                        } else {
+                            echo $s4_dot === 'active' ? 'Out for Delivery' : ($s4_dot === 'done' ? 'Delivered' : 'Preparing');
+                        }
+                        ?>
+                    </div>
                 </div>
 
                 <div class="mrt-step-line <?php echo $line4; ?>"></div>
 
-                <!-- Step 5: Delivered -->
+                <!-- Step 5: Delivered / Completed -->
                 <div class="mrt-step">
                     <div class="mrt-step-dot <?php echo $s5_dot; ?>">
-                        <?php if ($s5_dot === 'done'): ?><i class="fas fa-box-open" style="font-size:0.72rem;"></i>
+                        <?php if ($is_service): ?><i class="fas fa-flag-checkered" style="font-size:0.72rem;<?php echo $s5_dot === 'done' ? '' : 'opacity:0.35;'; ?>"></i>
+                        <?php elseif ($s5_dot === 'done'): ?><i class="fas fa-box-open" style="font-size:0.72rem;"></i>
                         <?php else: ?><i class="fas fa-box-open" style="font-size:0.72rem;opacity:0.35;"></i>
                         <?php endif; ?>
                     </div>
-                    <div class="mrt-step-lbl <?php echo $s5_lbl; ?>">Delivered</div>
+                    <div class="mrt-step-lbl <?php echo $s5_lbl; ?>"><?php echo $is_service ? 'Completed' : 'Delivered'; ?></div>
                 </div>
 
                 <?php endif; ?>
@@ -599,8 +619,15 @@ displayMessage();
 
             <?php if ($status === 'approved'): ?>
             <div class="mrt-detail-group">
-                <div class="mrt-detail-label"><i class="fas fa-truck me-1"></i>Delivery Status</div>
+                <div class="mrt-detail-label"><i class="fas <?php echo $is_service ? 'fa-wrench' : 'fa-truck'; ?> me-1"></i><?php echo $is_service ? 'Status' : 'Delivery Status'; ?></div>
                 <div class="mrt-detail-val">
+                    <?php if ($is_service): ?>
+                    <span style="display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:700;
+                                 padding:3px 10px;border-radius:20px;
+                                 background:rgba(29,78,216,0.10);color:#1d4ed8;">
+                        <i class="fas fa-wrench"></i> In Progress
+                    </span>
+                    <?php else: ?>
                     <?php
                     $ds_labels = [
                         'out_for_delivery'  => ['label' => 'Out for Delivery',  'color' => '#1d4ed8',  'bg' => 'rgba(59,130,246,0.10)',  'icon' => 'fa-truck'],
@@ -615,6 +642,7 @@ displayMessage();
                                  background:<?php echo $dsc['bg']; ?>;color:<?php echo $dsc['color']; ?>;">
                         <i class="fas <?php echo $dsc['icon']; ?>"></i> <?php echo $dsc['label']; ?>
                     </span>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -642,9 +670,14 @@ displayMessage();
         </div>
 
 
-        <!-- Delivery Banner -->
+        <!-- Delivery / Progress Banner -->
         <?php if ($status === 'approved'): ?>
-        <?php if ($delivery_status === 'out_for_delivery'): ?>
+        <?php if ($is_service): ?>
+        <div class="mrt-notes" style="background:rgba(29,78,216,0.08);border:1px solid rgba(29,78,216,0.20);color:#1d4ed8;margin-bottom:16px;">
+            <i class="fas fa-wrench" style="margin-top:2px;flex-shrink:0;"></i>
+            <div><strong>In progress.</strong> Your approved request is being worked on.</div>
+        </div>
+        <?php elseif ($delivery_status === 'out_for_delivery'): ?>
         <div class="mrt-notes" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.20);color:#1d4ed8;margin-bottom:16px;">
             <i class="fas fa-truck fa-bounce" style="margin-top:2px;flex-shrink:0;"></i>
             <div><strong>Your item is on the way!</strong> It has been dispatched and is currently out for delivery to you.</div>
@@ -660,6 +693,12 @@ displayMessage();
             <div><strong>Preparing for delivery.</strong> Your approved request is being processed and will be dispatched soon.</div>
         </div>
         <?php endif; ?>
+        <?php endif; ?>
+        <?php if ($status === 'completed' && $is_service): ?>
+        <div class="mrt-notes" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.20);color:#15803d;margin-bottom:16px;">
+            <i class="fas fa-flag-checkered" style="margin-top:2px;flex-shrink:0;"></i>
+            <div><strong>Completed.</strong> Your maintenance request has been finished.</div>
+        </div>
         <?php endif; ?>
 
     </div>

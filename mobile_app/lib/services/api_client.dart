@@ -389,6 +389,129 @@ class ApiClient {
       // Best-effort only — the delivery confirmation itself already succeeded.
     }
   }
+
+  /// Looks up full details for a physical item by its QR code — a read-only
+  /// lookup ("what is this, and what's its status") for the item scanner's
+  /// check-details mode, never a delivery confirmation and never a write.
+  ///
+  /// Scoped to things actually belonging to [user]: an item they permanently
+  /// own, a unit they currently have borrowed, or (failing those) an active
+  /// request of theirs still moving through approval/delivery for it. A QR
+  /// that isn't tied to this user in any of those ways is refused outright —
+  /// otherwise anyone could scan a sticker lying around and see whichever
+  /// other user's borrow/ownership details it carries.
+  Future<ItemLookupResult> lookupItemDetails(AppUser user, String qrCodeId) async {
+    final qr = qrCodeId.trim();
+    if (qr.isEmpty) throw ApiException('That QR code could not be read.');
+
+    // 1) Permanently owned by this user (acquired/custom items).
+    final ownedRows = await SupabaseRest.select(
+      'user_owned_items',
+      'qr_code_id=eq.${Uri.encodeComponent(qr)}&user_id=eq.${user.id}',
+    );
+    final owned = ownedRows.firstOrNull;
+    if (owned != null) {
+      return ItemLookupResult(
+        qrCodeId: qr,
+        itemName: owned['item_name'] as String? ?? 'Item',
+        category: owned['category'] as String?,
+        condition: owned['condition'] as String?,
+        description: owned['description'] as String?,
+        ownershipLabel: 'Owned by you',
+        statusLabel: 'Owned',
+        statusColorKey: 'owned',
+        details: {
+          if (owned['year_owned'] != null) 'Year Owned': '${owned['year_owned']}',
+          if (_notBlank(owned['notes'])) 'Notes': owned['notes'] as String,
+        },
+      );
+    }
+
+    // Everything else is keyed off the physical inventory unit itself.
+    final invRows = await SupabaseRest.select('inventory', 'qr_code_id=eq.${Uri.encodeComponent(qr)}');
+    final inv = invRows.firstOrNull;
+    if (inv == null) {
+      throw ApiException('This QR code does not match any item.');
+    }
+    final invId = (inv['id'] as num).toInt();
+
+    // 2) A unit currently borrowed by this user.
+    final borrowRows = await SupabaseRest.select(
+      'borrow_records',
+      'inventory_id=eq.$invId&user_id=eq.${user.id}&order=id.desc&limit=1',
+    );
+    final borrow = borrowRows.firstOrNull;
+    if (borrow != null && (borrow['status'] == 'active' || borrow['status'] == 'overdue')) {
+      final overdue = borrow['status'] == 'overdue';
+      return ItemLookupResult(
+        qrCodeId: qr,
+        itemName: inv['item_name'] as String? ?? 'Item',
+        category: inv['category'] as String?,
+        condition: inv['condition'] as String?,
+        description: inv['description'] as String?,
+        ownershipLabel: 'Borrowed by you',
+        statusLabel: overdue ? 'Overdue' : 'Borrowed',
+        statusColorKey: overdue ? 'overdue' : 'borrowed',
+        details: {
+          'Location': (inv['location'] as String?)?.isNotEmpty == true ? inv['location'] as String : '—',
+          if (_notBlank(inv['model'])) 'Model': inv['model'] as String,
+          if (_notBlank(inv['serial_number'])) 'Serial No.': inv['serial_number'] as String,
+          if (borrow['borrow_date'] != null) 'Borrowed On': _fmtDate(borrow['borrow_date'] as String?),
+          if (borrow['expected_return_date'] != null) 'Expected Return': _fmtDate(borrow['expected_return_date'] as String?),
+        },
+      );
+    }
+
+    // 3) Not currently borrowed by this user, but maybe they have a request
+    // for it still working its way through approval/delivery.
+    final reqRows = await SupabaseRest.select(
+      'requests',
+      'inventory_id=eq.$invId&user_id=eq.${user.id}&order=id.desc&limit=1',
+    );
+    final req = reqRows.firstOrNull;
+    if (req != null && !['disapproved', 'completed'].contains(req['status'])) {
+      return ItemLookupResult(
+        qrCodeId: qr,
+        itemName: inv['item_name'] as String? ?? 'Item',
+        category: inv['category'] as String?,
+        condition: inv['condition'] as String?,
+        description: inv['description'] as String?,
+        ownershipLabel: 'Your request',
+        statusLabel: _requestStatusLabel(req['status'] as String?, req['delivery_status'] as String?),
+        statusColorKey: 'pending',
+        details: {
+          'Request Number': req['request_number'] as String? ?? '—',
+          'Location': (inv['location'] as String?)?.isNotEmpty == true ? inv['location'] as String : '—',
+        },
+      );
+    }
+
+    throw ApiException("This item isn't linked to your account — nothing to show.");
+  }
+
+  bool _notBlank(dynamic v) => v is String && v.trim().isNotEmpty;
+
+  String _requestStatusLabel(String? status, String? deliveryStatus) {
+    if (status == 'pending') return 'Pending Approval';
+    if (deliveryStatus == 'out_for_delivery') return 'Out for Delivery';
+    if (deliveryStatus == 'delivered' || status == 'delivered') return 'Delivered';
+    if (status == 'approved') return 'Approved';
+    return status == null ? 'Pending' : status[0].toUpperCase() + status.substring(1);
+  }
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  String _fmtDate(String? isoDate) {
+    if (isoDate == null || isoDate.isEmpty) return '—';
+    try {
+      final d = DateTime.parse(isoDate);
+      return '${_months[d.month - 1]} ${d.day}, ${d.year}';
+    } catch (_) {
+      return isoDate;
+    }
+  }
 }
 
 class ConfirmResult {
@@ -415,6 +538,34 @@ class ConfirmResult {
         ? 'All $totalInGroup units confirmed for $requestNumber. Last item: $itemName.'
         : '$itemName confirmed ($confirmedCount of $totalInGroup). $remainingInGroup unit(s) left — scan the next QR code.';
   }
+}
+
+/// Result of a read-only "check item details" scan — see
+/// ApiClient.lookupItemDetails(). [statusColorKey] is one of 'owned',
+/// 'borrowed', 'overdue', or 'pending', for the details screen to color.
+class ItemLookupResult {
+  final String qrCodeId;
+  final String itemName;
+  final String? category;
+  final String? condition;
+  final String? description;
+  final String ownershipLabel;
+  final String statusLabel;
+  final String statusColorKey;
+  /// Extra label/value rows shown below the main details, in order.
+  final Map<String, String> details;
+
+  ItemLookupResult({
+    required this.qrCodeId,
+    required this.itemName,
+    required this.category,
+    required this.condition,
+    required this.description,
+    required this.ownershipLabel,
+    required this.statusLabel,
+    required this.statusColorKey,
+    this.details = const {},
+  });
 }
 
 extension _FirstOrNullExt<T> on Iterable<T> {

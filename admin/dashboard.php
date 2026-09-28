@@ -85,7 +85,11 @@ if (!empty($unassigned_inventory)) {
 
 // Get request statistics
 $pending = count(filterByColumn($all_requests, 'status', 'pending'));
-$approved = count(filterByColumn($all_requests, 'status', 'approved'));
+// A request that was approved doesn't stay at status='approved' — it moves on
+// to 'delivered' then 'completed' (or just 'completed' for a service ticket).
+// Counting the literal 'approved' status alone missed every request that had
+// already progressed past that point — same fix as admin/analytics.php.
+$approved = count(array_filter($all_requests, fn($r) => in_array($r['status'], ['approved','delivered','completed'], true)));
 $disapproved = count(filterByColumn($all_requests, 'status', 'disapproved'));
 $pending_requests = $pending;
 

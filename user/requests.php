@@ -27,8 +27,15 @@ if (isset($_GET['item_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $request_type     = sanitizeInput($_POST['request_type']);
     $urgency          = in_array($_POST['urgency'] ?? '', ['low','medium','high','critical']) ? $_POST['urgency'] : 'medium';
-    $receiving_method = in_array($_POST['receiving_method'] ?? '', ['delivery','pickup']) ? $_POST['receiving_method'] : null;
     $safe_type        = in_array($request_type, ['borrow','item','service']) ? $request_type : 'borrow';
+    // Delivery/pickup only makes sense for a physical item changing hands —
+    // a maintenance/service ticket never gets "delivered". The form's
+    // receiving-method radios are only hidden (not disabled) for the service
+    // tab, so their default-checked value still rides along in the POST body
+    // even though the section was never shown — force it out explicitly
+    // rather than trusting the client to have actually hidden it.
+    $receiving_method = ($safe_type !== 'service' && in_array($_POST['receiving_method'] ?? '', ['delivery','pickup']))
+        ? $_POST['receiving_method'] : null;
 
     $cart_items = json_decode($_POST['items_json'] ?? '[]', true);
     if (!is_array($cart_items) || empty($cart_items)) {

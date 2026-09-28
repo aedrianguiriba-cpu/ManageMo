@@ -394,7 +394,12 @@ displayMessage();
     <!-- ══ ITEM REQUESTS ══ -->
     <?php
     $stat_item_pending     = count(array_filter($all_mine_item, fn($r) => $r['status'] === 'pending'));
-    $stat_item_approved    = count(array_filter($all_mine_item, fn($r) => $r['status'] === 'approved'));
+    // A request that was approved doesn't stay at status='approved' — it moves
+    // on to 'delivered' then 'completed'. Counting the literal 'approved'
+    // status alone missed every request that had already progressed past that
+    // point, which is why this showed 0 even with a stack of fulfilled
+    // requests (same fix as admin/analytics.php and admin/dashboard.php).
+    $stat_item_approved    = count(array_filter($all_mine_item, fn($r) => in_array($r['status'], ['approved','delivered','completed'], true)));
     $stat_item_disapproved = count(array_filter($all_mine_item, fn($r) => $r['status'] === 'disapproved'));
     ?>
     <div class="br-stats">
@@ -481,7 +486,10 @@ displayMessage();
     <!-- ══ SERVICE REQUESTS ══ -->
     <?php
     $stat_svc_pending     = count(array_filter($all_mine_service, fn($r) => $r['status'] === 'pending'));
-    $stat_svc_approved    = count(array_filter($all_mine_service, fn($r) => $r['status'] === 'approved'));
+    // Same fix as the Item Requests tab above — a service ticket that was
+    // approved moves on to 'completed' once finished (it never goes through
+    // 'delivered'), so the literal 'approved' status alone missed it.
+    $stat_svc_approved    = count(array_filter($all_mine_service, fn($r) => in_array($r['status'], ['approved','completed'], true)));
     $stat_svc_disapproved = count(array_filter($all_mine_service, fn($r) => $r['status'] === 'disapproved'));
     ?>
     <div class="br-stats">

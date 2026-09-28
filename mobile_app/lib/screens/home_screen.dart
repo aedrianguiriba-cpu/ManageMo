@@ -7,6 +7,7 @@ import 'requests_tab.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
 import 'scanner_screen.dart';
+import 'item_lookup_screen.dart';
 
 /// App shell: brand app bar + bottom navigation between the Dashboard and
 /// the Pending/Completed request lists. Owns the data futures so both tabs
@@ -41,6 +42,16 @@ class _HomeScreenState extends State<HomeScreen> {
       _completedFuture = _api.completedDeliveries(widget.user);
     });
     await Future.wait([_pendingFuture, _completedFuture]);
+  }
+
+  /// The "Scan" nav tab isn't a persistent page — tapping it opens the
+  /// read-only item-details scanner straight away and never changes
+  /// [_navIndex], so the bar doesn't visibly land on a 4th "screen" that
+  /// would otherwise just sit there empty once the scanner is dismissed.
+  Future<void> _openItemLookup() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ItemLookupScannerScreen(user: widget.user)),
+    );
   }
 
   Future<void> _scanItem(DeliveryItem item) async {
@@ -105,11 +116,21 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: _FloatingNavBar(
         currentIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
+        onTap: (i) {
+          // "Scan" (index 3) isn't one of the 3 IndexedStack pages — it just
+          // opens the item-details scanner on top of whichever tab is
+          // showing, so _navIndex itself never changes for it.
+          if (i == 3) {
+            _openItemLookup();
+            return;
+          }
+          setState(() => _navIndex = i);
+        },
         items: const [
           _FloatingNavItem(icon: Icons.dashboard_outlined, activeIcon: Icons.dashboard, label: 'Dashboard'),
           _FloatingNavItem(icon: Icons.qr_code_scanner, label: 'Requests'),
           _FloatingNavItem(icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
+          _FloatingNavItem(icon: Icons.search, label: 'Scan'),
         ],
       ),
     );

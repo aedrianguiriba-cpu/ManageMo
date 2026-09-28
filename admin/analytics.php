@@ -81,6 +81,25 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 .an-mini-table tr:last-child td { border-bottom:none; }
 .an-mini-table tr:hover td { background:rgba(0,0,0,0.015); }
 
+/* Mini table pager — shared by every paginated box on this page so they all
+   look and behave the same, and stay a consistent height regardless of how
+   many rows a given list happens to have. */
+.an-mini-pager { display:flex; justify-content:center; gap:6px; margin-top:12px; padding-top:12px; border-top:1px solid rgba(0,0,0,0.05); }
+.an-mini-pager a {
+    min-width:26px; text-align:center; border-radius:5px; padding:3px 0;
+    font-size:0.78rem; font-weight:700; text-decoration:none;
+    background:#f7f7f7; color:#555; border:1px solid #e5e7eb;
+}
+.an-mini-pager a.active { background:#8B0000; color:#fff; border-color:#8B0000; }
+
+/* Equal-height cards within a row, with the pager always pinned to the
+   bottom — otherwise a card with fewer rows just looks shorter than its
+   neighbors instead of lining up with them. */
+.row.g-3 > [class*="col-"] { display:flex; }
+.an-card { display:flex; flex-direction:column; width:100%; }
+.an-card > table { flex:0 0 auto; }
+.an-card > .an-mini-pager { margin-top:auto; }
+
 .an-badge {
     display:inline-flex; align-items:center;
     padding:3px 10px; border-radius:4px; font-size:0.74rem; font-weight:700;
@@ -167,7 +186,14 @@ $inv_value       = array_sum(array_column($filtered_inventory,'cost'));
 
 $req_total       = count($filtered_requests);
 $req_pending     = count(filterByColumn(array_values($filtered_requests),'status','pending'));
-$req_approved    = count(filterByColumn(array_values($filtered_requests),'status','approved'));
+// A request that was approved doesn't stay at status='approved' — it moves on
+// to 'delivered' then 'completed' (or just 'completed' for a service ticket).
+// Counting the literal 'approved' status alone missed every request that had
+// already progressed past that point, which in practice is almost all of
+// them — this showed 0 approved even with a full pipeline of approved,
+// fulfilled requests. 'Was approved' means it's anywhere past that gate and
+// wasn't disapproved, i.e. any status other than pending/disapproved.
+$req_approved    = count(array_filter($filtered_requests, fn($r) => in_array($r['status'], ['approved','delivered','completed'], true)));
 $req_disapproved = count(filterByColumn(array_values($filtered_requests),'status','disapproved'));
 $req_critical    = count(filterByColumn(array_values($filtered_requests),'urgency','critical'));
 
@@ -186,14 +212,31 @@ $category_counts = [];
 foreach ($filtered_inventory as $inv) $category_counts[$inv['category']] = ($category_counts[$inv['category']] ?? 0) + 1;
 arsort($category_counts);
 
+// Re-shape into the same [{'name','total'}] row shape anPaginate()/anPageUrl()
+// (defined below — PHP hoists top-level function declarations) expect, so
+// every mini-table on this page paginates the same way.
+$category_rows = [];
+foreach ($category_counts as $cat_name => $cat_count) $category_rows[] = ['name' => $cat_name, 'total' => $cat_count];
+
+// These breakdowns only scanned the inventory table — but an inventory item's
+// college_id is only ever set while it's actively borrowed/requested (see
+// "Available = no owner"), and clears back to null the moment it's returned.
+// User-owned items (acquired/custom items permanently transferred to someone)
+// live entirely in the separate user_owned_items table instead, each carrying
+// its own college_id — none of that ever got counted here, so a department
+// could genuinely own dozens of items and still show "1" or nothing at all.
+// user_owned_items has no cost column, so owned items add to Items but not Value.
+$__owned_for_breakdown = getUserOwnedItems();
+
 // Per-college breakdown
 $college_breakdown = [];
 foreach (getMainCampusColleges() as $abbr => $fullname) {
     $co_items = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $abbr));
-    if (empty($co_items)) continue;
+    $co_owned = array_values(array_filter($__owned_for_breakdown, fn($i) => ($i['college_id'] ?? '') === $abbr));
+    if (empty($co_items) && empty($co_owned)) continue;
     $college_breakdown[] = [
         'name'  => $fullname,
-        'total' => count($co_items),
+        'total' => count($co_items) + count($co_owned),
         'value' => array_sum(array_column($co_items, 'cost')),
     ];
 }
@@ -203,10 +246,11 @@ usort($college_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
 $office_breakdown = [];
 foreach (getMainCampusOffices() as $abbr => $fullname) {
     $of_items = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $abbr));
-    if (empty($of_items)) continue;
+    $of_owned = array_values(array_filter($__owned_for_breakdown, fn($i) => ($i['college_id'] ?? '') === $abbr));
+    if (empty($of_items) && empty($of_owned)) continue;
     $office_breakdown[] = [
         'name'  => $fullname,
-        'total' => count($of_items),
+        'total' => count($of_items) + count($of_owned),
         'value' => array_sum(array_column($of_items, 'cost')),
     ];
 }
@@ -217,14 +261,44 @@ $campus_breakdown = [];
 foreach (getDepartmentCampuses() as $campus) {
     if ($campus['abbreviation'] === '') continue;
     $ca_items = array_values(array_filter($all_inventory, fn($i) => ($i['college_id'] ?? '') === $campus['abbreviation']));
-    if (empty($ca_items)) continue;
+    $ca_owned = array_values(array_filter($__owned_for_breakdown, fn($i) => ($i['college_id'] ?? '') === $campus['abbreviation']));
+    if (empty($ca_items) && empty($ca_owned)) continue;
     $campus_breakdown[] = [
         'name'  => $campus['name'],
-        'total' => count($ca_items),
+        'total' => count($ca_items) + count($ca_owned),
         'value' => array_sum(array_column($ca_items, 'cost')),
     ];
 }
 usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
+
+// Pagination for the three breakdown tables — each paginates independently
+// since they're unrelated lists, same pattern as the Department Summary table
+// on the dashboard.
+$__breakdown_page_size = 5;
+function anPaginate(array $rows, string $get_key, int $page_size): array {
+    $page        = max(1, (int)($_GET[$get_key] ?? 1));
+    $total_pages = max(1, (int)ceil(count($rows) / $page_size));
+    $page        = min($page, $total_pages);
+    $offset      = ($page - 1) * $page_size;
+    return ['page' => $page, 'total_pages' => $total_pages, 'rows' => array_slice($rows, $offset, $page_size)];
+}
+$__college_pg  = anPaginate($college_breakdown, 'college_page',  $__breakdown_page_size);
+$__office_pg   = anPaginate($office_breakdown,  'office_page',   $__breakdown_page_size);
+$__campus_pg   = anPaginate($campus_breakdown,  'campus_page',   $__breakdown_page_size);
+$__topitems_pg = anPaginate($top_items_data,    'topitems_page', $__breakdown_page_size);
+$__category_pg = anPaginate($category_rows,     'category_page', $__breakdown_page_size);
+
+// Preserves the page's other filters (dept_id/date range) when switching pages
+// on one of these tables, even though the tables themselves aren't date-filtered.
+function anPageUrl(string $get_key, int $page): string {
+    global $dept_id, $date_from, $date_to;
+    $qs = $_GET;
+    $qs[$get_key] = $page;
+    $qs['dept_id']    = $dept_id;
+    $qs['date_from']  = $date_from;
+    $qs['date_to']    = $date_to;
+    return 'analytics.php?' . http_build_query($qs);
+}
 ?>
 
 <!-- Stat cards -->
@@ -322,7 +396,7 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
 <div class="row g-3">
     <!-- Most Requested Items -->
     <div class="col-md-6">
-        <div class="an-card">
+        <div class="an-card" id="top-items">
             <div class="an-card-title">
                 <div class="an-card-icon"><i class="fas fa-star"></i></div>
                 Most Requested Items
@@ -330,7 +404,7 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
             <table class="an-mini-table">
                 <thead><tr><th>Item</th><th style="text-align:right;">Requests</th></tr></thead>
                 <tbody>
-                <?php if (!empty($top_items_data)): foreach ($top_items_data as $item): ?>
+                <?php if (!empty($__topitems_pg['rows'])): foreach ($__topitems_pg['rows'] as $item): ?>
                 <tr>
                     <td><?php echo htmlspecialchars($item['item_name']); ?></td>
                     <td style="text-align:right;"><span class="an-badge an-badge-primary"><?php echo $item['req_count']; ?></span></td>
@@ -340,12 +414,19 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
                 <?php endif; ?>
                 </tbody>
             </table>
+            <?php if ($__topitems_pg['total_pages'] > 1): ?>
+            <div class="an-mini-pager">
+                <?php for ($i = 1; $i <= $__topitems_pg['total_pages']; $i++): ?>
+                <a href="<?php echo anPageUrl('topitems_page', $i); ?>#top-items" class="<?php echo $i === $__topitems_pg['page'] ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                <?php endfor; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 
     <!-- Category Distribution -->
     <div class="col-md-6">
-        <div class="an-card">
+        <div class="an-card" id="category-breakdown">
             <div class="an-card-title">
                 <div class="an-card-icon"><i class="fas fa-tags"></i></div>
                 Item Categories
@@ -353,16 +434,23 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
             <table class="an-mini-table">
                 <thead><tr><th>Category</th><th style="text-align:right;">Count</th></tr></thead>
                 <tbody>
-                <?php if (!empty($category_counts)): foreach ($category_counts as $cat_name => $cat_count): ?>
+                <?php if (!empty($__category_pg['rows'])): foreach ($__category_pg['rows'] as $cat): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($cat_name); ?></td>
-                    <td style="text-align:right;"><span class="an-badge an-badge-info"><?php echo $cat_count; ?></span></td>
+                    <td><?php echo htmlspecialchars($cat['name']); ?></td>
+                    <td style="text-align:right;"><span class="an-badge an-badge-info"><?php echo $cat['total']; ?></span></td>
                 </tr>
                 <?php endforeach; else: ?>
                 <tr><td colspan="2" style="text-align:center;color:rgba(0,0,0,0.35);padding:24px;">No data available</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
+            <?php if ($__category_pg['total_pages'] > 1): ?>
+            <div class="an-mini-pager">
+                <?php for ($i = 1; $i <= $__category_pg['total_pages']; $i++): ?>
+                <a href="<?php echo anPageUrl('category_page', $i); ?>#category-breakdown" class="<?php echo $i === $__category_pg['page'] ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                <?php endfor; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
@@ -370,7 +458,7 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
 <!-- Per-College / Per-Office / Per-Campus Breakdown -->
 <div class="row g-3 mt-1">
     <div class="col-md-4">
-        <div class="an-card">
+        <div class="an-card" id="college-breakdown">
             <div class="an-card-title">
                 <div class="an-card-icon"><i class="fas fa-building-columns"></i></div>
                 Inventory by College <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
@@ -378,7 +466,7 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
             <table class="an-mini-table">
                 <thead><tr><th>College</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
                 <tbody>
-                <?php if (!empty($college_breakdown)): foreach ($college_breakdown as $co): ?>
+                <?php if (!empty($__college_pg['rows'])): foreach ($__college_pg['rows'] as $co): ?>
                 <tr>
                     <td><?php echo htmlspecialchars($co['name']); ?></td>
                     <td style="text-align:right;"><span class="an-badge an-badge-primary"><?php echo $co['total']; ?></span></td>
@@ -389,10 +477,17 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
                 <?php endif; ?>
                 </tbody>
             </table>
+            <?php if ($__college_pg['total_pages'] > 1): ?>
+            <div class="an-mini-pager">
+                <?php for ($i = 1; $i <= $__college_pg['total_pages']; $i++): ?>
+                <a href="<?php echo anPageUrl('college_page', $i); ?>#college-breakdown" class="<?php echo $i === $__college_pg['page'] ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                <?php endfor; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="an-card">
+        <div class="an-card" id="office-breakdown">
             <div class="an-card-title">
                 <div class="an-card-icon"><i class="fas fa-building"></i></div>
                 Inventory by Office <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
@@ -400,7 +495,7 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
             <table class="an-mini-table">
                 <thead><tr><th>Office</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
                 <tbody>
-                <?php if (!empty($office_breakdown)): foreach ($office_breakdown as $of): ?>
+                <?php if (!empty($__office_pg['rows'])): foreach ($__office_pg['rows'] as $of): ?>
                 <tr>
                     <td><?php echo htmlspecialchars($of['name']); ?></td>
                     <td style="text-align:right;"><span class="an-badge an-badge-info"><?php echo $of['total']; ?></span></td>
@@ -411,10 +506,17 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
                 <?php endif; ?>
                 </tbody>
             </table>
+            <?php if ($__office_pg['total_pages'] > 1): ?>
+            <div class="an-mini-pager">
+                <?php for ($i = 1; $i <= $__office_pg['total_pages']; $i++): ?>
+                <a href="<?php echo anPageUrl('office_page', $i); ?>#office-breakdown" class="<?php echo $i === $__office_pg['page'] ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                <?php endfor; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="an-card">
+        <div class="an-card" id="campus-breakdown">
             <div class="an-card-title">
                 <div class="an-card-icon" style="color:#7c3aed;"><i class="fas fa-map-marker-alt"></i></div>
                 Inventory by Campus <span style="font-weight:400;color:rgba(0,0,0,0.35);font-size:0.78rem;">(overall — not date filtered)</span>
@@ -422,7 +524,7 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
             <table class="an-mini-table">
                 <thead><tr><th>Campus</th><th style="text-align:right;">Items</th><th style="text-align:right;">Value</th></tr></thead>
                 <tbody>
-                <?php if (!empty($campus_breakdown)): foreach ($campus_breakdown as $ca): ?>
+                <?php if (!empty($__campus_pg['rows'])): foreach ($__campus_pg['rows'] as $ca): ?>
                 <tr>
                     <td><?php echo htmlspecialchars($ca['name']); ?></td>
                     <td style="text-align:right;"><span class="an-badge" style="background:rgba(124,58,237,.10);color:#7c3aed;"><?php echo $ca['total']; ?></span></td>
@@ -433,6 +535,13 @@ usort($campus_breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
                 <?php endif; ?>
                 </tbody>
             </table>
+            <?php if ($__campus_pg['total_pages'] > 1): ?>
+            <div class="an-mini-pager">
+                <?php for ($i = 1; $i <= $__campus_pg['total_pages']; $i++): ?>
+                <a href="<?php echo anPageUrl('campus_page', $i); ?>#campus-breakdown" class="<?php echo $i === $__campus_pg['page'] ? 'active' : ''; ?>"><?php echo $i; ?></a>
+                <?php endfor; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>
