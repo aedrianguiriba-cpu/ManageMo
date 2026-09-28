@@ -41,6 +41,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setAppSetting('terminology', $terminology);
         logActivity($current_user['id'], 'UPDATE', 'Changed site terminology to ' . ($terminology === 'alt' ? 'Transferrable/Procurement' : 'Borrow/Request (default)'), 'app_settings', 0);
         redirectWithMessage('settings.php#system-tab', 'Terminology updated site-wide.', 'success');
+
+    } elseif ($action === 'update_catalog_paging') {
+        // Clamped to a sane range — 0 or a huge number would effectively break
+        // pagination (infinite pages, or one giant unpaginated page).
+        $page_size = max(4, min(60, (int)($_POST['borrow_catalog_page_size'] ?? 12)));
+        setAppSetting('borrow_catalog_page_size', (string)$page_size);
+        logActivity($current_user['id'], 'UPDATE', "Changed Borrow catalog page size to $page_size", 'app_settings', 0);
+        redirectWithMessage('settings.php#system-tab', 'Borrow catalog page size updated.', 'success');
     }
 }
 
@@ -526,6 +534,26 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     </div>
                     <div style="font-size:0.76rem;color:rgba(0,0,0,0.40);margin-top:10px;">
                         <i class="fas fa-info-circle me-1"></i>Changes only the wording shown on screen — statuses, URLs, and how requests work behind the scenes are unaffected.
+                    </div>
+                </form>
+            </div>
+            <div class="as-card">
+                <div class="as-card-title"><i class="fas fa-layer-group me-2" style="opacity:0.8;"></i>Borrow Catalog Pagination</div>
+                <div class="as-card-sub">How many items show per page in the Borrow catalog on the user Submit Request page.</div>
+                <?php $current_page_size = (int)getAppSetting('borrow_catalog_page_size', '12'); ?>
+                <form method="POST" action="settings.php#system-tab" style="margin-top:8px;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+                    <input type="hidden" name="action" value="update_catalog_paging">
+                    <div>
+                        <label style="display:block;font-size:0.76rem;font-weight:700;color:rgba(0,0,0,0.50);margin-bottom:4px;">Items per page</label>
+                        <input type="number" name="borrow_catalog_page_size" min="4" max="60" step="1"
+                               value="<?php echo $current_page_size; ?>"
+                               style="width:100px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:0.9rem;">
+                    </div>
+                    <button type="submit" class="btn" style="background:#8B0000;color:#fff;font-weight:700;font-size:0.85rem;padding:9px 18px;border-radius:6px;border:none;">
+                        <i class="fas fa-save me-1"></i>Save
+                    </button>
+                    <div style="width:100%;font-size:0.76rem;color:rgba(0,0,0,0.40);">
+                        <i class="fas fa-info-circle me-1"></i>Between 4 and 60. Takes effect immediately for everyone.
                     </div>
                 </form>
             </div>

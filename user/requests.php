@@ -1703,10 +1703,12 @@ function selectBorrowCard(card) {
     updateSummary();
 }
 
-// Borrow catalog: 12 cards per page, applied on top of whatever the search
-// box/category pills currently match. Re-filtering always jumps back to page
-// 1 — otherwise switching category could land you on a now out-of-range page.
-var BSHOP_PAGE_SIZE = 12;
+// Borrow catalog pagination, applied on top of whatever the search box/
+// category pills currently match. Re-filtering always jumps back to page 1
+// — otherwise switching category could land you on a now out-of-range page.
+// Page size is admin-configurable (Settings > System Settings > Borrow
+// Catalog Pagination), not hardcoded.
+var BSHOP_PAGE_SIZE = <?php echo max(4, min(60, (int)getAppSetting('borrow_catalog_page_size', '12'))); ?>;
 
 function filterShopItems(btn) {
     if (btn) {
