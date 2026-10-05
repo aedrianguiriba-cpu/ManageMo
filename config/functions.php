@@ -3,6 +3,15 @@ require_once 'data.php';
 require_once 'constants.php';
 require_once 'smtp.php';
 
+// Today's date in the university's own timezone — PHP's default timezone is
+// whatever the host happens to be set to (commonly UTC on shared hosting),
+// which for 8 hours after midnight Philippine time still reports "yesterday".
+// Anything comparing against "today" (e.g. rejecting past dates on a request
+// form) needs this instead of bare date('Y-m-d').
+function appToday(): string {
+    return (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+}
+
 // Session management
 function startSession() {
     if (session_status() === PHP_SESSION_NONE) {

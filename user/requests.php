@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Reject any submission carrying a "Date Needed" or "Expected Return Date"
     // before today — checked against the cart payload itself (not just the
     // client-side min= attribute below), since that's client-editable.
-    $today_for_validation = date('Y-m-d');
+    $today_for_validation = appToday();
     $has_past_date = false;
     if (is_array($cart_items)) {
         foreach ($cart_items as $__entry) {
@@ -291,7 +291,7 @@ $item_avail_data = [];
 // computed from the date itself (expected_return_date already passed, still not
 // returned) rather than trusted from the status column, which nothing ever flips
 // to 'overdue' automatically.
-$__today_str = date('Y-m-d');
+$__today_str = appToday();
 foreach ($borrow_records_all as $br) {
     if (in_array($br['status'], ['active', 'overdue']) && empty($br['actual_return_date'])) {
         $iid = $br['inventory_id'];
@@ -1286,7 +1286,7 @@ if (!empty($submit_error)): ?>
                                 <div class="rq-input-wrap">
                                     <i class="fas fa-calendar rq-input-icon"></i>
                                     <input type="date" class="form-control" id="borrow_date_needed"
-                                           name="borrow_date_needed" min="<?php echo date('Y-m-d'); ?>" onchange="updateSummary()">
+                                           name="borrow_date_needed" min="<?php echo appToday(); ?>" onchange="updateSummary()">
                                 </div>
                             </div>
                         </div>
@@ -1296,7 +1296,7 @@ if (!empty($submit_error)): ?>
                                 <div class="rq-input-wrap">
                                     <i class="fas fa-calendar rq-input-icon"></i>
                                     <input type="date" class="form-control" id="expected_return_date"
-                                           name="expected_return_date" required min="<?php echo date('Y-m-d'); ?>" onchange="updateSummary()">
+                                           name="expected_return_date" required min="<?php echo appToday(); ?>" onchange="updateSummary()">
                                 </div>
                             </div>
                         </div>
@@ -1453,7 +1453,7 @@ if (!empty($submit_error)): ?>
                             <label>Date Needed</label>
                             <div class="rq-input-wrap">
                                 <i class="fas fa-calendar rq-input-icon"></i>
-                                <input type="date" class="form-control" id="item_date_needed" name="item_date_needed" min="<?php echo date('Y-m-d'); ?>" oninput="updateSummary()">
+                                <input type="date" class="form-control" id="item_date_needed" name="item_date_needed" min="<?php echo appToday(); ?>" oninput="updateSummary()">
                             </div>
                         </div>
                     </div>
@@ -1504,7 +1504,7 @@ if (!empty($submit_error)): ?>
                             <label>Date Needed</label>
                             <div class="rq-input-wrap">
                                 <i class="fas fa-calendar rq-input-icon"></i>
-                                <input type="date" class="form-control" id="service_date_needed" name="service_date_needed" min="<?php echo date('Y-m-d'); ?>" oninput="updateSummary()">
+                                <input type="date" class="form-control" id="service_date_needed" name="service_date_needed" min="<?php echo appToday(); ?>" oninput="updateSummary()">
                             </div>
                         </div>
                     </div>
