@@ -1132,7 +1132,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                         <?php endif; ?>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="detailUnitsBody">
                 <?php foreach ($detail_units as $di_idx => $di): ?>
                     <tr style="border-bottom:1px solid #f0f0f0;">
                         <?php if ($__pending): ?>
@@ -1158,6 +1158,7 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
                 </tbody>
             </table>
             </div>
+            <nav class="mt-3"><ul id="detailUnitsPagination" class="pagination justify-content-center mb-0"></ul></nav>
         </div>
         <?php elseif ($request['request_type'] === 'borrow'): ?>
         <div class="ar-card mb-3">
@@ -1726,6 +1727,54 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
 </div>
 
 <script>
+// Paginate the "{Type} Units" table client-side — a bulk request (e.g. 50
+// borrowed chairs) can have far more rows than fit comfortably on screen.
+// Hidden rows stay in the DOM (just display:none), so the Select All
+// checkbox and the approval form submission still see every unit regardless
+// of which page is currently shown.
+(function() {
+    var PAGE_SIZE = 15;
+    var body = document.getElementById('detailUnitsBody');
+    var pager = document.getElementById('detailUnitsPagination');
+    if (!body || !pager) return;
+
+    var rows = Array.prototype.slice.call(body.children);
+    var totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    if (totalPages <= 1) return;
+
+    var page = 1;
+
+    function render() {
+        var start = (page - 1) * PAGE_SIZE;
+        rows.forEach(function(row, i) {
+            row.style.display = (i >= start && i < start + PAGE_SIZE) ? '' : 'none';
+        });
+
+        pager.innerHTML = '';
+        function addItem(label, targetPage, disabled, active) {
+            var li = document.createElement('li');
+            li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+            var a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.textContent = label;
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (disabled) return;
+                page = targetPage;
+                render();
+            });
+            li.appendChild(a);
+            pager.appendChild(li);
+        }
+        addItem('‹', Math.max(1, page - 1), page <= 1, false);
+        for (var i = 1; i <= totalPages; i++) addItem(String(i), i, false, i === page);
+        addItem('›', Math.min(totalPages, page + 1), page >= totalPages, false);
+    }
+
+    render();
+})();
+
 function toggleUnitTracker(uid, trigger, evt) {
     // Ignore clicks that landed on a link/button inside the row (e.g. "View")
     // so the row-click toggle doesn't hijack normal navigation.
