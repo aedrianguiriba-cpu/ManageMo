@@ -252,12 +252,18 @@ function getUserOwnedItems(): array {
     });
 }
 
-// ── Parallel cache warm-up ────────────────────────────────────────────────────
+// ── Cache warm-up ──────────────────────────────────────────────────────────────
 // Call once near the top of a page that's about to call several of the
-// whole-table getters above (the dashboard and reports pages each call ~8).
-// Fires the still-stale ones concurrently via cURL multi instead of paying
-// N sequential Supabase round-trips, then primes the cache so the individual
-// getX() calls that follow are in-memory hits.
+// whole-table getters above (the dashboard and reports pages each call ~8),
+// so repeat calls to those getX() functions later in the same request are
+// in-memory hits instead of separate _dbCache() misses.
+//
+// This used to fire the still-stale tables concurrently via cURL multi, but
+// that relies on curl_multi_select()'s select()-syscall behavior, which some
+// restricted shared hosts (this app runs on free-tier InfinityFree) handle
+// badly — pages were hanging indefinitely on exactly the requests that used
+// it. Plain sequential fetches are slower per cold-cache page load but
+// actually finish, which matters more.
 function warmSharedCache(array $tables = ['users', 'inventory', 'requests', 'user_owned_items', 'borrow_records', 'departments_college', 'departments_office', 'departments_campus']): void {
     $specs = [
         'users'               => ['users', 'order=id.asc'],
@@ -270,19 +276,6 @@ function warmSharedCache(array $tables = ['users', 'inventory', 'requests', 'use
         'departments_campus'  => ['departments', 'type=eq.campus&order=full_name.asc'],
     ];
 
-    $mem =& _dbCacheMem();
-    $queries = [];
-    foreach ($tables as $key) {
-        if (!isset($specs[$key])) continue;
-        if (array_key_exists($key, $mem)) continue;      // already warm this request
-        if (_dbCacheReadFresh($key, $mem)) continue;      // fresh file cache — no need to refetch
-        $queries[$key] = $specs[$key];
-    }
-
-    if (empty($queries)) return;
-
-    $results = supabase()->selectBatch($queries);
-
     $mappers = [
         'users'            => fn($rows) => array_map('_mapUserRow', $rows),
         'inventory'        => fn($rows) => array_map('_mapInventoryRow', $rows),
@@ -294,7 +287,14 @@ function warmSharedCache(array $tables = ['users', 'inventory', 'requests', 'use
         'departments_campus'  => fn($rows) => array_map('_mapCampusRow', $rows),
     ];
 
-    foreach ($results as $key => $rows) {
+    $mem =& _dbCacheMem();
+    foreach ($tables as $key) {
+        if (!isset($specs[$key])) continue;
+        if (array_key_exists($key, $mem)) continue;      // already warm this request
+        if (_dbCacheReadFresh($key, $mem)) continue;      // fresh file cache — no need to refetch
+
+        [$table, $qs] = $specs[$key];
+        $rows = supabase()->select($table, $qs);
         $data = isset($mappers[$key]) ? $mappers[$key]($rows) : $rows;
         _dbCacheSet($key, $data);
     }
