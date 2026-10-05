@@ -248,6 +248,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 ?>
 <div class="main-wrapper">
 <?php
+// Fire all the whole-table Supabase fetches this page needs concurrently
+// instead of one-by-one — see config/data.php.
+warmSharedCache();
+
 $all_inventory  = getInventory();
 // Inventory is a single global list — no more campus scoping.
 $inventory_items = $all_inventory;

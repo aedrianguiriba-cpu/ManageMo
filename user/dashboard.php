@@ -11,6 +11,10 @@ $user_id = $current_user['id'];
 $dept_user_ids = getDepartmentMateIds($current_user);
 $is_shared_dept = count($dept_user_ids) > 1;
 
+// Fire all the whole-table Supabase fetches this page needs concurrently
+// instead of one-by-one — see config/data.php.
+warmSharedCache();
+
 // Department (college/office) info for the welcome banner, if the user has one set.
 $user_departments = getMainCampusDepartments();
 $user_dept_name = !empty($current_user['college_id']) ? ($user_departments[$current_user['college_id']] ?? $current_user['college_id']) : null;

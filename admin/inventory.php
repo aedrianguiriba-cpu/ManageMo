@@ -812,6 +812,10 @@ displayMessage();
     <?php else: ?>
 
     <?php
+    // Fire all the whole-table Supabase fetches this page needs concurrently
+    // instead of one-by-one — see config/data.php.
+    warmSharedCache();
+
     $all_items = getInventory();
 
     // Shared filter/search — applies to the All Items and Available tabs.

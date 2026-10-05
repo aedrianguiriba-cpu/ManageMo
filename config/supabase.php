@@ -62,6 +62,10 @@ class SupabaseClient {
             CURLOPT_DNS_CACHE_TIMEOUT => 120,
             CURLOPT_FORBID_REUSE      => false,
             CURLOPT_FRESH_CONNECT     => false,
+            // Empty string = "accept any encoding curl supports" (gzip/deflate/br)
+            // and auto-decompress it — PostgREST responses compress well, so this
+            // cuts bytes-over-wire for the bigger tables without any API change.
+            CURLOPT_ENCODING => '',
         ]);
 
         if ($body !== null) {
@@ -101,6 +105,19 @@ class SupabaseClient {
     public function selectBatch(array $queries): array {
         if (empty($queries)) return [];
 
+        // Some restricted shared-hosting environments disable or sandbox the
+        // curl_multi_* functions (or the underlying select() syscall behaves
+        // oddly under them), which can turn the exec loop below into an
+        // infinite spin and hang the whole page. Fail safe: fall back to
+        // plain sequential selects rather than risk that.
+        if (!function_exists('curl_multi_init')) {
+            $results = [];
+            foreach ($queries as $key => [$table, $qs]) {
+                $results[$key] = $this->select($table, $qs);
+            }
+            return $results;
+        }
+
         $headers = [
             'apikey: '        . $this->key,
             'Authorization: Bearer ' . $this->key,
@@ -122,16 +139,26 @@ class SupabaseClient {
                 CURLOPT_TIMEOUT        => 10,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
+                CURLOPT_ENCODING       => '',
             ]);
             curl_multi_add_handle($mh, $ch);
             $handles[$key] = $ch;
         }
 
-        $running = null;
+        // Hard wall-clock cap on top of each handle's own CURLOPT_TIMEOUT — a
+        // belt-and-suspenders guard so a misbehaving curl_multi_select() (it
+        // can return -1 and spin instead of blocking, on some restricted
+        // hosts) can never turn into an indefinitely-loading page. Whatever
+        // hasn't finished by the cap is abandoned and treated as empty below.
+        $deadline = time() + 12;
+        $running  = null;
         do {
             $status = curl_multi_exec($mh, $running);
-            if ($running) curl_multi_select($mh);
-        } while ($running > 0 && $status === CURLM_OK);
+            if ($running) {
+                $sel = curl_multi_select($mh, 1.0);
+                if ($sel === -1) usleep(10000); // avoid busy-spin if select() itself misbehaves
+            }
+        } while ($running > 0 && $status === CURLM_OK && time() < $deadline);
 
         $results = [];
         foreach ($handles as $key => $ch) {

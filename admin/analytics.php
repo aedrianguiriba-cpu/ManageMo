@@ -154,6 +154,10 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 </div>
 
 <?php
+// Fire all the whole-table Supabase fetches this page needs concurrently
+// instead of one-by-one — see config/data.php.
+warmSharedCache();
+
 $all_inventory = getInventory();
 $all_requests  = getRequests();
 
