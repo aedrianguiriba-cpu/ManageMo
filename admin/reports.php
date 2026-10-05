@@ -19,6 +19,10 @@ $status_f    = sanitizeInput($_GET['status']    ?? '');
 $page        = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $per_page    = 15;
 
+// Fire all the whole-table Supabase fetches this page needs concurrently
+// instead of one-by-one — see config/data.php.
+warmSharedCache();
+
 // Data
 $all_inventory = getInventory();
 $all_requests  = getRequests();

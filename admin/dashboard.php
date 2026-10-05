@@ -14,6 +14,10 @@ $available_items = 0;
 $borrowed_items = 0;
 $pending_requests = 0;
 
+// Fire all the whole-table Supabase fetches this page needs concurrently
+// instead of one-by-one — see config/data.php.
+warmSharedCache();
+
 // Join colleges, offices, and campuses into one flat "owner" list — each owns
 // inventory the same way, via its abbreviation stored in inventory.college_id.
 $all_inventory = getInventory();

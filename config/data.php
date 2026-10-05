@@ -12,6 +12,12 @@ const DB_CACHE_TTL = 60;
 // Shared invalidation flag file — written by any admin write; checked by all sessions.
 define('DB_CACHE_FLAG_FILE', sys_get_temp_dir() . '/managemo_cache_invalidated.txt');
 
+// Directory for the shared cross-user cache — one file per table, shared by
+// every visitor instead of duplicated per-session. This is what makes the
+// Supabase round-trip happen once per TTL window for the whole site instead
+// of once per TTL window per logged-in user.
+define('DB_CACHE_DIR', sys_get_temp_dir() . '/managemo_cache');
+
 function _globalCacheInvalidatedAt(): int {
     static $t = null;
     if ($t === null) {
@@ -20,45 +26,66 @@ function _globalCacheInvalidatedAt(): int {
     return $t;
 }
 
-// ── In-request + session cache ────────────────────────────────────────────────
-function _dbCache(string $key, callable $loader): array {
+function _dbCacheFile(string $key): string {
+    return DB_CACHE_DIR . '/' . preg_replace('/[^a-zA-Z0-9_]/', '_', $key) . '.json';
+}
+
+// In-request memory store, shared by _dbCache() and warmSharedCache() (returned
+// by reference so both can populate the same underlying array).
+function &_dbCacheMem(): array {
     static $c = [];
+    return $c;
+}
 
-    // Layer 1: in-request memory (free)
-    if (array_key_exists($key, $c)) return $c[$key];
-
-    // Layer 2: session cache with TTL, invalidated by global flag
-    if (session_status() === PHP_SESSION_ACTIVE) {
-        $entry = $_SESSION['_db_cache'][$key] ?? null;
-        if ($entry
-            && (time() - $entry['ts']) < DB_CACHE_TTL
-            && $entry['ts'] >= _globalCacheInvalidatedAt()) {
-            $c[$key] = $entry['data'];
-            return $c[$key];
-        }
+// Reads a key's still-fresh shared file cache entry into memory, if any.
+// Returns true on a hit (and populates $mem[$key]), false otherwise.
+function _dbCacheReadFresh(string $key, array &$mem): bool {
+    $raw = @file_get_contents(_dbCacheFile($key));
+    if ($raw === false) return false;
+    $entry = json_decode($raw, true);
+    if (!is_array($entry)
+        || (time() - $entry['ts']) >= DB_CACHE_TTL
+        || $entry['ts'] < _globalCacheInvalidatedAt()) {
+        return false;
     }
+    $mem[$key] = $entry['data'];
+    return true;
+}
+
+function _dbCacheSet(string $key, array $data): void {
+    $mem =& _dbCacheMem();
+    $mem[$key] = $data;
+    if (!is_dir(DB_CACHE_DIR)) @mkdir(DB_CACHE_DIR, 0777, true);
+    @file_put_contents(_dbCacheFile($key), json_encode(['data' => $data, 'ts' => time()]), LOCK_EX);
+}
+
+// ── In-request + shared file cache ────────────────────────────────────────────
+function _dbCache(string $key, callable $loader): array {
+    $mem =& _dbCacheMem();
+
+    // Layer 1: in-request memory (free) — also what warmSharedCache() primes.
+    if (array_key_exists($key, $mem)) return $mem[$key];
+
+    // Layer 2: shared file cache with TTL, invalidated by global flag.
+    // Shared across ALL users/sessions so only one visitor per TTL window
+    // pays the Supabase round-trip; everyone else reads the cached file.
+    if (_dbCacheReadFresh($key, $mem)) return $mem[$key];
 
     // Layer 3: live Supabase API call
     $data = $loader();
-    $c[$key] = $data;
-
-    if (session_status() === PHP_SESSION_ACTIVE) {
-        $_SESSION['_db_cache'][$key] = ['data' => $data, 'ts' => time()];
-    }
-
+    _dbCacheSet($key, $data);
     return $data;
 }
 
-// Call this after any write/update/delete so all sessions re-fetch fresh data.
+// Call this after any write/update/delete so all users re-fetch fresh data.
 function clearDataCache(string ...$keys): void {
-    // Write global invalidation timestamp so other users' session caches also expire.
+    // Write global invalidation timestamp so every cached file is treated as stale.
     @file_put_contents(DB_CACHE_FLAG_FILE, time());
 
-    if (session_status() !== PHP_SESSION_ACTIVE) return;
     if (empty($keys)) {
-        unset($_SESSION['_db_cache']);
+        foreach (glob(DB_CACHE_DIR . '/*.json') ?: [] as $f) @unlink($f);
     } else {
-        foreach ($keys as $k) unset($_SESSION['_db_cache'][$k]);
+        foreach ($keys as $k) @unlink(_dbCacheFile($k));
     }
 }
 
@@ -67,12 +94,16 @@ function clearDataCache(string ...$keys): void {
 // or nested under a "Main Campus". A $campus_id argument is still accepted so
 // existing call sites keep working, but it no longer affects the result.
 
+function _mapDepartmentsByType(array $rows): array {
+    $out = [];
+    foreach ($rows as $r) $out[$r['abbreviation']] = $r['full_name'];
+    return $out;
+}
+
 function _departmentsByType(string $type): array {
     return _dbCache("departments_{$type}", function () use ($type) {
         $rows = supabase()->select('departments', "type=eq.$type&order=abbreviation.asc");
-        $out = [];
-        foreach ($rows as $r) $out[$r['abbreviation']] = $r['full_name'];
-        return $out;
+        return _mapDepartmentsByType($rows);
     });
 }
 
@@ -106,28 +137,36 @@ function getAllDepartmentNames(): array {
 // Unlike colleges/offices, a campus carries a location/description, so it needs
 // its own richer shape instead of the flat abbreviation => full_name map above.
 
+function _mapCampusRow(array $r): array {
+    return [
+        'id'           => (int)$r['id'],
+        'abbreviation' => $r['abbreviation'] ?? '',
+        'name'         => $r['full_name'],
+        'location'     => $r['location'] ?? '',
+        'description'  => $r['description'] ?? '',
+        'is_default'   => (bool)$r['is_default'],
+    ];
+}
+
 function getDepartmentCampuses(): array {
     return _dbCache('departments_campus', function () {
         $rows = supabase()->select('departments', 'type=eq.campus&order=full_name.asc');
-        return array_map(fn($r) => [
-            'id'           => (int)$r['id'],
-            'abbreviation' => $r['abbreviation'] ?? '',
-            'name'         => $r['full_name'],
-            'location'     => $r['location'] ?? '',
-            'description'  => $r['description'] ?? '',
-            'is_default'   => (bool)$r['is_default'],
-        ], $rows);
+        return array_map('_mapCampusRow', $rows);
     });
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
+function _mapUserRow(array $r): array {
+    // campus_id is no longer relied on (college_id is the source of truth for a
+    // user's department) — coalesce to 1 in case the column is absent/null.
+    return array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'is_active' => (int)$r['is_active']]);
+}
+
 function getUsers(): array {
     return _dbCache('users', function () {
         $rows = supabase()->select('users', 'order=id.asc');
-        // campus_id is no longer relied on (college_id is the source of truth for a
-        // user's department) — coalesce to 1 in case the column is absent/null.
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'is_active' => (int)$r['is_active']]), $rows);
+        return array_map('_mapUserRow', $rows);
     });
 }
 
@@ -142,21 +181,29 @@ function getCampuses(): array {
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
 
+function _mapInventoryRow(array $r): array {
+    // campus_id is no longer relied on for inventory (college_id is the source of
+    // truth for ownership) — coalesce to 1 in case the column is absent/null.
+    return array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'quantity' => (int)$r['quantity'], 'cost' => $r['cost'] !== null ? (float)$r['cost'] : null]);
+}
+
 function getInventory(): array {
     return _dbCache('inventory', function () {
         $rows = supabase()->select('inventory', 'order=id.asc');
-        // campus_id is no longer relied on for inventory (college_id is the source of
-        // truth for ownership) — coalesce to 1 in case the column is absent/null.
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'quantity' => (int)$r['quantity'], 'cost' => $r['cost'] !== null ? (float)$r['cost'] : null]), $rows);
+        return array_map('_mapInventoryRow', $rows);
     });
 }
 
 // ── Requests ──────────────────────────────────────────────────────────────────
 
+function _mapRequestRow(array $r): array {
+    return array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'inventory_id' => $r['inventory_id'] !== null ? (int)$r['inventory_id'] : null, 'quantity_requested' => (int)$r['quantity_requested'], 'approved_by' => $r['approved_by'] !== null ? (int)$r['approved_by'] : null]);
+}
+
 function getRequests(): array {
     return _dbCache('requests', function () {
         $rows = supabase()->select('requests', 'order=id.asc');
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'inventory_id' => $r['inventory_id'] !== null ? (int)$r['inventory_id'] : null, 'quantity_requested' => (int)$r['quantity_requested'], 'approved_by' => $r['approved_by'] !== null ? (int)$r['approved_by'] : null]), $rows);
+        return array_map('_mapRequestRow', $rows);
     });
 }
 
@@ -179,22 +226,78 @@ function getRequestItems(int $request_id = 0): array {
 
 // ── Borrow Records ────────────────────────────────────────────────────────────
 
+function _mapBorrowRecordRow(array $r): array {
+    return array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'inventory_id' => (int)$r['inventory_id'], 'request_id' => $r['request_id'] !== null ? (int)$r['request_id'] : null]);
+}
+
 function getBorrowRecords(): array {
     return _dbCache('borrow_records', function () {
         $rows = supabase()->select('borrow_records', 'order=id.asc');
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'inventory_id' => (int)$r['inventory_id'], 'request_id' => $r['request_id'] !== null ? (int)$r['request_id'] : null]), $rows);
+        return array_map('_mapBorrowRecordRow', $rows);
     });
 }
 
 // ── User Owned Items ──────────────────────────────────────────────────────────
 
+function _mapUserOwnedItemRow(array $r): array {
+    // campus_id is no longer relied on here either (college_id is the source of
+    // truth for ownership) — coalesce to 1 in case the column is absent/null.
+    return array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'quantity' => (int)$r['quantity'], 'year_owned' => $r['year_owned'] !== null ? (int)$r['year_owned'] : null]);
+}
+
 function getUserOwnedItems(): array {
     return _dbCache('user_owned_items', function () {
         $rows = supabase()->select('user_owned_items', 'order=id.asc');
-        // campus_id is no longer relied on here either (college_id is the source of
-        // truth for ownership) — coalesce to 1 in case the column is absent/null.
-        return array_map(fn($r) => array_merge($r, ['id' => (int)$r['id'], 'user_id' => (int)$r['user_id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'quantity' => (int)$r['quantity'], 'year_owned' => $r['year_owned'] !== null ? (int)$r['year_owned'] : null]), $rows);
+        return array_map('_mapUserOwnedItemRow', $rows);
     });
+}
+
+// ── Parallel cache warm-up ────────────────────────────────────────────────────
+// Call once near the top of a page that's about to call several of the
+// whole-table getters above (the dashboard and reports pages each call ~8).
+// Fires the still-stale ones concurrently via cURL multi instead of paying
+// N sequential Supabase round-trips, then primes the cache so the individual
+// getX() calls that follow are in-memory hits.
+function warmSharedCache(array $tables = ['users', 'inventory', 'requests', 'user_owned_items', 'borrow_records', 'departments_college', 'departments_office', 'departments_campus']): void {
+    $specs = [
+        'users'               => ['users', 'order=id.asc'],
+        'inventory'           => ['inventory', 'order=id.asc'],
+        'requests'            => ['requests', 'order=id.asc'],
+        'user_owned_items'    => ['user_owned_items', 'order=id.asc'],
+        'borrow_records'      => ['borrow_records', 'order=id.asc'],
+        'departments_college' => ['departments', 'type=eq.college&order=abbreviation.asc'],
+        'departments_office'  => ['departments', 'type=eq.office&order=abbreviation.asc'],
+        'departments_campus'  => ['departments', 'type=eq.campus&order=full_name.asc'],
+    ];
+
+    $mem =& _dbCacheMem();
+    $queries = [];
+    foreach ($tables as $key) {
+        if (!isset($specs[$key])) continue;
+        if (array_key_exists($key, $mem)) continue;      // already warm this request
+        if (_dbCacheReadFresh($key, $mem)) continue;      // fresh file cache — no need to refetch
+        $queries[$key] = $specs[$key];
+    }
+
+    if (empty($queries)) return;
+
+    $results = supabase()->selectBatch($queries);
+
+    $mappers = [
+        'users'            => fn($rows) => array_map('_mapUserRow', $rows),
+        'inventory'        => fn($rows) => array_map('_mapInventoryRow', $rows),
+        'requests'         => fn($rows) => array_map('_mapRequestRow', $rows),
+        'user_owned_items' => fn($rows) => array_map('_mapUserOwnedItemRow', $rows),
+        'borrow_records'   => fn($rows) => array_map('_mapBorrowRecordRow', $rows),
+        'departments_college' => '_mapDepartmentsByType',
+        'departments_office'  => '_mapDepartmentsByType',
+        'departments_campus'  => fn($rows) => array_map('_mapCampusRow', $rows),
+    ];
+
+    foreach ($results as $key => $rows) {
+        $data = isset($mappers[$key]) ? $mappers[$key]($rows) : $rows;
+        _dbCacheSet($key, $data);
+    }
 }
 
 // ── App Settings ──────────────────────────────────────────────────────────────
