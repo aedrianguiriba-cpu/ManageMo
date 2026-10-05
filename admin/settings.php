@@ -306,6 +306,14 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     padding:14px 18px; font-size:0.84rem; color:#1d4ed8; margin-top:18px;
     font-weight:500;
 }
+.as-pagination { display:flex; justify-content:center; align-items:center; gap:6px; margin-top:14px; }
+.as-pagination button {
+    min-width:28px; padding:5px 10px; font-size:0.80rem; font-weight:700;
+    border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#555; cursor:pointer;
+}
+.as-pagination button:hover:not(:disabled) { background:#f7f7f7; }
+.as-pagination button.active { background:#8B0000; border-color:#8B0000; color:#fff; }
+.as-pagination button:disabled { opacity:0.4; cursor:default; }
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -636,7 +644,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                 <div class="as-card-sub">All colleges and offices in the system</div>
                 <table class="as-table">
                     <thead><tr><th><i class="fas fa-building me-1"></i>Name</th><th style="text-align:right;"><i class="fas fa-boxes me-1"></i>Items</th></tr></thead>
-                    <tbody>
+                    <tbody id="sysDeptTableBody">
                     <?php foreach ($sys_departments as $abbr => $dept_name):
                         $item_count = count(array_filter($sys_inventory, fn($i) => ($i['college_id'] ?? '') === $abbr));
                     ?>
@@ -647,6 +655,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     <?php endforeach; ?>
                     </tbody>
                 </table>
+                <div id="sysDeptPagination" class="as-pagination"></div>
             </div>
         </div>
 
@@ -715,6 +724,45 @@ function checkAsStrength(pw) {
         const btn = document.querySelector(`[onclick*="${tabId}"]`);
         if (btn) switchAsTab(tabId, btn);
     }
+})();
+
+// Registered Colleges/Offices table — paginated client-side (this tab never
+// reloads the page, so server-side paging would fight the hash-based tab
+// switching above).
+(function() {
+    var PAGE_SIZE = 10;
+    var body = document.getElementById('sysDeptTableBody');
+    var pager = document.getElementById('sysDeptPagination');
+    if (!body || !pager) return;
+
+    var rows = Array.prototype.slice.call(body.children);
+    var totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    if (totalPages <= 1) return;
+
+    var page = 1;
+
+    function render() {
+        var start = (page - 1) * PAGE_SIZE;
+        rows.forEach(function(row, i) {
+            row.style.display = (i >= start && i < start + PAGE_SIZE) ? '' : 'none';
+        });
+
+        pager.innerHTML = '';
+        function addBtn(label, targetPage, disabled, active) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = label;
+            b.disabled = !!disabled;
+            if (active) b.classList.add('active');
+            b.addEventListener('click', function() { page = targetPage; render(); });
+            pager.appendChild(b);
+        }
+        addBtn('‹', Math.max(1, page - 1), page <= 1, false);
+        for (var i = 1; i <= totalPages; i++) addBtn(String(i), i, false, i === page);
+        addBtn('›', Math.min(totalPages, page + 1), page >= totalPages, false);
+    }
+
+    render();
 })();
 
 // Add smooth scrolling for mobile
