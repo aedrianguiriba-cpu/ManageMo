@@ -1120,7 +1120,7 @@ displayMessage();
 
     <!-- TAB NAVIGATION -->
     <div class="ai-tabs-container ai-no-print">
-        <div style="display: flex; gap: 8px; flex: 1; flex-wrap: wrap;">
+        <div style="display: flex; gap: 8px; flex: 1; flex-wrap: nowrap; overflow-x: auto; min-width: 0;">
             <a href="inventory.php?tab=all" class="ai-tab <?php echo $current_tab === 'all' ? 'ai-tab-active' : ''; ?>" onclick="setTab('all'); return false;">
                 <span class="ai-tab-icon"><i class="fas fa-layer-group"></i></span>
                 <span class="ai-tab-label">All Items</span>
