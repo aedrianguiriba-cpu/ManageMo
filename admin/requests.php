@@ -13,6 +13,10 @@ $type_filter = $_GET['type'] ?? '';
 $request_sort = $_GET['sort'] ?? 'newest';
 if (!in_array($request_sort, ['newest', 'oldest'])) $request_sort = 'newest';
 $request_sort_dir = $request_sort === 'oldest' ? 1 : -1;
+// Scoped to this page only — ITEMS_PER_PAGE is a shared global constant also
+// used by user/inventory.php, so it isn't safe to change site-wide just to
+// resize this list.
+$REQUESTS_PER_PAGE = 10;
 
 // See pickRepresentativeRequestUnit() in config/functions.php.
 function arGroupOverallStatus(array $rows): array {
@@ -458,11 +462,11 @@ $grouped_filtered = array_values($grouped_filtered);
 
 // Paginate on groups, not individual rows
 $total      = count($grouped_filtered);
-$total_pages = max(1, ceil($total / ITEMS_PER_PAGE));
-$offset     = ($page - 1) * ITEMS_PER_PAGE;
+$total_pages = max(1, ceil($total / $REQUESTS_PER_PAGE));
+$offset     = ($page - 1) * $REQUESTS_PER_PAGE;
 
 $requests = [];
-foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
+foreach (array_slice($grouped_filtered, $offset, $REQUESTS_PER_PAGE) as $grp) {
     $req   = $grp['first'];
     $rows  = $grp['rows'];
     $user  = findById($users_data, $req['user_id']);
@@ -1510,10 +1514,10 @@ foreach (array_slice($grouped_filtered, $offset, ITEMS_PER_PAGE) as $grp) {
         }
         $tab_grouped = array_values($tab_grouped);
         $total       = count($tab_grouped);
-        $total_pages = max(1, ceil($total / ITEMS_PER_PAGE));
-        $offset      = ($page - 1) * ITEMS_PER_PAGE;
+        $total_pages = max(1, ceil($total / $REQUESTS_PER_PAGE));
+        $offset      = ($page - 1) * $REQUESTS_PER_PAGE;
         $requests    = [];
-        foreach (array_slice($tab_grouped, $offset, ITEMS_PER_PAGE) as $grp) {
+        foreach (array_slice($tab_grouped, $offset, $REQUESTS_PER_PAGE) as $grp) {
             $rr   = $grp['first'];
             $rows = $grp['rows'];
             $u    = findById($users_data, $rr['user_id']);
