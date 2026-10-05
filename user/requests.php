@@ -38,8 +38,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? $_POST['receiving_method'] : null;
 
     $cart_items = json_decode($_POST['items_json'] ?? '[]', true);
+
+    // Reject any submission carrying a "Date Needed" or "Expected Return Date"
+    // before today — checked against the cart payload itself (not just the
+    // client-side min= attribute below), since that's client-editable.
+    $today_for_validation = date('Y-m-d');
+    $has_past_date = false;
+    if (is_array($cart_items)) {
+        foreach ($cart_items as $__entry) {
+            if ((!empty($__entry['date_needed']) && $__entry['date_needed'] < $today_for_validation)
+                || (!empty($__entry['return_date']) && $__entry['return_date'] < $today_for_validation)) {
+                $has_past_date = true;
+                break;
+            }
+        }
+    }
+
     if (!is_array($cart_items) || empty($cart_items)) {
         $submit_error = 'No items in your request. Please add at least one item.';
+    } elseif ($has_past_date) {
+        $submit_error = 'Date Needed and Expected Return Date cannot be in the past — please choose today or a future date.';
     } else {
         $errors   = [];
         $availability_notices = []; // "only 2 of 5 were still available" style — not a save failure
@@ -1268,7 +1286,7 @@ if (!empty($submit_error)): ?>
                                 <div class="rq-input-wrap">
                                     <i class="fas fa-calendar rq-input-icon"></i>
                                     <input type="date" class="form-control" id="borrow_date_needed"
-                                           name="borrow_date_needed" onchange="updateSummary()">
+                                           name="borrow_date_needed" min="<?php echo date('Y-m-d'); ?>" onchange="updateSummary()">
                                 </div>
                             </div>
                         </div>
@@ -1278,7 +1296,7 @@ if (!empty($submit_error)): ?>
                                 <div class="rq-input-wrap">
                                     <i class="fas fa-calendar rq-input-icon"></i>
                                     <input type="date" class="form-control" id="expected_return_date"
-                                           name="expected_return_date" required onchange="updateSummary()">
+                                           name="expected_return_date" required min="<?php echo date('Y-m-d'); ?>" onchange="updateSummary()">
                                 </div>
                             </div>
                         </div>
@@ -1435,7 +1453,7 @@ if (!empty($submit_error)): ?>
                             <label>Date Needed</label>
                             <div class="rq-input-wrap">
                                 <i class="fas fa-calendar rq-input-icon"></i>
-                                <input type="date" class="form-control" id="item_date_needed" name="item_date_needed" oninput="updateSummary()">
+                                <input type="date" class="form-control" id="item_date_needed" name="item_date_needed" min="<?php echo date('Y-m-d'); ?>" oninput="updateSummary()">
                             </div>
                         </div>
                     </div>
@@ -1486,7 +1504,7 @@ if (!empty($submit_error)): ?>
                             <label>Date Needed</label>
                             <div class="rq-input-wrap">
                                 <i class="fas fa-calendar rq-input-icon"></i>
-                                <input type="date" class="form-control" id="service_date_needed" name="service_date_needed" oninput="updateSummary()">
+                                <input type="date" class="form-control" id="service_date_needed" name="service_date_needed" min="<?php echo date('Y-m-d'); ?>" oninput="updateSummary()">
                             </div>
                         </div>
                     </div>
@@ -2117,6 +2135,14 @@ function handleItemCatalogChange(select) {
 /* ── Cart ── */
 var cart = [];
 
+// String comparison works here since both sides are YYYY-MM-DD.
+function isPastDate(dateStr) {
+    if (!dateStr) return false;
+    var now = new Date();
+    var todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    return dateStr < todayStr;
+}
+
 function addToCart() {
     var type = document.getElementById('request_type_hidden').value;
     var entry = {};
@@ -2126,6 +2152,7 @@ function addToCart() {
         if (!name) { showCartError('Please select an item to <?php echo strtolower(termLabel("Borrow")); ?>.'); return; }
         var rd = document.getElementById('expected_return_date').value;
         if (!rd) { showCartError('Please enter the expected return date.'); return; }
+        if (isPastDate(rd)) { showCartError('Expected return date cannot be in the past.'); return; }
         var qty = parseInt(document.getElementById('borrow_quantity').value) || 1;
         var reason = document.getElementById('reason').value.trim();
         var borrowCard = document.querySelector('#bshop-grid .bshop-card.bshop-selected');
@@ -2142,6 +2169,7 @@ function addToCart() {
         var inventoryId = unitIds.length > 0 ? unitIds[0] : (borrowCard ? (borrowCard.getAttribute('data-item-id') || '') : '');
         var selectedUnitIds = unitIds.slice(0, qty);
         var dateNeeded1 = document.getElementById('borrow_date_needed').value;
+        if (isPastDate(dateNeeded1)) { showCartError('Date needed cannot be in the past.'); return; }
         entry = { type:'borrow', name:name, inventory_id:inventoryId, unit_ids:selectedUnitIds, qty:qty, return_date:rd, reason:reason, date_needed:dateNeeded1 };
     } else if (type === 'item') {
         var sel2 = document.getElementById('item_description');
@@ -2155,6 +2183,7 @@ function addToCart() {
         try { itemUnitIds = JSON.parse(itemUnitIdsRaw); } catch(e) { itemUnitIds = []; }
         var itemFirstUnitId = itemCard ? (itemCard.getAttribute('data-first-unit-id') || '') : '';
         var dateNeeded2 = document.getElementById('item_date_needed').value;
+        if (isPastDate(dateNeeded2)) { showCartError('Date needed cannot be in the past.'); return; }
         entry = { type:'item', name:name2, qty:qty2, reason:reason2, inventory_id:itemFirstUnitId, unit_ids:itemUnitIds, date_needed:dateNeeded2 };
     } else {
         var svcSubject = document.getElementById('service_subject').value.trim();
@@ -2164,6 +2193,7 @@ function addToCart() {
         var svcDesc = document.getElementById('service_description').value.trim();
         if (!svcDesc) { showCartError('Please describe the service needed.'); return; }
         var dateNeeded3 = document.getElementById('service_date_needed').value;
+        if (isPastDate(dateNeeded3)) { showCartError('Date needed cannot be in the past.'); return; }
         entry = { type:'service', name:svcSubject, service_type:svcType, description:svcDesc, date_needed:dateNeeded3 };
     }
     cart.push(entry);
