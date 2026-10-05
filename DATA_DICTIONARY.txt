@@ -1,0 +1,747 @@
+======================================================================
+MANAGEMO DATA DICTIONARY
+======================================================================
+
+Database: PostgreSQL on Supabase. Source: database/schema.sql.
+Row level security is disabled on every table because the PHP session handles access control.
+
+Conventions
+- PK = primary key, UQ = unique, FK (soft) = points to another table but no foreign key is enforced in the database.
+- college_id on any table holds a departments.abbreviation. The department can be a college, an office or a campus.
+- Descriptions marked * are inferred from the column name and surrounding code comments, not stated in the schema.
+
+TABLES AT A GLANCE
+------------------
+
+> users
+    Purpose: Accounts for admins and regular users
+
+> departments
+    Purpose: Colleges, offices and campuses (one list)
+
+> inventory
+    Purpose: One row per physical item or stock line
+
+> requests
+    Purpose: Borrow, item, service and condemnation requests
+
+> request_items
+    Purpose: Line items attached to a request
+
+> borrow_records
+    Purpose: History of items lent out and returned
+
+> user_owned_items
+    Purpose: Items a user or department already owns
+
+> notifications
+    Purpose: Messages shown in the notification bell
+
+> app_settings
+    Purpose: Site-wide key/value settings
+
+USERS
+-----
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: User ID
+
+> email
+    Type: TEXT
+    Null: No
+    Key / Constraint: UQ
+    Description: Login email
+
+> password
+    Type: TEXT
+    Null: No
+    Description: BCrypt hash, never plain text
+
+> full_name
+    Type: TEXT
+    Null: No
+    Description: Display name
+
+> role
+    Type: TEXT
+    Null: No
+    Default: 'user'
+    Key / Constraint: admin, user
+    Description: Decides which side of the system the person sees
+
+> college_id
+    Type: TEXT
+    Null: Yes
+    Key / Constraint: FK (soft) departments.abbreviation
+    Description: The user's department. Users with the same value share owned items, records and requests
+
+> phone
+    Type: TEXT
+    Null: Yes
+    Description: Contact number
+
+> is_active
+    Type: INT
+    Null: No
+    Default: 1
+    Description: 1 = can log in, 0 = deactivated
+
+> reset_token
+    Type: TEXT
+    Null: Yes
+    Description: Password reset token*
+
+> reset_token_expires
+    Type: TIMESTAMPTZ
+    Null: Yes
+    Description: When the reset token stops working*
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Account creation time
+
+> updated_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Last change
+
+DEPARTMENTS
+-----------
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: Department ID
+
+> type
+    Type: TEXT
+    Null: No
+    Key / Constraint: college, office, campus; UQ with abbreviation
+    Description: What kind of row this is
+
+> abbreviation
+    Type: TEXT
+    Null: No
+    Key / Constraint: UQ with type
+    Description: Short code. Other tables store this value in college_id
+
+> full_name
+    Type: TEXT
+    Null: No
+    Description: Full name
+
+> location
+    Type: TEXT
+    Null: Yes
+    Description: Address. Campus rows only
+
+> description
+    Type: TEXT
+    Null: Yes
+    Description: Short description. Campus rows only
+
+> is_default
+    Type: BOOLEAN
+    Null: No
+    Default: FALSE
+    Description: TRUE = seeded row, protected from deletion. Admin-added rows are FALSE
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: Yes
+    Default: NOW()
+    Description: Creation time
+
+INVENTORY
+---------
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: Inventory ID
+
+> qr_code_id
+    Type: TEXT
+    Null: No
+    Key / Constraint: UQ
+    Description: Code printed on the unit's QR label
+
+> item_name
+    Type: TEXT
+    Null: No
+    Description: Item name
+
+> category
+    Type: TEXT
+    Null: No
+    Description: Category such as Furniture or Electronics
+
+> description
+    Type: TEXT
+    Null: Yes
+    Description: Details
+
+> college_id
+    Type: TEXT
+    Null: Yes
+    Key / Constraint: FK (soft) departments.abbreviation
+    Description: Owning college, office or campus. NULL = no department tag
+
+> quantity
+    Type: INT
+    Null: No
+    Default: 1
+    Description: Units in this row
+
+> status
+    Type: TEXT
+    Null: No
+    Default: 'available'
+    Key / Constraint: available, borrowed, requested, maintenance, damaged, condemned, disposed, owned
+    Description: Current state. owned = permanently transferred to a user through an item request. disposed = junked, sold or donated after condemnation
+
+> location
+    Type: TEXT
+    Null: Yes
+    Description: Where the item is kept
+
+> purchase_date
+    Type: DATE
+    Null: Yes
+    Description: Date bought
+
+> cost
+    Type: NUMERIC(12,2)
+    Null: Yes
+    Description: Purchase cost
+
+> condition
+    Type: TEXT
+    Null: Yes
+    Key / Constraint: excellent, good, fair, poor
+    Description: Physical condition
+
+> condemnation_reason
+    Type: TEXT
+    Null: Yes
+    Description: Why the item was condemned
+
+> condemned_at
+    Type: TIMESTAMPTZ
+    Null: Yes
+    Description: When it was condemned
+
+> condemned_by
+    Type: INT
+    Null: Yes
+    Key / Constraint: FK (soft) users.id
+    Description: Admin who condemned it
+
+> condemned_condition
+    Type: TEXT
+    Null: Yes
+    Description: Condition recorded at condemnation*
+
+> disposal_notes
+    Type: TEXT
+    Null: Yes
+    Description: How it was disposed of
+
+> disposed_at
+    Type: TIMESTAMPTZ
+    Null: Yes
+    Description: When it was disposed of
+
+> disposed_by
+    Type: INT
+    Null: Yes
+    Key / Constraint: FK (soft) users.id
+    Description: Admin who disposed of it
+
+> group_id
+    Type: TEXT
+    Null: Yes
+    Description: Shared by units added together in one batch
+
+> acquisition_mode
+    Type: TEXT
+    Null: No
+    Default: 'borrow'
+    Key / Constraint: borrow, request, both
+    Description: Whether users can borrow it, request it, or either*
+
+> model
+    Type: TEXT
+    Null: Yes
+    Description: Model name
+
+> serial_number
+    Type: TEXT
+    Null: Yes
+    Description: Manufacturer serial number
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Creation time
+
+REQUESTS
+--------
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: Request ID
+
+> request_number
+    Type: TEXT
+    Null: No
+    Key / Constraint: UQ
+    Description: Readable number such as REQ-00001
+
+> user_id
+    Type: INT
+    Null: No
+    Key / Constraint: FK (soft) users.id
+    Description: Who submitted it
+
+> inventory_id
+    Type: INT
+    Null: Yes
+    Key / Constraint: FK (soft) inventory.id
+    Description: The unit requested. NULL for custom items and some services
+
+> group_id
+    Type: TEXT
+    Null: Yes
+    Description: Links the rows created by one submission. Admin actions apply to the whole group
+
+> qr_code_id
+    Type: TEXT
+    Null: Yes
+    Description: QR code of the requested unit
+
+> request_type
+    Type: TEXT
+    Null: No
+    Key / Constraint: borrow, item, service, condemnation
+    Description: item = procurement or acquire. condemnation = user asks to condemn an item they own or borrowed
+
+> urgency
+    Type: TEXT
+    Null: No
+    Default: 'medium'
+    Key / Constraint: low, medium, high, critical
+    Description: Priority set by the user
+
+> receiving_method
+    Type: TEXT
+    Null: Yes
+    Key / Constraint: delivery, pickup
+    Description: How the user gets the item
+
+> reason_for_request
+    Type: TEXT
+    Null: Yes
+    Description: Why it is needed
+
+> service_description
+    Type: TEXT
+    Null: Yes
+    Description: Problem description, or the custom item name and quantity
+
+> expected_return_date
+    Type: DATE
+    Null: Yes
+    Description: When a borrowed item is due back
+
+> date_needed
+    Type: DATE
+    Null: Yes
+    Description: Needed-by date for item and service requests
+
+> quantity_requested
+    Type: INT
+    Null: No
+    Default: 1
+    Description: Units asked for
+
+> status
+    Type: TEXT
+    Null: No
+    Default: 'pending'
+    Key / Constraint: pending, approved, disapproved, delivered, completed
+    Description: Where the request is in its life
+
+> delivery_status
+    Type: TEXT
+    Null: Yes
+    Key / Constraint: out_for_delivery, delivered
+    Description: Delivery progress after approval
+
+> approved_by
+    Type: INT
+    Null: Yes
+    Key / Constraint: FK (soft) users.id
+    Description: Admin who decided
+
+> approved_at
+    Type: TIMESTAMPTZ
+    Null: Yes
+    Description: When the admin decided
+
+> disapproval_reason
+    Type: TEXT
+    Null: Yes
+    Description: Reason given when disapproved
+
+> scheduled_delivery_date
+    Type: DATE
+    Null: Yes
+    Description: Planned delivery date
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Submission time
+
+> updated_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Last change
+
+REQUEST_ITEMS
+-------------
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: Line ID
+
+> request_id
+    Type: INT
+    Null: No
+    Key / Constraint: FK (soft) requests.id
+    Description: Parent request
+
+> inventory_id
+    Type: INT
+    Null: Yes
+    Key / Constraint: FK (soft) inventory.id
+    Description: Unit for this line
+
+> qr_code_id
+    Type: TEXT
+    Null: Yes
+    Description: QR code of the unit
+
+> item_name
+    Type: TEXT
+    Null: No
+    Description: Item name
+
+> quantity
+    Type: INT
+    Null: No
+    Default: 1
+    Description: Units on this line
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Creation time
+
+BORROW_RECORDS
+--------------
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: Record ID
+
+> user_id
+    Type: INT
+    Null: No
+    Key / Constraint: FK (soft) users.id
+    Description: Borrower
+
+> inventory_id
+    Type: INT
+    Null: No
+    Key / Constraint: FK (soft) inventory.id
+    Description: Item borrowed
+
+> request_id
+    Type: INT
+    Null: Yes
+    Key / Constraint: FK (soft) requests.id
+    Description: Request that led to the loan. NULL for older records
+
+> borrow_date
+    Type: DATE
+    Null: No
+    Description: Day the item went out
+
+> expected_return_date
+    Type: DATE
+    Null: Yes
+    Description: Due date
+
+> actual_return_date
+    Type: DATE
+    Null: Yes
+    Description: Day it came back. NULL while still out
+
+> status
+    Type: TEXT
+    Null: No
+    Default: 'active'
+    Key / Constraint: active, returned, overdue
+    Description: Loan state
+
+> notes
+    Type: TEXT
+    Null: Yes
+    Description: Free-text note
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Creation time
+
+USER_OWNED_ITEMS
+----------------
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: Record ID
+
+> qr_code_id
+    Type: TEXT
+    Null: Yes
+    Key / Constraint: UQ
+    Description: QR code of the owned item
+
+> user_id
+    Type: INT
+    Null: No
+    Key / Constraint: FK (soft) users.id
+    Description: Owner
+
+> item_name
+    Type: TEXT
+    Null: No
+    Description: Item name
+
+> category
+    Type: TEXT
+    Null: No
+    Description: Category
+
+> description
+    Type: TEXT
+    Null: Yes
+    Description: Details
+
+> year_owned
+    Type: INT
+    Null: Yes
+    Description: Year the user got it
+
+> college_id
+    Type: TEXT
+    Null: Yes
+    Key / Constraint: FK (soft) departments.abbreviation
+    Description: Department the item belongs to
+
+> quantity
+    Type: INT
+    Null: No
+    Default: 1
+    Description: Units owned
+
+> condition
+    Type: TEXT
+    Null: Yes
+    Description: Condition. Free text here, unlike inventory
+
+> notes
+    Type: TEXT
+    Null: Yes
+    Description: Free-text note
+
+> purchase_date
+    Type: DATE
+    Null: Yes
+    Description: Date bought
+
+> group_id
+    Type: TEXT
+    Null: Yes
+    Description: Shared by units recorded together
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Creation time
+
+NOTIFICATIONS
+-------------
+
+> id
+    Type: BIGSERIAL
+    Null: No
+    Default: auto
+    Key / Constraint: PK
+    Description: Notification ID
+
+> user_id
+    Type: INT
+    Null: No
+    Key / Constraint: FK (soft) users.id, indexed
+    Description: Recipient
+
+> title
+    Type: TEXT
+    Null: No
+    Description: Headline
+
+> message
+    Type: TEXT
+    Null: Yes
+    Description: Body text
+
+> type
+    Type: TEXT
+    Null: No
+    Default: 'info'
+    Key / Constraint: info, success, warning, danger
+    Description: Controls the style
+
+> link
+    Type: TEXT
+    Null: Yes
+    Description: Page opened when clicked
+
+> is_read
+    Type: BOOLEAN
+    Null: No
+    Default: FALSE
+    Description: TRUE once read
+
+> created_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Time sent
+
+APP_SETTINGS
+------------
+
+> key
+    Type: TEXT
+    Null: No
+    Key / Constraint: PK
+    Description: Setting name
+
+> value
+    Type: TEXT
+    Null: No
+    Description: Setting value
+
+> updated_at
+    Type: TIMESTAMPTZ
+    Null: No
+    Default: NOW()
+    Description: Last change
+
+Known keys:
+- terminology: default shows Borrow and Request. alt shows Transferrable and Procurement.
+- borrow_catalog_page_size: how many items the borrow catalog shows per page. This key is set from Admin Settings and is not in the seed script.
+
+RELATIONSHIPS
+-------------
+
+> requests.user_id
+    To: users.id
+    Meaning: Who asked
+
+> requests.approved_by
+    To: users.id
+    Meaning: Admin who decided
+
+> requests.inventory_id
+    To: inventory.id
+    Meaning: Unit requested
+
+> request_items.request_id
+    To: requests.id
+    Meaning: Lines of a request
+
+> request_items.inventory_id
+    To: inventory.id
+    Meaning: Unit on a line
+
+> borrow_records.user_id
+    To: users.id
+    Meaning: Borrower
+
+> borrow_records.inventory_id
+    To: inventory.id
+    Meaning: Item lent
+
+> borrow_records.request_id
+    To: requests.id
+    Meaning: Request behind the loan
+
+> user_owned_items.user_id
+    To: users.id
+    Meaning: Owner
+
+> notifications.user_id
+    To: users.id
+    Meaning: Recipient
+
+> inventory.condemned_by, disposed_by
+    To: users.id
+    Meaning: Admin who acted
+
+> users / inventory / user_owned_items .college_id
+    To: departments.abbreviation
+    Meaning: Affiliation. A text match, not an enforced key
+
+None of these are database foreign keys. The application is responsible for keeping them consistent.
+
+NOTES
+-----
+
+- There is no campuses table. Campuses are departments rows with type = 'campus'.
+- inventory.campus_id, users.campus_id and user_owned_items.campus_id were removed. college_id is the only ownership field.
+- Most ID columns that point at other tables are INT while the primary keys are BIGSERIAL. This works for current data sizes but the types do not match.
+- Seed data in the schema file includes four demo users and sample inventory, requests and borrow records.

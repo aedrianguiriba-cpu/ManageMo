@@ -1,0 +1,389 @@
+======================================================================
+MANAGEMO USER MANUAL
+Inventory and Asset Management System
+Pampanga State University
+======================================================================
+
+CONTENTS
+
+  1. About ManageMo
+  2. Getting Started (everyone)
+  3. User Guide
+  4. Administrator Guide
+  5. Mobile App
+  6. Status Reference
+  7. Troubleshooting
+
+
+----------------------------------------------------------------------
+1. ABOUT MANAGEMO
+----------------------------------------------------------------------
+
+ManageMo keeps track of the equipment owned by the university. It lets
+you see what is available, ask to borrow or receive an item, ask for a
+repair, and follow your request until the item reaches you.
+
+There are two kinds of accounts:
+
+  USER   Browses inventory, submits requests, and tracks them.
+  ADMIN  Manages inventory, decides on requests, delivers items,
+         retires old equipment, and manages accounts and settings.
+
+Which pages you see depends on your account type. You cannot open the
+other kind of page. If you try, you are sent back to your own
+dashboard.
+
+
+----------------------------------------------------------------------
+2. GETTING STARTED (EVERYONE)
+----------------------------------------------------------------------
+
+2.1 Create an account
+
+  1. Open the ManageMo website. The login page appears.
+  2. Choose Sign Up.
+  3. Enter your full name, email, a password of at least 6 characters,
+     the same password again, and your department (college, office or
+     campus).
+  4. Submit the form.
+  5. A message asks you to log in. Your account is ready right away.
+     There is no email to confirm.
+
+  Every self-registered account is a USER account. Administrator
+  accounts are created by the system owner, not on the sign-up page.
+
+2.2 Log in
+
+  1. Enter your email and password on the login page.
+  2. Choose Log In.
+  3. You land on your dashboard: the user dashboard for users, the
+     admin dashboard for administrators.
+
+  If you see "Invalid email or password", check both and try again.
+  If the details are right, your account may have been deactivated.
+  Contact an administrator.
+
+2.3 Forgot your password
+
+  1. On the login page, choose Forgot Password.
+  2. Enter your email.
+  3. Open the email and click the reset link.
+  4. Type a new password and save it.
+  5. Log in with the new password.
+
+2.4 The notification bell
+
+  The bell at the top of every page shows messages about your
+  requests, for example when a request is approved or an item is out
+  for delivery.
+
+  - Click a notification to open the page it refers to.
+  - Choose Mark all read to clear the list.
+
+2.5 Log out
+
+  Open the account menu at the top right and choose Logout. Always log
+  out on a shared computer.
+
+
+----------------------------------------------------------------------
+3. USER GUIDE
+----------------------------------------------------------------------
+
+3.1 Dashboard
+
+  The first page after login. It shows:
+  - Summary cards for your requests and borrowed items.
+  - A calendar of return dates.
+  - Quick actions for common tasks.
+  - A short list of recent requests and the items you own.
+  - A browse-and-reserve list of available items.
+
+3.2 Inventory
+
+  Menu: Inventory
+
+  A read-only list of what the university has. You cannot change
+  anything here.
+
+  - Available tab: items you can ask for.
+  - Borrowed tab: items that are currently lent out.
+  - Department Owned Items tab: items owned by your department.
+  - Use the search box, category filter and owner filter to find
+    something.
+  - Choose Reserve on an available item to start a request for it.
+
+3.3 Submitting a request
+
+  Menu: Requests
+
+  Choose the type of request:
+
+  BORROW   Use a catalog item for a limited time and return it.
+  ITEM     Ask for an item that you will keep (procurement). Pick a
+           catalog item, or type the name of an item that is not in
+           the catalog.
+  SERVICE  Ask for maintenance or repair. Describe the problem.
+
+  Steps:
+
+  1. Choose the request type.
+  2. For Borrow and Item, pick the item from the grid. For Borrow, the
+     availability calendar shows when the item is free. Set the date
+     you will return it.
+  3. For Service, describe what is wrong and where.
+  4. Set the urgency: low, medium, high or critical.
+  5. Choose how you want to receive it: delivery or pickup.
+  6. Give the reason for the request.
+  7. Submit.
+
+  If you ask for several units, each unit becomes its own request, but
+  they stay together as one group so you can follow them as one.
+  Administrators are notified when you submit.
+
+  Tip: Terms may read differently on your site. An administrator can
+  switch the wording so that Borrow reads "Transferrable" and Request
+  reads "Procurement".
+
+3.4 Following your requests
+
+  Menu: My Requests
+
+  Each request group is a card with a progress bar:
+
+    Submitted -> Under Review -> Approved or Disapproved
+              -> Out for Delivery -> Delivered
+
+  - If a request is disapproved, the reason is shown on the card.
+  - When an item is out for delivery you receive an email and a
+    notification.
+
+3.5 Your records
+
+  Menu: Borrow Records
+
+  Three tabs: Borrow, Item and Service. Each is a list of your past
+  and current requests. You can page through the list and print it.
+
+3.6 Department sharing
+
+  Users in the same department share owned items, borrow records and
+  requests. If your account has no department, you only see your own.
+
+3.7 Settings
+
+  Menu: Settings
+
+  Change your name, phone number and password.
+
+3.8 Get the mobile app
+
+  Menu: Get App. Download and install the app, then see section 5.
+
+
+----------------------------------------------------------------------
+4. ADMINISTRATOR GUIDE
+----------------------------------------------------------------------
+
+4.1 Dashboard
+
+  The first page after login. It shows:
+  - Summary cards for the whole inventory.
+  - A campus inventory line chart and a campus summary.
+  - Doughnut charts of item and request status.
+  - Quick actions and lists of recent requests and recent items.
+
+  The sidebar leads to every admin page.
+
+4.2 Inventory
+
+  Menu: Inventory
+
+  Adding an item:
+  1. Choose Add Item.
+  2. Enter the name, category, department, location, cost, condition,
+     model, serial number and quantity.
+  3. Save. One record is created for each unit, and each unit gets its
+     own QR code. New units start as Available.
+
+  Other actions:
+  - Edit an item or one unit.
+  - View or print a unit's QR code to stick on the equipment.
+  - Search and filter by category, status and owner.
+
+  Items cannot be deleted. To remove old equipment from use, use
+  Condemnation (section 4.5).
+
+4.3 Campuses and departments
+
+  Menu: Campuses
+
+  - Campus cards show each campus and its items.
+  - Choose Manage Departments to add or remove colleges, offices and
+    campuses.
+  - Built-in entries are protected and cannot be deleted. Entries you
+    add yourself can be deleted.
+
+4.4 Requests
+
+  Menu: Requests
+
+  This is where you decide on requests and see them through to
+  delivery.
+
+  1. Filter the list by type, status, urgency or campus. Switch
+     between table view and tracker view.
+  2. Open a request. Actions apply to the whole group of units that
+     were submitted together.
+  3. Choose a decision:
+
+     APPROVE      The request moves on. If the user asked for an item
+                  that is not in the catalog, a new inventory record
+                  is created at this point.
+     DISAPPROVE   You must type a reason. The reserved unit is released
+                  and the user is told why.
+
+  4. For an approved request, choose Mark Out for Delivery. The user
+     receives an email and a notification.
+  5. When the item has been handed over, choose Mark Delivered. The
+     user can also confirm delivery by scanning the unit's QR code in
+     the mobile app, which has the same effect.
+  6. For a borrow request, delivery sets the unit to Borrowed and
+     starts a borrow record. When the item comes back, set its actual
+     return date. The record closes and the unit becomes Available
+     again.
+  7. Item and service requests are complete once delivered.
+
+4.5 Condemnation
+
+  Menu: Condemnation
+
+  Use this page to retire equipment that can no longer be used.
+
+  - Evaluate tab: units still in service.
+  - Condemned tab: units you have condemned.
+  - Disposed tab: units that have been disposed of.
+
+  Steps:
+  1. On the Evaluate tab, choose Condemn for a unit. You must enter a
+     reason. The date and your name are saved.
+  2. The unit moves to the Condemned tab.
+  3. From there, choose Dispose when the equipment has been junked,
+     sold or donated. The disposal date is saved.
+  4. If the unit turns out to be usable, choose Restore. It becomes
+     Available again.
+
+4.6 Users
+
+  Menu: Users
+
+  - See every account with its role and department.
+  - View a profile.
+  - Deactivate an account so the person can no longer log in, or
+    activate it again.
+  - Assign or change a user's campus or college.
+
+4.7 Analytics and Reports
+
+  Menu: Analytics, Reports
+
+  - Analytics shows charts of inventory and request activity.
+  - Reports are printable summaries.
+
+4.8 Settings
+
+  Menu: Settings
+
+  - Update your admin profile and password.
+  - Terminology: switch the site wording between Borrow / Request and
+    Transferrable / Procurement. The change applies to every page for
+    every user.
+  - Borrow catalog page size: how many items the borrow catalog shows
+    on each page.
+  - Borrow catalog tab: a read-only view of the catalog.
+
+
+----------------------------------------------------------------------
+5. MOBILE APP
+----------------------------------------------------------------------
+
+The ManageMo mobile app is for confirming deliveries and looking up
+items. Download it from the Get App page.
+
+  - Pending deliveries: lists the items that are out for delivery to
+    you.
+  - Confirm delivery: scan the QR code on each unit. Scanning marks it
+    delivered in the system.
+  - Check item details: scan any unit's QR code to see its details.
+    This is read-only.
+
+
+----------------------------------------------------------------------
+6. STATUS REFERENCE
+----------------------------------------------------------------------
+
+Request status
+
+  pending       Submitted and waiting for an administrator.
+  approved      An administrator accepted it.
+  disapproved   An administrator declined it. A reason is given.
+  delivered     The item has reached the user.
+  completed     The request is finished.
+
+Delivery status
+
+  out_for_delivery   Approved and on its way to the user.
+  delivered          Handed over.
+
+Item (unit) status
+
+  available     Can be requested.
+  requested     Held for a pending request.
+  borrowed      Lent out.
+  maintenance   Being repaired.
+  damaged       Broken and waiting for a decision.
+  condemned     Marked as no longer usable.
+  disposed      Condemned and then junked, sold or donated.
+  owned         Permanently given to a user through an Item request.
+
+Borrow record status
+
+  active        Item is out.
+  returned      Item came back.
+  overdue       Item was not returned by its due date.
+
+
+----------------------------------------------------------------------
+7. TROUBLESHOOTING
+----------------------------------------------------------------------
+
+I cannot log in.
+  Check the email and password. Use Forgot Password if needed. If the
+  details are correct, ask an administrator whether your account is
+  active.
+
+I did not get the password reset email.
+  Check your spam folder, then try again. Make sure you typed the
+  same email you registered with.
+
+An item I want is not on the list.
+  Only available items can be requested. Check the Borrowed tab for
+  its return date, or submit an Item request with the name of what
+  you need.
+
+I cannot find a menu or page.
+  Users and administrators see different menus. If you expect an
+  admin page, check with the system owner that your account has the
+  admin role.
+
+My request is still "Under Review".
+  An administrator has not decided yet. Urgent requests should be set
+  to a higher urgency when you submit them.
+
+My item is out for delivery but I have not received it.
+  Contact the administrator who handled your request. Quote the
+  request number shown on your request card.
+
+I scanned the wrong QR code in the app.
+  Tell an administrator. They can correct the delivery status from the
+  Requests page.

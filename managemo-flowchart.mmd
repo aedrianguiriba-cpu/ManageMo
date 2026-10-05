@@ -1,0 +1,62 @@
+flowchart TD
+  S([Start]) --> LG["Sign up or log in"]
+  LG --> RL{"Role"}
+
+  subgraph USER["USER"]
+    direction TB
+    U1["Browse inventory"]
+    U2["Submit request<br/>borrow, item, or service"]
+    U3["Track request status"]
+    U4["Receive item<br/>scan unit QR in mobile app"]
+    U5["Return borrowed item"]
+  end
+
+  subgraph ADMIN["ADMIN"]
+    direction TB
+    A1["Manage inventory<br/>add items, unit QR codes"]
+    A2{"Review request"}
+    A3["Approve"]
+    A4["Disapprove with reason"]
+    A5["Mark out for delivery"]
+    A6["Mark delivered"]
+    A7["Record return"]
+    A8["Evaluate equipment<br/>condemnation page"]
+    A10{"Condemn unit?"}
+    A11["Condemned<br/>reason and date saved"]
+    A12["Disposed<br/>disposal date saved"]
+    A13["Restore to service"]
+    A9["Manage users, view reports,<br/>change settings"]
+  end
+
+  RL -->|user| U1
+  RL -->|admin| A1
+  RL -->|admin| A9
+  U1 --> U2
+  A1 -->|"units available"| U1
+  A1 -->|"old or damaged units"| A8
+  A8 --> A10
+  A10 -->|"no, keep in service"| A1
+  A10 -->|"yes, reason required"| A11
+  A11 -->|"dispose"| A12
+  A11 -->|"restore"| A13
+  A13 -->|"unit available again"| U1
+  U2 -->|"pending request"| A2
+  A2 --> A3
+  A2 --> A4
+  A4 -->|"user notified"| U3
+  A3 --> A5
+  A5 -->|"email and notification"| U3
+  U3 --> U4
+  A5 --> A6
+  U4 -->|"QR scan confirms delivery"| A6
+  A6 -->|"borrow requests only"| U5
+  U5 --> A7
+  A7 -->|"unit available again"| U1
+  A6 -->|"item or service"| E([Complete])
+
+  classDef plain fill:#fff,stroke:#000,color:#000,stroke-width:1px
+  classDef admin fill:#fff,stroke:#000,color:#000,stroke-width:3px
+  class S,LG,RL,U1,U2,U3,U4,U5,E plain
+  class A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13 admin
+  style USER fill:#fff,stroke:#000,stroke-dasharray:5 5
+  style ADMIN fill:#fff,stroke:#000,stroke-dasharray:5 5

@@ -2,8 +2,23 @@
                      MANAGEMO — SYSTEM DOCUMENTATION
               Inventory & Asset Management System
               Pampanga State University (PSU)
-              Version 2.0.0
+              Version 2.1.0
 ================================================================================
+
+WHAT'S NEW SINCE 2.0.0
+-----------------------
+  - Department data sharing: accounts sharing the same college_id now pool
+    their owned items, borrow records, and request history together across
+    every user-facing page and the mobile app (Module 2b).
+  - Site-wide Borrow/Request terminology switch, configurable by the admin
+    (Module 15b).
+  - "Department Owned Items" tab now has search, category, and owner filters
+    (Module 2).
+  - Mobile app: new "Check Item Details" QR scanner (read-only lookup,
+    separate from the delivery-confirmation scanner) (Module 13).
+  - Admin Settings → Borrow Catalog page-size setting, applied to both the
+    user-facing Borrow shop grid and the admin's own read-only Borrow
+    Catalog tab (Module 15b).
 
 OVERVIEW
 --------
@@ -28,9 +43,20 @@ across requests. Data access lives in:
   config/functions.php            — business logic helpers (auth, QR generation,
                                      email, dbCreate*/dbUpdate*/dbDelete* wrappers)
   config/constants.php            — app-wide constants (roles, statuses, urgency)
-  config/departments_custom.json  — user-added colleges, offices, and campuses
+  config/departments_custom.json  — LEGACY, unused (see KNOWN LIMITATIONS) —
+                                     colleges/offices/campuses now live in the
+                                     Supabase `departments` table instead
   .env                             — SUPABASE_URL, SUPABASE_KEY (service_role),
                                      API_TOKEN_SECRET (used by api/*.php)
+
+  app_settings table (Supabase)   — key/value store for site-wide admin
+                                     settings (terminology mode, borrow
+                                     catalog page size). Read/written via
+                                     getAppSettings()/getAppSetting()/
+                                     setAppSetting() in config/data.php.
+                                     Must be created manually via the SQL in
+                                     database/schema.sql — it is not created
+                                     automatically. See Module 15b.
 
 ================================================================================
 DIRECTORY STRUCTURE
@@ -50,7 +76,8 @@ ManageMo/
 │   ├── functions.php            Business logic (auth, formatting, QR gen, email,
 │   │                            dbCreate*/dbUpdate*/dbDelete* persistence helpers)
 │   ├── mock_data.php            Legacy MockData class — unused, kept for reference
-│   └── departments_custom.json  Persisted user-added colleges, offices, campuses
+│   └── departments_custom.json  LEGACY — unused; departments now persist in
+│                                 Supabase's `departments` table (Module 12)
 │
 ├── includes/
 │   ├── header.php              HTML <head>, Bootstrap/FA CDN links (cache-busted style.css)
@@ -60,7 +87,8 @@ ManageMo/
 │
 ├── user/                       Pages accessible to Role: user
 │   ├── dashboard.php           User home — KPI cards, request summary, recent activity
-│   ├── inventory.php           Browse campus inventory + "My Owned Items" tab (paginated)
+│   ├── inventory.php           Browse campus inventory + "Department Owned Items" tab
+│   │                            (search/category/owner filters, paginated)
 │   ├── requests.php            Submit new request (borrow / item / service)
 │   ├── my-requests.php         View all submitted requests, grouped by unit (paginated)
 │   ├── borrow-records.php      My Records — 3-tab page (Borrow/Item/Service), each paginated
@@ -77,7 +105,9 @@ ManageMo/
 │   ├── reports.php             Printable reports
 │   ├── condemnation.php        Condemnation & Disposal lifecycle management
 │   ├── users.php               User management
-│   └── settings.php            System/admin settings (persisted via dbUpdateUser)
+│   └── settings.php            System/admin settings — profile fields persisted via
+│                                dbUpdateUser(); Terminology switch and Borrow Catalog
+│                                page-size persisted via setAppSetting() (Module 15b)
 │
 ├── api/                        JSON REST API for the Flutter mobile app (see Module 13)
 │   ├── _bootstrap.php           Shared helpers: stateless signed-token auth, JSON I/O
@@ -94,13 +124,22 @@ ManageMo/
 │   │   ├── main.dart            App entry — restores saved session or shows login
 │   │   ├── screens/
 │   │   │   ├── login_screen.dart     Email/password login (same accounts as web app)
-│   │   │   ├── home_screen.dart      2 tabs: "Pending Scan" / "Completed"
-│   │   │   └── scanner_screen.dart   Live QR scan, per-unit delivery confirmation
+│   │   │   ├── home_screen.dart      Bottom nav: "Pending Scan" / "Completed" tabs +
+│   │   │   │                        a "Scan" button that opens item_lookup_screen.dart
+│   │   │   │                        directly (not a switched tab)
+│   │   │   ├── scanner_screen.dart   Live QR scan, per-unit delivery confirmation
+│   │   │   │                        (write path — flips inventory/borrow_records)
+│   │   │   └── item_lookup_screen.dart  "Check Item Details" — read-only QR scan that
+│   │   │                            looks up and displays an inventory item's details;
+│   │   │                            does not mutate any data (see Module 13)
 │   │   └── services/
 │   │       ├── supabase_config.dart  Hardcoded Supabase URL + service_role key
 │   │       ├── supabase_rest.dart    Thin PostgREST wrapper (mirrors config/supabase.php)
 │   │       └── api_client.dart       Login (bcrypt check), pending/completed lists,
-│   │                                 confirmDelivery() — mirrors admin "Mark Delivered"
+│   │                                 confirmDelivery() — mirrors admin "Mark Delivered";
+│   │                                 lookupItemDetails() — backs item_lookup_screen.dart;
+│   │                                 _departmentMateIds()/_idsFilter() — Dart mirror of
+│   │                                 config/functions.php's getDepartmentMateIds()
 │   ├── android/, ios/            Camera permission wired in AndroidManifest.xml / Info.plist
 │   └── test/widget_test.dart     Smoke test — app boots to login screen
 │
@@ -154,10 +193,13 @@ MODULE 2: INVENTORY  (user/inventory.php, admin/inventory.php, admin/inventory-c
 ────────────────────────────────────────────────────────────────────────────────
 Data source: getInventory() → array of items (live Supabase `inventory` table).
 Each item has:
-  id, qr_code_id, item_name, category, description,
-  campus_id, college_id (Main Campus only), quantity, status, location,
-  purchase_date, cost, condition, condemnation_reason, condemned_at,
-  disposal_notes, disposed_at, group_id, created_at
+  id, qr_code_id, item_name, category, description, college_id, quantity,
+  status, location, purchase_date, cost, condition, condemnation_reason,
+  condemned_at, condemned_by, condemned_condition, disposal_notes,
+  disposed_at, disposed_by, group_id, acquisition_mode, model,
+  serial_number, created_at
+  (campus_id was dropped from this table — see this module's note below and
+  the ERD's caption.)
 
 Item statuses: available | borrowed | maintenance | damaged | requested | condemned | disposed
 
@@ -168,8 +210,14 @@ QR Code system:
   - lib/qrcode.php generates the actual QR image for each code.
   - QR images are stored in assets/qrcodes/.
 
-User view:  read-only browse (Available/Borrowed tabs) + "My Owned Items" tab,
-            both paginated (ITEMS_PER_PAGE=15 groups per page).
+User view:  read-only browse (Available/Borrowed tabs) + "Department Owned
+            Items" tab, all paginated (ITEMS_PER_PAGE=15 groups per page).
+            The owned-items tab is scoped to the viewer's whole department
+            (see Module 2b) and, when department sharing is active, adds a
+            filter card with Search, Category, and Owner dropdowns — same
+            .inv-filter-card pattern used by the other tabs, with an
+            "Owner" column shown on each item card whenever more than one
+            account shares the pool.
 Admin view: add items, add units to an existing item, edit item details/status,
             view a per-item detail modal with each unit's QR code.
             Deletion has been REMOVED — there is no way to delete an inventory
@@ -179,6 +227,40 @@ Campus view (admin/inventory-campus.php):
   - Grid of all campus cards with per-campus stats.
   - Main Campus card shows Colleges and Offices breakdowns.
   - "Manage Departments" button opens a tabbed modal (see Module 12).
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 2b: DEPARTMENT DATA SHARING  (config/functions.php, mirrored in mobile app)
+────────────────────────────────────────────────────────────────────────────────
+Accounts that share the same college_id are treated as one pool: owned items,
+borrow records, and request history are fully shared and actionable across
+every account in that college — not just visible, but the same data surface
+each member's own actions would use.
+
+Core helper:
+  getDepartmentMateIds(array $user): array
+    - Returns every user ID sharing $user['college_id'].
+    - If the user has NO college_id set, returns [$user['id']] only — i.e.
+      unassigned accounts are NEVER pooled with each other. This is a
+      deliberate privacy-safe default (not user-specified) so that accounts
+      without a department don't accidentally see each other's data.
+  Mirrored in the mobile app as _departmentMateIds()/_idsFilter() in
+  mobile_app/lib/services/api_client.dart, used to scope pending/completed
+  deliveries and the item-lookup feature the same way.
+
+Applied throughout:
+  - user/inventory.php    — Department Owned Items tab, "already borrowed" checks
+  - user/requests.php     — availability/ownership checks
+  - user/my-requests.php  — request list + stats
+  - user/borrow-records.php — all 3 record tables ("Borrowed By"/"Requested By"
+    owner column shown whenever count($dept_user_ids) > 1)
+  - user/dashboard.php    — KPIs, Return Schedule Calendar, Owned Items widget
+  - user/settings.php     — profile sidebar activity stats
+  - mobile_app            — pending/completed deliveries, item lookup
+
+UI convention: pages compute `$show_owner_col = count($dept_user_ids) > 1;`
+and only render an Owner/Borrowed-By/Requested-By column or filter when true,
+so a solo (no-department) account sees the exact same single-user UI as
+before this feature existed.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 3: REQUEST SUBMISSION  (user/requests.php)
@@ -453,7 +535,9 @@ Sections (top to bottom):
        borrowed return date chip (blue, if currently borrowed), Reserve button
        (maroon, links to requests.php?item_id=X).
      - filterIbItems(cat, btn) JS function handles category filtering.
-     - $campus_inventory filtered to current user's campus_id.
+     - $campus_inventory is the site-wide inventory list (campus_id no longer
+       exists — see Module 2); the variable name is a holdover from before
+       that column was dropped.
 
   6. Recent Requests table + Campus Items list.
 
@@ -548,38 +632,40 @@ Printable tabular reports:
 MODULE 12: DEPARTMENT & CAMPUS MANAGER  (admin/inventory-campus.php)
 ────────────────────────────────────────────────────────────────────────────────
 Accessed via "Manage Departments" button on the Campus Inventory page.
-Opens a tabbed modal with three tabs:
+Opens a tabbed modal with three tabs. As of the `departments` table migration,
+colleges, offices, and campuses are three TYPES of the same table/list — there
+is no more separate campus_id concept or per-campus scoping (see Module 2's
+note and the ERD below); "Main Campus only" no longer applies to colleges/
+offices, since campus_id was dropped from every table.
 
-  Tab 1 — Colleges (Main Campus only)
-    - Lists all colleges (8 defaults + any custom).
-    - Add: enter abbreviation (auto-uppercased) + full name → POST → saved to JSON.
-    - Delete: custom entries only; default colleges are protected.
+  Tab 1 — Colleges
+    - Lists all colleges (defaults + any custom), i.e. departments rows with
+      type='college'.
+    - Add: enter abbreviation (auto-uppercased) + full name → POST →
+      dbAddCustomDepartment('college', …) → INSERT into departments.
+    - Delete: custom entries only (is_default = false); default colleges are
+      protected by dbDeleteCustomDepartment()'s is_default check.
 
-  Tab 2 — Offices (Main Campus only)
-    - Lists all administrative offices (14 defaults + any custom).
+  Tab 2 — Offices
+    - Lists all administrative offices (defaults + any custom), type='office'.
     - Add/delete same as colleges tab.
 
   Tab 3 — Campuses
-    - Lists all PSU campuses (8 defaults + any custom).
-    - Add: enter name, location, optional description → assigned auto-incremented ID.
-    - Delete: custom campuses only; default 8 campuses are protected.
-
-  Note: Colleges and Offices apply to Main Campus (ID 1) only.
-        Other campuses do not have sub-department breakdowns.
+    - Lists all PSU campuses (defaults + any custom), type='campus'.
+    - Add: enter name, location, optional description → dbAddCustomDepartment
+      ('campus', …) derives an abbreviation from the name (campuses have none
+      naturally) and inserts a departments row.
+    - Delete: custom campuses only; default campuses (is_default = true) are
+      protected.
 
 Persistence:
-  Custom entries are saved to config/departments_custom.json:
-  {
-    "colleges": { "CON": "College of Nursing (CON)" },
-    "offices":  { "OAR": "Office of Alumni Relations (OAR)" },
-    "campuses": [
-      { "id": 9, "name": "Magalang Campus", "location": "Magalang, Pampanga",
-        "description": "", "colleges": [] }
-    ]
-  }
-
-  At runtime, getMainCampusColleges(), getMainCampusOffices(), and getCampuses()
-  merge defaults with custom JSON entries automatically.
+  All three tabs read/write the SAME `departments` table (see the ERD below):
+  id, type ('college'|'office'|'campus'), abbreviation, full_name, location
+  (campus rows only), description (campus rows only), is_default.
+  getMainCampusColleges(), getMainCampusOffices(), and getCampuses() in
+  config/data.php each query it filtered by type — there is no JSON file or
+  in-app merge step anymore; every row, default or custom, lives in Supabase.
+  (config/departments_custom.json is legacy — see KNOWN LIMITATIONS.)
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 13: QR DELIVERY SCANNER  (mobile_app/ — Flutter app, IMPLEMENTED)
@@ -644,6 +730,27 @@ QR Code format: whatever qr_code_id was generated for that inventory row /
 request unit (see Module 2) — matched via an exact `qr_code_id=eq.` lookup,
 no special per-unit suffix parsing needed.
 
+"Check Item Details" (read-only lookup, item_lookup_screen.dart):
+  - Reached from the home screen's "Scan" nav button — separate from, and
+    does not switch into, the delivery-confirmation scanner.
+  - Scans any inventory item's QR code and shows its details (name, category,
+    status, location, condition, owner, etc.) via api_client.dart's
+    lookupItemDetails(), which is department-scoped the same way as the rest
+    of the app (Module 2b).
+  - Purely read-only — makes no writes to Supabase, unlike scanner_screen.dart.
+
+Duplicate/stale-scan handling (scanner_screen.dart + confirmDelivery()):
+  - A `_confirmedCodes` set in scanner_screen.dart ignores the camera
+    re-firing a stale detection right after a scan (prevents a spurious
+    "already confirmed" error on the unit just scanned).
+  - confirmDelivery() in api_client.dart filters matches to
+    delivery_status=out_for_delivery FIRST, so a reused/recycled QR code
+    can't match a stale historical (already-delivered) request row from a
+    previous borrow cycle.
+  - confirmDelivery() writes the ORIGINAL REQUESTER's user_id (not the
+    scanning user's) into the borrow_records/notifications rows it creates —
+    important once department-mates can scan for each other under Module 2b.
+
 Build/verify notes: `flutter analyze`, `flutter test`, and `flutter build apk`
 all pass. Requires the CAMERA permission (wired into AndroidManifest.xml /
 Info.plist's NSCameraUsageDescription).
@@ -661,6 +768,43 @@ MODULE 15: SETTINGS  (user/settings.php, admin/settings.php)
 User settings: update full_name, phone, password (with current password verify).
 Admin settings: system name, email, campus configuration.
 Both persist via dbUpdateUser() — real Supabase writes, not session-mocked.
+
+────────────────────────────────────────────────────────────────────────────────
+MODULE 15b: TERMINOLOGY SWITCH & CATALOG PAGE SIZE  (admin/settings.php → System
+            Settings tab; config/functions.php; config/data.php)
+────────────────────────────────────────────────────────────────────────────────
+Terminology switch:
+  - One global admin setting (System Settings tab, "Terminology" card) toggles
+    between Default wording and an alternate set: Borrow/Borrowable/Borrowing
+    → "Transferrable", Request/Requesting/Requested/Acquire → "Procurement".
+  - Backed by termLabel(string $default_text): string in config/functions.php
+    — regex-matches the borrow-family (/borrow/i) or request/acquire-family
+    (/request|acquir/i) senses and substitutes the alt label; a no-op unless
+    app_settings.terminology === 'alt'.
+  - Scope is intentionally narrow: only swaps the specific borrow/procurement
+    senses of these words, never the generic umbrella "Requests"/"Service
+    Request" wording, which stays fixed everywhere.
+  - Applied across admin/inventory.php, admin/requests.php, admin/dashboard.php,
+    admin/analytics.php, admin/reports.php, admin/inventory-campus.php, and
+    every user/*.php page (including JS-embedded label objects, not just
+    server-rendered text).
+  - POST action `update_terminology` writes app_settings via setAppSetting().
+
+Borrow Catalog pagination:
+  - Admin-configurable page size (System Settings tab, "Borrow Catalog
+    Pagination" card; app_settings key: borrow_catalog_page_size, default 12,
+    clamped 4–60) applies to BOTH:
+      1. The user-facing Borrow shop grid in user/requests.php
+         (BSHOP_PAGE_SIZE / renderBshopPage() / filterShopItemsPage()).
+      2. The admin's own separate, read-only "Borrow Catalog" tab in
+         admin/settings.php (anPaginate()-style sliding-window pager) —
+         a distinct page from the user-facing shop grid that previously had
+         no pagination at all.
+  - POST action `update_catalog_paging` writes app_settings via setAppSetting().
+
+Both settings require the app_settings table to exist in Supabase — see the
+"app_settings table" note near the top of this document and
+database/schema.sql for the exact DDL. It is NOT created automatically.
 
 ────────────────────────────────────────────────────────────────────────────────
 MODULE 16: MOBILE RESPONSIVENESS  (css/style.css + per-page <style> blocks)
@@ -734,16 +878,26 @@ Per-page responsive rules (in each file's <style> block):
 DATA RELATIONSHIPS
 ================================================================================
 
-Users ──────────────────── campus_id   →  Campuses
-Users ──────────────────── college_id  →  Main Campus Colleges (string key)
-Inventory ──────────────── campus_id   →  Campuses
-Inventory ──────────────── college_id  →  Main Campus Colleges (Main Campus only)
+Users ──────────────────── college_id  →  Departments (type='college'/'office'/
+                                           'campus'; loose text match on
+                                           abbreviation — not an enforced FK)
+Inventory ──────────────── college_id  →  Departments (same loose match)
+UserOwnedItems ─────────── college_id  →  Departments (same loose match)
 Requests ───────────────── user_id     →  Users
 Requests ───────────────── inventory_id → Inventory (nullable — see Module 3)
 Requests ───────────────── approved_by  → Users (admin)
+RequestItems ────────────── request_id  → Requests
+RequestItems ────────────── inventory_id → Inventory
 BorrowRecords ──────────── user_id     →  Users
 BorrowRecords ──────────── inventory_id → Inventory
 BorrowRecords ──────────── request_id   → Requests
+UserOwnedItems ──────────── user_id     →  Users
+Notifications ───────────── user_id     →  Users
+
+Note: there is no Campuses table — campus_id was dropped from users,
+inventory, and user_owned_items. Campuses are just Departments rows with
+type='campus'. See the ERD artifact (or database/schema.sql) for the full,
+exact column list per table.
 
 ================================================================================
 REQUEST STATUS FLOW
@@ -793,26 +947,27 @@ URGENCY LEVELS
   critical — Immediate attention required
 
 ================================================================================
-CAMPUS STRUCTURE
+DEPARTMENT STRUCTURE  (colleges, offices, campuses)
 ================================================================================
 
-Default campuses (cannot be deleted):
-  ID 1 — Main Campus (Brgy. Cabambangan, Bacolor, Pampanga)
-           Colleges: CEA, COE, CCS, CBS, CAS, CIT, CHTM, CSSP
-           Offices:  OUP, OVPAA, OVPAF, OVPRDE, OUR, OSAS, HRMO,
-                     ICTO, FBO, PMO, PPMO, ULib, GCC, PDO
-  ID 2 — Mexico Campus
-  ID 3 — Porac Campus
-  ID 4 — Santo Tomas Campus
-  ID 5 — Lubao Campus
-  ID 6 — Candaba Campus
-  ID 7 — Apalit Campus
-  ID 8 — City of San Fernando Campus
+All three are just TYPES in the same `departments` table (id, type,
+abbreviation, full_name, location, description, is_default) — there is no
+separate Campuses table, and campuses are no longer nested under any one
+"Main Campus". college_id elsewhere in the schema can point at a college,
+office, OR campus abbreviation; the app doesn't distinguish which at the
+database level.
 
-Custom campuses are added via the Department Manager UI and stored in
-config/departments_custom.json with auto-incremented IDs starting at 9.
+Default rows (is_default = true, protected from deletion):
+  Colleges: CEA, COE, CCS, CBS, CAS, CIT, CHTM, CSSP
+  Offices:  OUP, OVPAA, OVPAF, OVPRDE, OUR, OSAS, HRMO,
+            ICTO, FBO, PMO, PPMO, ULib, GCC, PDO
+  Campuses: Main Campus (Brgy. Cabambangan, Bacolor, Pampanga), Mexico Campus,
+            Porac Campus, Santo Tomas Campus, Lubao Campus, Candaba Campus,
+            Apalit Campus, City of San Fernando Campus
 
-Only Main Campus (ID 1) supports College and Office sub-department breakdowns.
+Custom colleges/offices/campuses are added via the Department Manager UI
+(Module 12) and persist as ordinary `departments` rows with is_default=false
+— there is no ID-numbering scheme to track and no JSON file involved.
 
 ================================================================================
 DESIGN SYSTEM
@@ -876,5 +1031,16 @@ KNOWN LIMITATIONS / OPERATIONAL NOTES
     wider distribution of the app.
   - config/mock_data.php is legacy/dead code — no longer referenced anywhere;
     kept only as a historical reference for the original data shape.
+  - config/departments_custom.json is ALSO legacy/dead code — departments
+    (colleges/offices/campuses) migrated to a real Supabase `departments`
+    table (Module 12); nothing reads or writes the JSON file anymore.
+  - The app_settings table (Module 15b) is not created automatically — it
+    must be created manually in the Supabase SQL editor using the DDL in
+    database/schema.sql before the Terminology switch or Borrow Catalog
+    page-size setting will work; until then, those features will error/no-op.
+  - Department data sharing (Module 2b) pools by college_id only. Since
+    college_id can hold a college, office, or campus abbreviation
+    interchangeably (Module 12), pooling in practice follows whichever of
+    those three the user's college_id happens to be set to.
 
 ================================================================================
