@@ -969,7 +969,7 @@ displayMessage();
     $grouped_owned       = groupOwnedItems($owned_items);
 
     // Pagination settings
-    $items_per_page = 6;
+    $items_per_page = 10;
     $current_page_all = isset($_GET['page_all']) ? (int)$_GET['page_all'] : 1;
     $current_page_available = isset($_GET['page_available']) ? (int)$_GET['page_available'] : 1;
     $current_page_requested = isset($_GET['page_requested']) ? (int)$_GET['page_requested'] : 1;
