@@ -503,6 +503,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     foreach (getRequests() as $r)        { $history_counts[$r['user_id']]['requests']    = ($history_counts[$r['user_id']]['requests']    ?? 0) + 1; }
     foreach (getBorrowRecords() as $b)   { $history_counts[$b['user_id']]['borrows']      = ($history_counts[$b['user_id']]['borrows']      ?? 0) + 1; }
     foreach (getUserOwnedItems() as $o)  { $history_counts[$o['user_id']]['owned_items']  = ($history_counts[$o['user_id']]['owned_items']  ?? 0) + 1; }
+
+    // Pagination
+    $um_per_page    = 12;
+    $um_total_pages = max(1, (int)ceil(count($all_users) / $um_per_page));
+    $um_page        = max(1, min($um_total_pages, (int)($_GET['page'] ?? 1)));
+    $um_offset      = ($um_page - 1) * $um_per_page;
+    $all_users_page = array_slice($all_users, $um_offset, $um_per_page);
     ?>
 
     <!-- Stats -->
@@ -534,7 +541,7 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 
     <!-- Card Grid -->
     <div class="um-grid">
-    <?php foreach ($all_users as $u):
+    <?php foreach ($all_users_page as $u):
         $col      = $avatar_colors[($u['id'] - 1) % count($avatar_colors)];
         $initials = strtoupper(substr($u['full_name'], 0, 1));
         $dept_name = (!empty($u['college_id']) && isset($all_department_names[$u['college_id']])) ? $all_department_names[$u['college_id']] : '';
@@ -656,6 +663,34 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
     <?php endif; ?>
     <?php endforeach; ?>
     </div>
+
+    <!-- Pagination -->
+    <?php if ($um_total_pages > 1): ?>
+    <div class="d-flex justify-content-center align-items-center gap-2 mt-4">
+        <a href="users.php?page=<?php echo max(1, $um_page - 1); ?>"
+           class="btn btn-sm <?php echo $um_page <= 1 ? 'disabled' : ''; ?>"
+           style="background:#fff;border:1px solid #e5e7eb;color:#555;font-weight:600;<?php echo $um_page <= 1 ? 'pointer-events:none;opacity:0.5;' : ''; ?>">
+            <i class="fas fa-chevron-left"></i>
+        </a>
+        <?php for ($i = 1; $i <= $um_total_pages; $i++): ?>
+        <a href="users.php?page=<?php echo $i; ?>"
+           class="btn btn-sm"
+           style="min-width:38px; font-weight:700; <?php echo $i === $um_page
+                ? 'background:#8B0000;border:1px solid #8B0000;color:#fff;'
+                : 'background:#fff;border:1px solid #e5e7eb;color:#555;'; ?>">
+            <?php echo $i; ?>
+        </a>
+        <?php endfor; ?>
+        <a href="users.php?page=<?php echo min($um_total_pages, $um_page + 1); ?>"
+           class="btn btn-sm <?php echo $um_page >= $um_total_pages ? 'disabled' : ''; ?>"
+           style="background:#fff;border:1px solid #e5e7eb;color:#555;font-weight:600;<?php echo $um_page >= $um_total_pages ? 'pointer-events:none;opacity:0.5;' : ''; ?>">
+            <i class="fas fa-chevron-right"></i>
+        </a>
+    </div>
+    <div class="text-center" style="font-size:0.78rem;color:rgba(0,0,0,0.42);margin-top:8px;">
+        Showing <?php echo $um_offset + 1; ?>–<?php echo min($um_offset + $um_per_page, $count_total); ?> of <?php echo $count_total; ?> users
+    </div>
+    <?php endif; ?>
 <?php endif; ?>
 
 </div>
