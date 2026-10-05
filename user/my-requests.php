@@ -283,6 +283,19 @@ displayMessage();
     transition:background 0.15s;
 }
 .mrt-new-btn:hover { background:#7a0000 !important; color:#fff !important; }
+
+/* Modal item list pagination — a bulk request (e.g. 50 borrowed chairs) can
+   have far more units than fit comfortably in the "Items in this request"
+   modal, so it's paged client-side same as the shop grid elsewhere. */
+.mrt-modal-pagination { display:none; justify-content:center; align-items:center; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.mrt-modal-pagination.active { display:flex; }
+.mrt-modal-pagination button {
+    min-width:28px; padding:4px 9px; font-size:0.78rem; font-weight:700;
+    border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#555; cursor:pointer;
+}
+.mrt-modal-pagination button:hover:not(:disabled) { background:#f7f7f7; }
+.mrt-modal-pagination button.active { background:#8B0000; border-color:#8B0000; color:#fff; }
+.mrt-modal-pagination button:disabled { opacity:0.4; cursor:default; }
 </style>
 
 <div class="container-fluid mt-4 pb-4">
@@ -732,7 +745,7 @@ displayMessage();
                     <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.4);margin-bottom:8px;">
                         <?php echo $req['request_type'] === 'service' ? 'Service' : 'Items in this request (' . $req['unit_count'] . ')'; ?>
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:6px;">
+                    <div class="mrt-modal-items" style="display:flex;flex-direction:column;gap:6px;">
                         <?php foreach ($req['group_rows'] as $gr_idx => $gr):
                             // Service tickets have no catalog item — fall back to the
                             // service description instead of the literal word "Item".
@@ -760,6 +773,7 @@ displayMessage();
                         </div>
                         <?php endforeach; ?>
                     </div>
+                    <div class="mrt-modal-pagination"></div>
                     <?php if ($reason): ?>
                     <div style="margin-top:16px;">
                         <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(0,0,0,0.4);margin-bottom:4px;">Reason / Description</div>
@@ -809,5 +823,56 @@ displayMessage();
 
 </div>
 </div>
+
+<script>
+// Paginate each "Items in this request" modal list client-side — initialized
+// lazily when a modal is actually opened, not up front for every card on the page.
+(function () {
+    var PAGE_SIZE = 8;
+
+    function initModalPagination(modalEl) {
+        var list = modalEl.querySelector('.mrt-modal-items');
+        var pager = modalEl.querySelector('.mrt-modal-pagination');
+        if (!list || !pager || list.dataset.paginated === '1') return;
+        list.dataset.paginated = '1';
+
+        var items = Array.prototype.slice.call(list.children);
+        var totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+        if (totalPages <= 1) return;
+
+        var page = 1;
+
+        function render() {
+            var start = (page - 1) * PAGE_SIZE;
+            items.forEach(function (el, i) {
+                el.style.display = (i >= start && i < start + PAGE_SIZE) ? '' : 'none';
+            });
+
+            pager.innerHTML = '';
+            pager.classList.add('active');
+
+            function addBtn(label, targetPage, disabled, active) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = label;
+                b.disabled = !!disabled;
+                if (active) b.classList.add('active');
+                b.addEventListener('click', function () { page = targetPage; render(); });
+                pager.appendChild(b);
+            }
+
+            addBtn('‹', Math.max(1, page - 1), page <= 1, false);
+            for (var i = 1; i <= totalPages; i++) addBtn(String(i), i, false, i === page);
+            addBtn('›', Math.min(totalPages, page + 1), page >= totalPages, false);
+        }
+
+        render();
+    }
+
+    document.querySelectorAll('.modal').forEach(function (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', function () { initModalPagination(modalEl); });
+    });
+})();
+</script>
 
 <?php require_once dirname(__DIR__) . '/includes/footer.php'; ?>
