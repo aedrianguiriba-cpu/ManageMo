@@ -1120,7 +1120,7 @@ displayMessage();
 
     <!-- TAB NAVIGATION -->
     <div class="ai-tabs-container ai-no-print">
-        <div style="display: flex; gap: 8px; flex: 1; flex-wrap: nowrap; overflow-x: auto; min-width: 0;">
+        <div class="ai-tabs-row">
             <a href="inventory.php?tab=all" class="ai-tab <?php echo $current_tab === 'all' ? 'ai-tab-active' : ''; ?>" onclick="setTab('all'); return false;">
                 <span class="ai-tab-icon"><i class="fas fa-layer-group"></i></span>
                 <span class="ai-tab-label">All Items</span>
@@ -1152,7 +1152,7 @@ displayMessage();
                 <span class="ai-tab-badge"><?php echo $total_owned; ?></span>
             </a>
         </div>
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; flex-shrink: 0;">
             <a href="inventory.php?action=add" class="btn ai-btn-primary" style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;"><i class="fas fa-plus"></i> Add Item</a>
             <a href="inventory.php?action=add_owned&tab=owned" class="btn ai-btn-primary" style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;"><i class="fas fa-user-plus"></i> Add User Item</a>
         </div>
@@ -2023,6 +2023,17 @@ displayMessage();
     flex-wrap: wrap;
 }
 
+/* Tabs shrink to fit one row instead of scrolling or wrapping — icon/badge
+   stay fixed size, only the label truncates (with an ellipsis) once space
+   runs out. */
+.ai-tabs-row {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
 .ai-tab {
     display: flex;
     align-items: center;
@@ -2035,14 +2046,23 @@ displayMessage();
     border-radius: 6px;
     transition: all 0.15s;
     cursor: pointer;
-    white-space: nowrap;
     background: transparent;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .ai-tab-icon {
     display: flex;
     align-items: center;
     font-size: 0.78rem;
+    flex-shrink: 0;
+}
+
+.ai-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .ai-tab-badge {
@@ -2057,6 +2077,12 @@ displayMessage();
     border-radius: 4px;
     font-size: 0.72rem;
     font-weight: 700;
+    flex-shrink: 0;
+}
+
+@media (max-width: 1300px) {
+    .ai-tabs-row { gap: 3px; }
+    .ai-tab { padding: 8px 9px; gap: 5px; font-size: 0.78rem; }
 }
 
 .ai-tab:hover {
