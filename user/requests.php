@@ -1393,6 +1393,7 @@ if (!empty($submit_error)): ?>
                                     <i class="fas fa-search"></i><span>No items match</span>
                                 </div>
                             </div>
+                            <div id="ishop-pagination" class="bshop-pagination"></div>
                         </div>
                     </div>
 
@@ -1981,6 +1982,10 @@ function selectItemReqCard(card) {
     updateSummary();
 }
 
+// Item Request catalog pagination — same scheme as the borrow shop above
+// (filterShopItems()/renderBshopPage()), reusing the same admin-configurable
+// page size. The "Other / Custom" card is pinned outside pagination (always
+// shown first, on every page) rather than competing for a page slot.
 function filterItemShop(btn) {
     if (btn) {
         document.querySelectorAll('#ishop-cats .bshop-cat').forEach(function(b) { b.classList.remove('active'); });
@@ -1990,19 +1995,66 @@ function filterItemShop(btn) {
     var activeBtn = document.querySelector('#ishop-cats .bshop-cat.active');
     if (activeBtn) activeCat = activeBtn.getAttribute('data-cat') || '';
     var search = (document.getElementById('ishop-search').value || '').toLowerCase().trim();
-    var visible = 0;
-    document.querySelectorAll('#ishop-grid .bshop-card').forEach(function(card) {
+
+    var customCard = document.querySelector('#ishop-grid .bshop-card-custom');
+    if (customCard) {
+        var custName = (customCard.querySelector('.bshop-name') ? customCard.querySelector('.bshop-name').textContent : '').toLowerCase();
+        customCard.style.display = (!search || custName.indexOf(search) !== -1) ? '' : 'none';
+    }
+
+    var matches = [];
+    document.querySelectorAll('#ishop-grid .bshop-card:not(.bshop-card-custom)').forEach(function(card) {
         var cat = card.getAttribute('data-category') || '';
         var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
-        var isCustom = card.classList.contains('bshop-card-custom');
-        var catMatch = !activeCat || cat === activeCat || isCustom;
+        var catMatch = !activeCat || cat === activeCat;
         var searchMatch = !search || name.indexOf(search) !== -1;
-        var show = catMatch && searchMatch;
-        card.style.display = show ? '' : 'none';
-        if (show) visible++;
+        if (catMatch && searchMatch) matches.push(card);
+        else card.style.display = 'none';
     });
+    renderIshopPage(matches, 1);
+}
+
+// Shows just the current page's slice of [matches], hides the rest, and
+// rebuilds the pager underneath the grid.
+function renderIshopPage(matches, page) {
+    var totalPages = Math.max(1, Math.ceil(matches.length / BSHOP_PAGE_SIZE));
+    page = Math.min(Math.max(1, page), totalPages);
+    var start = (page - 1) * BSHOP_PAGE_SIZE;
+    document.querySelectorAll('#ishop-grid .bshop-card:not(.bshop-card-custom)').forEach(function(card) { card.style.display = 'none'; });
+    matches.slice(start, start + BSHOP_PAGE_SIZE).forEach(function(card) { card.style.display = ''; });
+
+    var customCard = document.querySelector('#ishop-grid .bshop-card-custom');
+    var customVisible = customCard && customCard.style.display !== 'none';
     var emptyEl = document.getElementById('ishop-empty');
-    if (emptyEl) emptyEl.style.display = visible === 0 ? 'flex' : 'none';
+    if (emptyEl) emptyEl.style.display = (matches.length === 0 && !customVisible) ? 'flex' : 'none';
+
+    var pagerEl = document.getElementById('ishop-pagination');
+    if (!pagerEl) return;
+    if (totalPages <= 1) { pagerEl.innerHTML = ''; return; }
+    var html = '<button type="button" ' + (page === 1 ? 'disabled' : 'onclick="filterItemShopPage(' + (page - 1) + ')"') + '><i class="fas fa-chevron-left"></i></button>';
+    for (var i = 1; i <= totalPages; i++) {
+        html += '<button type="button" class="' + (i === page ? 'active' : '') + '" onclick="filterItemShopPage(' + i + ')">' + i + '</button>';
+    }
+    html += '<button type="button" ' + (page === totalPages ? 'disabled' : 'onclick="filterItemShopPage(' + (page + 1) + ')"') + '><i class="fas fa-chevron-right"></i></button>';
+    pagerEl.innerHTML = html;
+}
+
+// Re-runs the current search/category filter, then jumps straight to [page]
+// instead of resetting to page 1 — used by the pager's own buttons.
+function filterItemShopPage(page) {
+    var activeBtn = document.querySelector('#ishop-cats .bshop-cat.active');
+    var activeCat = activeBtn ? (activeBtn.getAttribute('data-cat') || '') : '';
+    var search = (document.getElementById('ishop-search').value || '').toLowerCase().trim();
+    var matches = [];
+    document.querySelectorAll('#ishop-grid .bshop-card:not(.bshop-card-custom)').forEach(function(card) {
+        var cat = card.getAttribute('data-category') || '';
+        var name = (card.querySelector('.bshop-name') ? card.querySelector('.bshop-name').textContent : '').toLowerCase();
+        var catMatch = !activeCat || cat === activeCat;
+        var searchMatch = !search || name.indexOf(search) !== -1;
+        if (catMatch && searchMatch) matches.push(card);
+    });
+    renderIshopPage(matches, page);
+    document.getElementById('ishop-pagination').scrollIntoView({behavior: 'smooth', block: 'nearest'});
 }
 
 function selectServiceCard(card) {
@@ -2246,6 +2298,7 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
 renderCart();
 updateSummary();
 filterShopItems(); // also paginates the borrow catalog from page 1 on first load
+filterItemShop();  // also paginates the item request catalog from page 1 on first load
 
 // Pre-select item from inventory page
 <?php if ($auto_fill_item && $auto_fill_type === 'item'): ?>
@@ -2260,6 +2313,11 @@ filterShopItems(); // also paginates the borrow catalog from page 1 on first loa
             if (c.getAttribute('data-value') === autoVal) matchCard = c;
         });
         if (matchCard) {
+            // The catalog is paginated now — a deep-linked item could land on
+            // any page (same fix as the borrow shop's equivalent block below).
+            var allCards = Array.from(document.querySelectorAll('#ishop-grid .bshop-card:not(.bshop-card-custom)'));
+            var idx = allCards.indexOf(matchCard);
+            if (idx >= 0) filterItemShopPage(Math.floor(idx / BSHOP_PAGE_SIZE) + 1);
             selectItemReqCard(matchCard);
             setTimeout(function() { matchCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
         }
