@@ -93,6 +93,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'acquisition_mode' => $ref_item['acquisition_mode'] ?? 'borrow',
             'model'         => $ref_item['model'] ?? null,
             'group_id'      => $group_id_for_units,
+            // Inherit the group's existing Max Borrow Duration override (if
+            // any) — it's a per-item-group setting, so new units joining the
+            // group shouldn't silently fall back to the global default.
+            'max_borrow_days' => $ref_item['max_borrow_days'] ?? null,
         ];
         // Continues the existing "<name> Unit N" numbering — total units after this add is
         // always > 1, so every unit (old and new) is uniquely named/serialed.
@@ -180,6 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $item_status  = sanitizeInput($_POST['status']);
         // Items still Available haven't been claimed by any department/campus/college yet.
         $college_id   = $item_status === 'available' ? null : (sanitizeInput($_POST['college_id'] ?? '') ?: null);
+        $max_borrow_days_edit = is_numeric($_POST['max_borrow_days'] ?? '') ? max(1, (int)$_POST['max_borrow_days']) : null;
         dbUpdateInventory($inventory_id, [
             'item_name'        => $item_name,
             'category'         => sanitizeInput($_POST['category']),
@@ -195,8 +200,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'acquisition_mode' => in_array($acq_mode, ['borrow', 'request', 'both']) ? $acq_mode : 'borrow',
             'model'            => sanitizeInput($_POST['model'] ?? '') ?: null,
             'serial_number'    => sanitizeInput($_POST['serial_number'] ?? '') ?: null,
-            'max_borrow_days'  => is_numeric($_POST['max_borrow_days'] ?? '') ? max(1, (int)$_POST['max_borrow_days']) : null,
+            'max_borrow_days'  => $max_borrow_days_edit,
         ]);
+        // Max Borrow Duration is a per-item-group setting, not per physical
+        // unit — a group's units would otherwise end up with different
+        // effective limits depending on which specific unit a user happens
+        // to be assigned, which reads as "the same item" to them. Keep every
+        // other unit sharing this one's group in sync.
+        $edited_item = findById(getInventory(), $inventory_id);
+        $edited_group_id = $edited_item['group_id'] ?? null;
+        if ($edited_group_id) {
+            foreach (getInventory() as $sibling) {
+                if ((int)$sibling['id'] === $inventory_id) continue;
+                if (($sibling['group_id'] ?? null) !== $edited_group_id) continue;
+                dbUpdateInventory((int)$sibling['id'], ['max_borrow_days' => $max_borrow_days_edit]);
+            }
+        }
         logActivity($current_user['id'], 'UPDATE', "Updated inventory item: $item_name", 'inventory', $inventory_id);
         redirectWithMessage('inventory.php', 'Item updated successfully!', 'success');
 

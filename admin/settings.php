@@ -57,15 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setAppSetting('max_borrow_duration_days', (string)$max_days);
         logActivity($current_user['id'], 'UPDATE', "Changed max borrow duration to $max_days day(s)", 'app_settings', 0);
         redirectWithMessage('settings.php#system-tab', 'Maximum borrow duration updated.', 'success');
-
-    } elseif ($action === 'update_request_policy') {
-        $policy_text = trim($_POST['request_policy_text'] ?? '');
-        if ($policy_text === '') {
-            redirectWithMessage('settings.php#system-tab', 'Policy text cannot be empty.', 'danger');
-        }
-        setAppSetting('request_policy_text', $policy_text);
-        logActivity($current_user['id'], 'UPDATE', 'Updated the borrow/request policy text', 'app_settings', 0);
-        redirectWithMessage('settings.php#system-tab', 'Request policy updated.', 'success');
     }
 }
 
@@ -637,23 +628,6 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
                     </button>
                     <div style="width:100%;font-size:0.76rem;color:rgba(0,0,0,0.40);">
                         <i class="fas fa-info-circle me-1"></i>Between 1 and 365 days from today. Takes effect immediately for everyone.
-                    </div>
-                </form>
-            </div>
-            <div class="as-card">
-                <div class="as-card-title"><i class="fas fa-file-contract me-2" style="opacity:0.8;"></i>Borrow/Request Policy</div>
-                <div class="as-card-sub">Shown to users on the Submit Request page — they must check an agreement box before they can submit a borrow or item request.</div>
-                <form method="POST" action="settings.php#system-tab" style="margin-top:8px;">
-                    <input type="hidden" name="action" value="update_request_policy">
-                    <textarea name="request_policy_text" rows="8" required
-                              style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:0.85rem;font-family:inherit;line-height:1.5;"><?php echo htmlspecialchars(getRequestPolicyText()); ?></textarea>
-                    <div class="d-flex align-items-center gap-3 mt-2">
-                        <button type="submit" class="btn" style="background:#8B0000;color:#fff;font-weight:700;font-size:0.85rem;padding:9px 18px;border-radius:6px;border:none;">
-                            <i class="fas fa-save me-1"></i>Save
-                        </button>
-                        <div style="font-size:0.76rem;color:rgba(0,0,0,0.40);">
-                            <i class="fas fa-info-circle me-1"></i>Plain text — line breaks are preserved. Takes effect immediately for everyone.
-                        </div>
                     </div>
                 </form>
             </div>

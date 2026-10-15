@@ -26,25 +26,6 @@ function maxReturnDateFor(?int $itemSpecific): string {
     return (new DateTime('now', new DateTimeZone('Asia/Manila')))->modify("+{$days} days")->format('Y-m-d');
 }
 
-// Shown (and required to be acknowledged) on the Submit Request page before a
-// user can borrow or request anything — editable from Settings > System.
-function getRequestPolicyText(): string {
-    return getAppSetting('request_policy_text', "This policy covers borrowing and requesting physical inventory items through this system.\n\n"
-        . "What's included:\n"
-        . "- Items currently marked Available in the inventory catalog.\n"
-        . "- University-owned equipment, furniture, and supplies listed in the system.\n\n"
-        . "What's NOT included:\n"
-        . "- Service/maintenance tickets (these are governed separately, not by this borrowing policy).\n"
-        . "- Items already borrowed, requested, condemned, or disposed — these are not eligible until returned/restocked.\n"
-        . "- Personally-owned items not listed in the inventory system.\n\n"
-        . "By submitting a borrow or item request, you agree to:\n\n"
-        . "1. Use borrowed items responsibly and only for their intended purpose.\n"
-        . "2. Return borrowed items on or before the agreed expected return date.\n"
-        . "3. Report any damage, loss, or malfunction to the property custodian's office immediately.\n"
-        . "4. Accept responsibility for the cost of repair or replacement of items damaged or lost while in your possession.\n"
-        . "5. Understand that repeated late returns or policy violations may result in restricted borrowing privileges.");
-}
-
 // Does this user currently have at least one borrowed item past its
 // expected_return_date? Used to block new borrow requests until they return
 // what they already have overdue.

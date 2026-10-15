@@ -83,8 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!is_array($cart_items) || empty($cart_items)) {
         $submit_error = 'No items in your request. Please add at least one item.';
-    } elseif (empty($_POST['policy_agreed'])) {
-        $submit_error = 'You must agree to the borrow/request policy before submitting.';
     } elseif ($has_overdue_borrow) {
         $submit_error = 'You have an overdue borrowed item. Please return it before submitting a new borrow request.';
     } elseif ($has_past_date) {
@@ -648,17 +646,6 @@ if (!empty($submit_error)): ?>
 .rq-add-btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:10px; border-radius:11px; margin-top:10px; border:2px dashed rgba(139,0,0,0.25); background:rgba(139,0,0,0.03); color:#8B0000; font-size:0.84rem; font-weight:700; cursor:pointer; transition:all 0.15s; }
 .rq-add-btn:hover { background:rgba(139,0,0,0.08); border-color:rgba(139,0,0,0.50); }
 .rq-cart-error { display:none; color:#dc2626; font-size:0.80rem; font-weight:600; margin-top:8px; padding:8px 12px; background:rgba(239,68,68,0.08); border-radius:9px; }
-
-/* Snackbar — brief floating toast, used for the policy-checkbox validation */
-.rq-snackbar {
-    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(16px);
-    background: #1a1a1a; color: #fff; padding: 13px 20px; border-radius: 8px;
-    font-size: 0.86rem; font-weight: 600; box-shadow: 0 10px 28px rgba(0,0,0,0.30);
-    display: flex; align-items: center; gap: 10px; z-index: 2000; max-width: min(90vw, 440px);
-    opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease;
-}
-.rq-snackbar.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-.rq-snackbar i { color: #f87171; flex-shrink: 0; }
 .rq-sum-preview-item { display:flex; align-items:flex-start; gap:7px; padding:5px 0; }
 .rq-sum-preview-num { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:5px; background:rgba(139,0,0,0.12); color:#8B0000; font-size:0.60rem; font-weight:800; flex-shrink:0; margin-top:1px; }
 
@@ -1636,17 +1623,6 @@ if (!empty($submit_error)): ?>
                 </div>
 
                 <hr class="rq-divider">
-
-                <!-- POLICY ACKNOWLEDGMENT -->
-                <div class="rq-section-title"><i class="fas fa-file-contract"></i> Borrow / Request Policy</div>
-                <div style="background:#f7f7f7;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;max-height:160px;overflow-y:auto;font-size:0.82rem;color:#374151;white-space:pre-line;line-height:1.6;margin-bottom:10px;"><?php echo htmlspecialchars(getRequestPolicyText()); ?></div>
-                <label style="display:flex;align-items:flex-start;gap:8px;font-size:0.85rem;color:#374151;cursor:pointer;margin-bottom:4px;">
-                    <input type="checkbox" id="policy_agreed" name="policy_agreed" value="1" required style="margin-top:3px;">
-                    <span>I have read and agree to the policy above. <span class="rq-req">*</span></span>
-                </label>
-                <div id="rqSnackbar" class="rq-snackbar"><i class="fas fa-circle-exclamation"></i><span id="rqSnackbarMsg"></span></div>
-
-                <hr class="rq-divider">
                 <input type="hidden" id="items_json" name="items_json">
                 <div class="d-flex gap-2 flex-wrap">
                     <button type="submit" class="btn rq-submit-btn">
@@ -2388,17 +2364,6 @@ function hideCartError() {
     var el = document.getElementById('cart-error');
     if (el) el.style.display = 'none';
 }
-
-var rqSnackbarTimer = null;
-function showSnackbar(msg) {
-    var el = document.getElementById('rqSnackbar');
-    var msgEl = document.getElementById('rqSnackbarMsg');
-    if (!el || !msgEl) return;
-    msgEl.textContent = msg;
-    el.classList.add('show');
-    clearTimeout(rqSnackbarTimer);
-    rqSnackbarTimer = setTimeout(function() { el.classList.remove('show'); }, 4000);
-}
 function escHtml(str) {
     var d = document.createElement('div'); d.textContent = String(str); return d.innerHTML;
 }
@@ -2448,12 +2413,6 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
         e.preventDefault();
         showCartError('Please add at least one item to your request before submitting.');
         document.getElementById('rq-cart-area').scrollIntoView({ behavior:'smooth', block:'center' });
-        return;
-    }
-    if (!document.getElementById('policy_agreed').checked) {
-        e.preventDefault();
-        showSnackbar('Please check the box confirming you have read and agree to the policy.');
-        document.getElementById('policy_agreed').scrollIntoView({ behavior:'smooth', block:'center' });
         return;
     }
     document.getElementById('items_json').value = JSON.stringify(cart);
