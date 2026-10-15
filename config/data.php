@@ -184,7 +184,15 @@ function getCampuses(): array {
 function _mapInventoryRow(array $r): array {
     // campus_id is no longer relied on for inventory (college_id is the source of
     // truth for ownership) — coalesce to 1 in case the column is absent/null.
-    return array_merge($r, ['id' => (int)$r['id'], 'campus_id' => (int)($r['campus_id'] ?? 1), 'quantity' => (int)$r['quantity'], 'cost' => $r['cost'] !== null ? (float)$r['cost'] : null]);
+    return array_merge($r, [
+        'id'              => (int)$r['id'],
+        'campus_id'       => (int)($r['campus_id'] ?? 1),
+        'quantity'        => (int)$r['quantity'],
+        'cost'            => $r['cost'] !== null ? (float)$r['cost'] : null,
+        // NULL means "use the global Maximum Borrow Duration setting" — see
+        // resolveMaxBorrowDays() in config/functions.php.
+        'max_borrow_days' => isset($r['max_borrow_days']) && $r['max_borrow_days'] !== null ? (int)$r['max_borrow_days'] : null,
+    ]);
 }
 
 function getInventory(): array {

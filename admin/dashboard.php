@@ -8,6 +8,13 @@ require_once dirname(__DIR__) . '/includes/navbar.php';
 requireAdmin();
 
 $current_user = getCurrentUser();
+
+// "Poor man's cron" (InfinityFree's free tier has no real scheduled-task
+// support) — hooked into the admin dashboard specifically, not every page,
+// so a burst of overdue-reminder emails only ever adds latency to an admin's
+// page load once a day, never a random student's.
+runOverdueReminderSweepIfDue();
+
 $dept_stats = [];
 $total_items = 0;
 $available_items = 0;

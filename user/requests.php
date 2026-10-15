@@ -54,10 +54,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Borrow requests can't push the return date further out than whichever
+    // limit applies — the item's own override (inventory.max_borrow_days) if
+    // set, else the global "Maximum Borrow Duration" setting. Checked against
+    // the cart payload, same as the past-date check above; each entry is
+    // resolved against its OWN item, since a single cart can mix items with
+    // different limits.
+    $has_too_far_date   = false;
+    $too_far_limit_days = null;
+    if ($safe_type === 'borrow' && is_array($cart_items)) {
+        $__inv_for_validation = getInventory();
+        foreach ($cart_items as $__entry) {
+            if (empty($__entry['return_date'])) continue;
+            $__entry_inv_id = !empty($__entry['inventory_id']) ? (int)$__entry['inventory_id'] : null;
+            $__entry_item   = $__entry_inv_id ? findById($__inv_for_validation, $__entry_inv_id) : null;
+            $__entry_max_date = maxReturnDateFor($__entry_item['max_borrow_days'] ?? null);
+            if ($__entry['return_date'] > $__entry_max_date) {
+                $has_too_far_date   = true;
+                $too_far_limit_days = resolveMaxBorrowDays($__entry_item['max_borrow_days'] ?? null);
+                break;
+            }
+        }
+    }
+
+    // Can't submit a new borrow request while something already borrowed is
+    // overdue — the user needs to return it first.
+    $has_overdue_borrow = $safe_type === 'borrow' && userHasOverdueBorrow((int)$current_user['id']);
+
     if (!is_array($cart_items) || empty($cart_items)) {
         $submit_error = 'No items in your request. Please add at least one item.';
+    } elseif (empty($_POST['policy_agreed'])) {
+        $submit_error = 'You must agree to the borrow/request policy before submitting.';
+    } elseif ($has_overdue_borrow) {
+        $submit_error = 'You have an overdue borrowed item. Please return it before submitting a new borrow request.';
     } elseif ($has_past_date) {
         $submit_error = 'Date Needed and Expected Return Date cannot be in the past — please choose today or a future date.';
+    } elseif ($has_too_far_date) {
+        $submit_error = "Expected Return Date can be at most $too_far_limit_days day(s) from today for one or more of the items in this request.";
     } else {
         $errors   = [];
         $availability_notices = []; // "only 2 of 5 were still available" style — not a save failure
@@ -285,6 +318,7 @@ foreach (groupInventoryItems($all_sorted) as $group) {
 
 // Borrow catalog: available + borrowed + requested items, grouped
 $borrow_records_all = getBorrowRecords();
+$user_has_overdue_borrow = userHasOverdueBorrow((int)$current_user['id']);
 $item_avail_data = [];
 
 // Return dates from active/overdue borrow records (already delivered). "Overdue" is
@@ -614,6 +648,17 @@ if (!empty($submit_error)): ?>
 .rq-add-btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:10px; border-radius:11px; margin-top:10px; border:2px dashed rgba(139,0,0,0.25); background:rgba(139,0,0,0.03); color:#8B0000; font-size:0.84rem; font-weight:700; cursor:pointer; transition:all 0.15s; }
 .rq-add-btn:hover { background:rgba(139,0,0,0.08); border-color:rgba(139,0,0,0.50); }
 .rq-cart-error { display:none; color:#dc2626; font-size:0.80rem; font-weight:600; margin-top:8px; padding:8px 12px; background:rgba(239,68,68,0.08); border-radius:9px; }
+
+/* Snackbar — brief floating toast, used for the policy-checkbox validation */
+.rq-snackbar {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(16px);
+    background: #1a1a1a; color: #fff; padding: 13px 20px; border-radius: 8px;
+    font-size: 0.86rem; font-weight: 600; box-shadow: 0 10px 28px rgba(0,0,0,0.30);
+    display: flex; align-items: center; gap: 10px; z-index: 2000; max-width: min(90vw, 440px);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.rq-snackbar.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.rq-snackbar i { color: #f87171; flex-shrink: 0; }
 .rq-sum-preview-item { display:flex; align-items:flex-start; gap:7px; padding:5px 0; }
 .rq-sum-preview-num { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:5px; background:rgba(139,0,0,0.12); color:#8B0000; font-size:0.60rem; font-weight:800; flex-shrink:0; margin-top:1px; }
 
@@ -1160,6 +1205,16 @@ if (!empty($submit_error)): ?>
 
                 <!-- BORROW FIELDS -->
                 <div id="borrow_fields">
+                    <?php if ($user_has_overdue_borrow): ?>
+                    <div class="alert alert-danger d-flex align-items-start gap-2 mb-3">
+                        <i class="fas fa-triangle-exclamation mt-1"></i>
+                        <div>
+                            <strong>You have an overdue <?php echo strtolower(termLabel("Borrow")); ?>ed item.</strong>
+                            You can't submit a new <?php echo strtolower(termLabel("Borrow")); ?> request until it's returned —
+                            check <a href="borrow-records.php" class="alert-link">My Borrow Records</a> for details.
+                        </div>
+                    </div>
+                    <?php endif; ?>
                     <div class="rq-section-title"><i class="fas fa-hand-holding"></i> <?php echo termLabel("Borrow"); ?> Details</div>
 
                     <?php
@@ -1193,6 +1248,7 @@ if (!empty($submit_error)): ?>
                                         data-available="<?php echo $ci['available_count']; ?>"
                                         data-unit-ids="<?php echo htmlspecialchars(json_encode($ci['available_unit_ids'])); ?>"
                                         data-all-unit-ids="<?php echo htmlspecialchars(json_encode(array_column($ci['units'], 'id'))); ?>"
+                                        data-max-borrow-days="<?php echo (int)resolveMaxBorrowDays($ci['units'][0]['max_borrow_days'] ?? null); ?>"
                                         <?php if ($auto_fill_item && $ci['item_name'] === $auto_fill_item) echo 'selected'; ?>>
                                     <?php echo htmlspecialchars($ci['item_name']); ?>
                                 </option>
@@ -1241,6 +1297,7 @@ if (!empty($submit_error)): ?>
                                      data-available="<?php echo $availableQty; ?>"
                                      data-quantity="<?php echo $totalUnits; ?>"
                                      data-unit-ids="<?php echo htmlspecialchars(json_encode($ci['available_unit_ids'])); ?>"
+                                     data-max-borrow-days="<?php echo (int)resolveMaxBorrowDays($firstUnit['max_borrow_days'] ?? null); ?>"
                                      onclick="selectBorrowCard(this)">
                                     <div class="bshop-check"><i class="fas fa-check"></i></div>
                                     <div class="bshop-avail-badge <?php echo $availableQty > 0 ? 'bshop-avail-ok' : 'bshop-avail-none'; ?>">
@@ -1295,8 +1352,15 @@ if (!empty($submit_error)): ?>
                                 <label>Expected Return Date <span class="rq-req">*</span></label>
                                 <div class="rq-input-wrap">
                                     <i class="fas fa-calendar rq-input-icon"></i>
+                                    <?php $__max_borrow_days = resolveMaxBorrowDays(null); // global default shown before any item is picked ?>
                                     <input type="date" class="form-control" id="expected_return_date"
-                                           name="expected_return_date" required min="<?php echo appToday(); ?>" onchange="updateSummary()">
+                                           name="expected_return_date" required
+                                           min="<?php echo appToday(); ?>"
+                                           max="<?php echo maxReturnDateFor(null); ?>"
+                                           onchange="updateSummary()">
+                                    <div style="font-size:0.72rem;color:rgba(0,0,0,0.40);margin-top:4px;" id="returnDateHint">
+                                        <i class="fas fa-info-circle me-1"></i>Up to <?php echo $__max_borrow_days; ?> day<?php echo $__max_borrow_days !== 1 ? 's' : ''; ?> from today.
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1572,6 +1636,17 @@ if (!empty($submit_error)): ?>
                 </div>
 
                 <hr class="rq-divider">
+
+                <!-- POLICY ACKNOWLEDGMENT -->
+                <div class="rq-section-title"><i class="fas fa-file-contract"></i> Borrow / Request Policy</div>
+                <div style="background:#f7f7f7;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;max-height:160px;overflow-y:auto;font-size:0.82rem;color:#374151;white-space:pre-line;line-height:1.6;margin-bottom:10px;"><?php echo htmlspecialchars(getRequestPolicyText()); ?></div>
+                <label style="display:flex;align-items:flex-start;gap:8px;font-size:0.85rem;color:#374151;cursor:pointer;margin-bottom:4px;">
+                    <input type="checkbox" id="policy_agreed" name="policy_agreed" value="1" required style="margin-top:3px;">
+                    <span>I have read and agree to the policy above. <span class="rq-req">*</span></span>
+                </label>
+                <div id="rqSnackbar" class="rq-snackbar"><i class="fas fa-circle-exclamation"></i><span id="rqSnackbarMsg"></span></div>
+
+                <hr class="rq-divider">
                 <input type="hidden" id="items_json" name="items_json">
                 <div class="d-flex gap-2 flex-wrap">
                     <button type="submit" class="btn rq-submit-btn">
@@ -1836,6 +1911,19 @@ function handleCatalogChange(select) {
         qtyInput.removeAttribute('max');
         qtyInput.removeAttribute('title');
     }
+
+    // The selected item may override the global Maximum Borrow Duration —
+    // re-cap the return date field (and the running MAX_BORROW_DURATION_DAYS
+    // used by isBeyondMaxBorrowDuration()) to whichever applies to this item.
+    var itemMaxDays = select.value ? (parseInt(opt && opt.getAttribute('data-max-borrow-days')) || DEFAULT_MAX_BORROW_DURATION_DAYS) : DEFAULT_MAX_BORROW_DURATION_DAYS;
+    MAX_BORROW_DURATION_DAYS = itemMaxDays;
+    var returnDateInput = document.getElementById('expected_return_date');
+    var maxDate = new Date(); maxDate.setDate(maxDate.getDate() + itemMaxDays);
+    var maxDateStr = maxDate.getFullYear() + '-' + String(maxDate.getMonth() + 1).padStart(2, '0') + '-' + String(maxDate.getDate()).padStart(2, '0');
+    returnDateInput.setAttribute('max', maxDateStr);
+    if (returnDateInput.value && returnDateInput.value > maxDateStr) returnDateInput.value = maxDateStr;
+    var hintEl = document.getElementById('returnDateHint');
+    if (hintEl) hintEl.innerHTML = '<i class="fas fa-info-circle me-1"></i>Up to ' + itemMaxDays + ' day' + (itemMaxDays !== 1 ? 's' : '') + ' from today' + (select.value ? ' for this item' : '') + '.';
 
     renderItemAvailCal(select);
 }
@@ -2143,16 +2231,35 @@ function isPastDate(dateStr) {
     return dateStr < todayStr;
 }
 
+// Mirrors the "max" attribute on #expected_return_date — kept as its own JS
+// check (not just relying on the native max=) since the server-side rule is
+// the authoritative one and this just gives earlier feedback.
+// DEFAULT_* is the global Maximum Borrow Duration setting (no item selected
+// yet); MAX_BORROW_DURATION_DAYS is re-pointed by handleCatalogChange() to
+// whichever item is currently selected, since an item can override it.
+var USER_HAS_OVERDUE_BORROW = <?php echo $user_has_overdue_borrow ? 'true' : 'false'; ?>;
+var DEFAULT_MAX_BORROW_DURATION_DAYS = <?php echo $__max_borrow_days; ?>;
+var MAX_BORROW_DURATION_DAYS = DEFAULT_MAX_BORROW_DURATION_DAYS;
+function isBeyondMaxBorrowDuration(dateStr) {
+    if (!dateStr) return false;
+    var max = new Date();
+    max.setDate(max.getDate() + MAX_BORROW_DURATION_DAYS);
+    var maxStr = max.getFullYear() + '-' + String(max.getMonth() + 1).padStart(2, '0') + '-' + String(max.getDate()).padStart(2, '0');
+    return dateStr > maxStr;
+}
+
 function addToCart() {
     var type = document.getElementById('request_type_hidden').value;
     var entry = {};
     if (type === 'borrow') {
+        if (USER_HAS_OVERDUE_BORROW) { showCartError('You have an overdue borrowed item — please return it before submitting a new borrow request.'); return; }
         var sel = document.getElementById('borrow_catalog_select');
         var name = sel.value;
         if (!name) { showCartError('Please select an item to <?php echo strtolower(termLabel("Borrow")); ?>.'); return; }
         var rd = document.getElementById('expected_return_date').value;
         if (!rd) { showCartError('Please enter the expected return date.'); return; }
         if (isPastDate(rd)) { showCartError('Expected return date cannot be in the past.'); return; }
+        if (isBeyondMaxBorrowDuration(rd)) { showCartError('Expected return date can be at most ' + MAX_BORROW_DURATION_DAYS + ' day(s) from today.'); return; }
         var qty = parseInt(document.getElementById('borrow_quantity').value) || 1;
         var reason = document.getElementById('reason').value.trim();
         var borrowCard = document.querySelector('#bshop-grid .bshop-card.bshop-selected');
@@ -2245,6 +2352,13 @@ function resetStaging(type) {
         document.querySelectorAll('.bshop-card').forEach(function(c) { c.classList.remove('bshop-selected'); });
         document.getElementById('borrow_date_needed').value = '';
         document.getElementById('expected_return_date').value = '';
+        document.getElementById('expected_return_date').setAttribute('max', (function() {
+            var d = new Date(); d.setDate(d.getDate() + DEFAULT_MAX_BORROW_DURATION_DAYS);
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        })());
+        MAX_BORROW_DURATION_DAYS = DEFAULT_MAX_BORROW_DURATION_DAYS;
+        var __returnDateHint = document.getElementById('returnDateHint');
+        if (__returnDateHint) __returnDateHint.innerHTML = '<i class="fas fa-info-circle me-1"></i>Up to ' + DEFAULT_MAX_BORROW_DURATION_DAYS + ' day' + (DEFAULT_MAX_BORROW_DURATION_DAYS !== 1 ? 's' : '') + ' from today.';
         document.getElementById('borrow_quantity').value = 1;
         document.getElementById('reason').value = '';
         var iacWrap = document.getElementById('iac-wrap');
@@ -2273,6 +2387,17 @@ function showCartError(msg) {
 function hideCartError() {
     var el = document.getElementById('cart-error');
     if (el) el.style.display = 'none';
+}
+
+var rqSnackbarTimer = null;
+function showSnackbar(msg) {
+    var el = document.getElementById('rqSnackbar');
+    var msgEl = document.getElementById('rqSnackbarMsg');
+    if (!el || !msgEl) return;
+    msgEl.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(rqSnackbarTimer);
+    rqSnackbarTimer = setTimeout(function() { el.classList.remove('show'); }, 4000);
 }
 function escHtml(str) {
     var d = document.createElement('div'); d.textContent = String(str); return d.innerHTML;
@@ -2323,6 +2448,12 @@ document.getElementById('requestForm').addEventListener('submit', function(e) {
         e.preventDefault();
         showCartError('Please add at least one item to your request before submitting.');
         document.getElementById('rq-cart-area').scrollIntoView({ behavior:'smooth', block:'center' });
+        return;
+    }
+    if (!document.getElementById('policy_agreed').checked) {
+        e.preventDefault();
+        showSnackbar('Please check the box confirming you have read and agree to the policy.');
+        document.getElementById('policy_agreed').scrollIntoView({ behavior:'smooth', block:'center' });
         return;
     }
     document.getElementById('items_json').value = JSON.stringify(cart);

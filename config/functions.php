@@ -12,6 +12,116 @@ function appToday(): string {
     return (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
 }
 
+// An item's own max_borrow_days (inventory.max_borrow_days) overrides the
+// global "Maximum Borrow Duration" setting when set; NULL/absent falls back
+// to the global value. Centralized here so the admin item form and the
+// borrow request validation can't drift out of sync on this rule.
+function resolveMaxBorrowDays(?int $itemSpecific): int {
+    if ($itemSpecific !== null && $itemSpecific > 0) return $itemSpecific;
+    return max(1, (int)getAppSetting('max_borrow_duration_days', '14'));
+}
+
+function maxReturnDateFor(?int $itemSpecific): string {
+    $days = resolveMaxBorrowDays($itemSpecific);
+    return (new DateTime('now', new DateTimeZone('Asia/Manila')))->modify("+{$days} days")->format('Y-m-d');
+}
+
+// Shown (and required to be acknowledged) on the Submit Request page before a
+// user can borrow or request anything — editable from Settings > System.
+function getRequestPolicyText(): string {
+    return getAppSetting('request_policy_text', "This policy covers borrowing and requesting physical inventory items through this system.\n\n"
+        . "What's included:\n"
+        . "- Items currently marked Available in the inventory catalog.\n"
+        . "- University-owned equipment, furniture, and supplies listed in the system.\n\n"
+        . "What's NOT included:\n"
+        . "- Service/maintenance tickets (these are governed separately, not by this borrowing policy).\n"
+        . "- Items already borrowed, requested, condemned, or disposed — these are not eligible until returned/restocked.\n"
+        . "- Personally-owned items not listed in the inventory system.\n\n"
+        . "By submitting a borrow or item request, you agree to:\n\n"
+        . "1. Use borrowed items responsibly and only for their intended purpose.\n"
+        . "2. Return borrowed items on or before the agreed expected return date.\n"
+        . "3. Report any damage, loss, or malfunction to the property custodian's office immediately.\n"
+        . "4. Accept responsibility for the cost of repair or replacement of items damaged or lost while in your possession.\n"
+        . "5. Understand that repeated late returns or policy violations may result in restricted borrowing privileges.");
+}
+
+// Does this user currently have at least one borrowed item past its
+// expected_return_date? Used to block new borrow requests until they return
+// what they already have overdue.
+function userHasOverdueBorrow(int $userId): bool {
+    $today = appToday();
+    foreach (getBorrowRecords() as $br) {
+        if ((int)$br['user_id'] === $userId
+            && in_array($br['status'], ['active', 'overdue'], true)
+            && !empty($br['expected_return_date'])
+            && $br['expected_return_date'] < $today) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Emails + in-app notifies every user who has at least one overdue borrowed
+// item, bundling all of a user's overdue items into one message rather than
+// one per item. Returns how many users were notified.
+function sendOverdueReminders(): int {
+    $today = appToday();
+    $overdue_by_user = [];
+    foreach (getBorrowRecords() as $br) {
+        if (!in_array($br['status'], ['active', 'overdue'], true)) continue;
+        if (empty($br['expected_return_date']) || $br['expected_return_date'] >= $today) continue;
+        $overdue_by_user[(int)$br['user_id']][] = $br;
+    }
+    if (empty($overdue_by_user)) return 0;
+
+    $users     = getUsers();
+    $inventory = getInventory();
+    $sent      = 0;
+
+    foreach ($overdue_by_user as $user_id => $records) {
+        $user = findById($users, $user_id);
+        if (!$user || empty($user['email'])) continue;
+
+        $items        = [];
+        $earliest_due = null;
+        foreach ($records as $br) {
+            $unit = findById($inventory, (int)$br['inventory_id']);
+            $items[] = ['name' => $unit['item_name'] ?? 'Item', 'qty' => 1];
+            if ($earliest_due === null || $br['expected_return_date'] < $earliest_due) {
+                $earliest_due = $br['expected_return_date'];
+            }
+        }
+
+        sendStatusEmail($user['email'], $user['full_name'], 'OVERDUE-' . date('Ymd'), 'return_reminder', [
+            'items'    => $items,
+            'due_date' => $earliest_due ? formatDate($earliest_due, 'M d, Y') : null,
+            'overdue'  => true,
+        ]);
+        $names = implode(', ', array_column($items, 'name'));
+        notifyUser($user_id, 'Overdue item reminder',
+            'You have ' . count($items) . ' overdue item(s): ' . $names . '. Please return them as soon as possible.',
+            'danger', 'user/borrow-records.php');
+        $sent++;
+    }
+
+    return $sent;
+}
+
+// "Poor man's cron" — InfinityFree's free tier has no reliable scheduled-task
+// support, so this piggybacks on normal page traffic (called from
+// includes/header.php, hit by every page) instead of a real cron job. The
+// app_settings flag below means the actual sweep — and its emails — only run
+// once per calendar day no matter how many requests come in that day.
+function runOverdueReminderSweepIfDue(): void {
+    $today = appToday();
+    if (getAppSetting('last_overdue_reminder_run', '') === $today) return;
+    // Set the flag FIRST: sendOverdueReminders() can take a few seconds (one
+    // email per overdue user), and concurrent requests within that window
+    // would otherwise all see the stale flag and run the sweep again.
+    setAppSetting('last_overdue_reminder_run', $today);
+    sendOverdueReminders();
+}
+
 // Session management
 function startSession() {
     if (session_status() === PHP_SESSION_NONE) {

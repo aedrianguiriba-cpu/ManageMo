@@ -24,6 +24,9 @@ ALTER TABLE inventory ADD COLUMN IF NOT EXISTS disposed_by         INT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS acquisition_mode    TEXT NOT NULL DEFAULT 'borrow';
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS model               TEXT;
 ALTER TABLE inventory ADD COLUMN IF NOT EXISTS serial_number       TEXT;
+-- Optional per-item override of the global "Maximum Borrow Duration" setting
+-- (Settings > System Settings). NULL means "use the global setting".
+ALTER TABLE inventory ADD COLUMN IF NOT EXISTS max_borrow_days     INT;
 DO $$ BEGIN
     IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventory_acquisition_mode_check') THEN
         ALTER TABLE inventory DROP CONSTRAINT inventory_acquisition_mode_check;

@@ -42,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'acquisition_mode' => in_array($acq_mode, ['borrow', 'request', 'both']) ? $acq_mode : 'borrow',
             'model'            => sanitizeInput($_POST['model'] ?? '') ?: null,
             'serial_number'    => sanitizeInput($_POST['serial_number'] ?? '') ?: null,
+            // Optional override of the global Maximum Borrow Duration setting —
+            // blank means "use the global setting" (see resolveMaxBorrowDays()).
+            'max_borrow_days'  => is_numeric($_POST['max_borrow_days'] ?? '') ? max(1, (int)$_POST['max_borrow_days']) : null,
         ];
         $base_serial = $base_data['serial_number'];
         $first_id = null;
@@ -192,6 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'acquisition_mode' => in_array($acq_mode, ['borrow', 'request', 'both']) ? $acq_mode : 'borrow',
             'model'            => sanitizeInput($_POST['model'] ?? '') ?: null,
             'serial_number'    => sanitizeInput($_POST['serial_number'] ?? '') ?: null,
+            'max_borrow_days'  => is_numeric($_POST['max_borrow_days'] ?? '') ? max(1, (int)$_POST['max_borrow_days']) : null,
         ]);
         logActivity($current_user['id'], 'UPDATE', "Updated inventory item: $item_name", 'inventory', $inventory_id);
         redirectWithMessage('inventory.php', 'Item updated successfully!', 'success');
@@ -488,6 +492,13 @@ displayMessage();
                     <input type="text" class="form-control" name="serial_number" placeholder="Manufacturer serial no.">
                 </div>
             </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Max Borrow Duration (days)</label>
+                    <input type="number" class="form-control" name="max_borrow_days" min="1" max="365" placeholder="Default (global setting)">
+                    <div class="form-text">Leave blank to use the global Maximum Borrow Duration (Settings).</div>
+                </div>
+            </div>
             <div class="mb-4">
                 <label class="form-label">Description</label>
                 <textarea class="form-control" name="description" rows="3"></textarea>
@@ -580,6 +591,15 @@ displayMessage();
                 <div class="col-md-6">
                     <label class="form-label">Serial Number</label>
                     <input type="text" class="form-control" name="serial_number" value="<?php echo htmlspecialchars($item['serial_number'] ?? ''); ?>">
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Max Borrow Duration (days)</label>
+                    <input type="number" class="form-control" name="max_borrow_days" min="1" max="365"
+                           value="<?php echo htmlspecialchars((string)($item['max_borrow_days'] ?? '')); ?>"
+                           placeholder="Default (global setting)">
+                    <div class="form-text">Leave blank to use the global Maximum Borrow Duration (Settings).</div>
                 </div>
             </div>
             <div class="mb-3">
